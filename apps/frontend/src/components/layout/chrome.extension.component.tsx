@@ -1,14 +1,19 @@
-import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { useExternalLinks } from '@gitroom/react/helpers/external.links';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 export const ChromeExtensionComponent = () => {
-  const { billingEnabled } = useVariables();
-  if (!billingEnabled) {
+  const { extensionStoreUrl } = useExternalLinks();
+  const t = useT();
+  if (!extensionStoreUrl) {
     return null;
   }
   return (
     <a
-      href="https://chromewebstore.google.com/detail/postiz/cidhffagahknaeodkplfbcpfeielnkjl"
+      href={extensionStoreUrl}
       target="_blank"
       className="hover:text-newTextColor"
+      aria-label={t('browser_extension', 'Browser extension')}
+      data-tooltip-id="tooltip"
+      data-tooltip-content={t('browser_extension', 'Browser extension')}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

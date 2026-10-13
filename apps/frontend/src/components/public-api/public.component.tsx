@@ -10,6 +10,11 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useDecisionModal } from '@gitroom/frontend/components/layout/new-modal';
 import { McpClientIcon } from '@gitroom/frontend/components/public-api/mcp.client.icons';
+import {
+  CliLinks,
+  McpConnectorClient,
+  useExternalLinks,
+} from '@gitroom/react/helpers/external.links';
 import clsx from 'clsx';
 
 // Remote clients can't set headers, they get a URL to paste (hint = where)
@@ -20,23 +25,17 @@ export const remoteMcpClients = {
     'In ChatGPT go to Settings > Connectors > Create and paste this URL.',
 } as const;
 
-// Official one-click connectors listed in the assistants' directories, they
-// point at the public MCP server: the hosted PostCherry (billingEnabled), or a
-// self-hosted install through "Use self-hosted" on its sign-in page.
-export const mcpConnectorUrls = {
-  Claude: 'https://claude.ai/directory/postiz',
-  ChatGPT:
-    'https://chatgpt.com/plugins/plugin_asdk_app_6aaaf1a529808191a2a15fde824bb013',
-  Cursor: 'https://cursor.com/marketplace/postiz',
-  'Grok Bot': 'https://x.ai/bot/plugin/58737848',
-} as const;
-
 // Clients with no MCP or CLI settings: you paste instructions into the chat,
-// the agent installs the CLI itself and asks you for the API key
+// the agent installs the CLI itself and asks you for the API key.
+// They are only offered when a CLI is configured (CLI_PACKAGE).
 export const chatOnlyMcpClients = {
-  'Grok Bot':
-    'Install the CLI with `npm install -g postiz`, then install the skill with `npx skills add gitroomhq/postiz-agent`. Ask me for my PostCherry API key and set it as the POSTIZ_API_KEY environment variable before using the CLI.',
-} as const;
+  'Grok Bot': (cli: CliLinks) =>
+    `Install the CLI with \`npm install -g ${cli.package}\`${
+      cli.skill
+        ? `, then install the skill with \`npx skills add ${cli.skill}\``
+        : ''
+    }. Ask me for my PostCherry API key and set it as the POSTIZ_API_KEY environment variable before using the CLI.`,
+};
 
 export const mcpClients = [
   'OpenClaw',
@@ -64,13 +63,16 @@ export type McpAuth = 'oauth' | 'apikey';
 // Only the self-hosted docker images are built with a version
 export const isSelfHosted = !!process.env.NEXT_PUBLIC_VERSION;
 
-// The directory listings behind the "Official connector" tab
-const officialConnectorClients = [
+// The directory listings behind the "Official connector" tab, each one is
+// shown only when its URL is configured (MCP_CONNECTOR_*_URL). They point at
+// the public MCP server, a self-hosted install signs in through "Use
+// self-hosted" on the connector's sign-in page.
+const officialConnectorClients: McpConnectorClient[] = [
   'Claude',
   'ChatGPT',
   'Cursor',
   'Grok Bot',
-] as const;
+];
 
 export const getMcpOauthUrl = (mcpBase: string) =>
   `${mcpBase}/mcp-oauth-dynamic`;
@@ -86,11 +88,12 @@ export const getMcpConfig = (
   client: AnyMcpClient,
   auth: McpAuth,
   mcpBase: string,
-  apiKey: string
+  apiKey: string,
+  cli: CliLinks | null = null
 ): { config: string; hint: string } => {
   if (isChatOnlyMcpClient(client)) {
     return {
-      config: chatOnlyMcpClients[client],
+      config: cli ? chatOnlyMcpClients[client](cli) : '',
       hint: 'Paste this into the chat. The agent will ask you for your API key.',
     };
   }
@@ -314,22 +317,24 @@ const McpSection = ({
   mcpBase: string;
 }) => {
   const t = useT();
-  const { billingEnabled } = useVariables();
+  const { mcpConnectorUrls, hasMcpConnectors, cli, docsLink } =
+    useExternalLinks();
   const [activeClient, setActiveClient] = useState<AnyMcpClient>('Claude');
-  const officialConnectors = billingEnabled || isSelfHosted;
-  // the directory connectors come first wherever they work
-  const tabs: Array<'official' | McpAuth> = officialConnectors
+  // the directory connectors come first wherever they are configured
+  const tabs: Array<'official' | McpAuth> = hasMcpConnectors
     ? ['official', 'oauth', 'apikey']
     : ['oauth', 'apikey'];
   const [tab, setTab] = useState(tabs[0]);
   const auth: McpAuth = tab === 'apikey' ? 'apikey' : 'oauth';
   const [revealed, setRevealed] = useState(false);
+  const mcpDocs = docsLink('/mcp/introduction');
 
   const { config, hint } = getMcpConfig(
     activeClient,
     auth,
     mcpBase,
-    user.publicApi
+    user.publicApi,
+    cli
   );
 
   const baseUrl = auth === 'oauth' ? getMcpOauthUrl(mcpBase) : `${mcpBase}/mcp`;
@@ -359,34 +364,36 @@ const McpSection = ({
           </div>
         </div>
         <div className="flex flex-wrap gap-[6px] shrink-0 pt-[2px]">
-          {officialConnectors && (
-            <>
-              <a
-                className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-                href={mcpConnectorUrls.Claude}
-                target="_blank"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-                {t('add_to_claude', 'Add to Claude')}
-              </a>
-              <a
-                className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-                href={mcpConnectorUrls.ChatGPT}
-                target="_blank"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-                {t('add_to_chatgpt', 'Add to ChatGPT')}
-              </a>
-            </>
+          {!!mcpConnectorUrls.Claude && (
+            <a
+              className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+              href={mcpConnectorUrls.Claude}
+              target="_blank"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+              {t('add_to_claude', 'Add to Claude')}
+            </a>
           )}
-          <a
-            className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-            href="https://docs.postiz.com/mcp/introduction"
-            target="_blank"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-            {t('read_the_docs', 'Docs')}
-          </a>
+          {!!mcpConnectorUrls.ChatGPT && (
+            <a
+              className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+              href={mcpConnectorUrls.ChatGPT}
+              target="_blank"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+              {t('add_to_chatgpt', 'Add to ChatGPT')}
+            </a>
+          )}
+          {!!mcpDocs && (
+            <a
+              className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+              href={mcpDocs}
+              target="_blank"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+              {t('read_the_docs', 'Docs')}
+            </a>
+          )}
         </div>
       </div>
       <div className="p-[20px] mobile:p-[14px] flex flex-col gap-[16px]">
@@ -433,23 +440,25 @@ const McpSection = ({
                   )}
             </div>
             <div className="flex flex-wrap gap-[8px]">
-              {officialConnectorClients.map((client) => (
-                <a
-                  key={client}
-                  className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[8px]"
-                  href={mcpConnectorUrls[client]}
-                  target="_blank"
-                >
-                  <McpClientIcon client={client} />
-                  {client === 'Claude'
-                    ? t('add_to_claude', 'Add to Claude')
-                    : client === 'ChatGPT'
-                    ? t('add_to_chatgpt', 'Add to ChatGPT')
-                    : client === 'Cursor'
-                    ? t('add_to_cursor', 'Add to Cursor')
-                    : t('add_to_grok_bot', 'Add to Grok Bot')}
-                </a>
-              ))}
+              {officialConnectorClients
+                .filter((client) => !!mcpConnectorUrls[client])
+                .map((client) => (
+                  <a
+                    key={client}
+                    className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[8px]"
+                    href={mcpConnectorUrls[client]}
+                    target="_blank"
+                  >
+                    <McpClientIcon client={client} />
+                    {client === 'Claude'
+                      ? t('add_to_claude', 'Add to Claude')
+                      : client === 'ChatGPT'
+                      ? t('add_to_chatgpt', 'Add to ChatGPT')
+                      : client === 'Cursor'
+                      ? t('add_to_cursor', 'Add to Cursor')
+                      : t('add_to_grok_bot', 'Add to Grok Bot')}
+                  </a>
+                ))}
             </div>
           </div>
         ) : (
@@ -462,7 +471,8 @@ const McpSection = ({
             {[
               ...Object.keys(remoteMcpClients),
               ...mcpClients,
-              ...Object.keys(chatOnlyMcpClients),
+              // chat-only clients only work by installing the CLI
+              ...(cli ? Object.keys(chatOnlyMcpClients) : []),
             ].map((client) => (
               <button
                 key={client}
@@ -533,7 +543,7 @@ const McpSection = ({
             {!isRemoteMcpClient(activeClient) && !chatOnly && (
               <CopyButton text={baseUrl} label={t('copy_url', 'Copy URL')} />
             )}
-            {activeClient === 'Claude' && officialConnectors && (
+            {activeClient === 'Claude' && !!mcpConnectorUrls.Claude && (
               <a
                 className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
                 href={mcpConnectorUrls.Claude}
@@ -543,7 +553,7 @@ const McpSection = ({
                 {t('add_to_claude', 'Add to Claude')}
               </a>
             )}
-            {activeClient === 'ChatGPT' && officialConnectors && (
+            {activeClient === 'ChatGPT' && !!mcpConnectorUrls.ChatGPT && (
               <a
                 className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
                 href={mcpConnectorUrls.ChatGPT}
@@ -553,7 +563,7 @@ const McpSection = ({
                 {t('add_to_chatgpt', 'Add to ChatGPT')}
               </a>
             )}
-            {activeClient === 'Grok Bot' && officialConnectors && (
+            {activeClient === 'Grok Bot' && !!mcpConnectorUrls['Grok Bot'] && (
               <a
                 className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
                 href={mcpConnectorUrls['Grok Bot']}
@@ -572,45 +582,62 @@ const McpSection = ({
   );
 };
 
-export const localCliSteps = [
-  {
-    label: 'Install the CLI',
-    code: 'npm install -g postiz',
-  },
-  {
-    label: 'Run: postiz auth:login',
-    code: 'postiz auth:login',
-  },
-  {
-    label: 'Install the skill for your AI agent',
-    code: 'npx skills add gitroomhq/postiz-agent',
-  },
-] as const;
+// label is the English default of t(labelKey), translations can use {{command}}
+export interface CliStep {
+  labelKey: string;
+  label: string;
+  code: string;
+}
 
-const ciCliSteps = [
+const cliInstallStep = (cli: CliLinks): CliStep => ({
+  labelKey: 'cli_step_install',
+  label: 'Install the CLI',
+  code: `npm install -g ${cli.package}`,
+});
+
+// the agent skill is optional (CLI_SKILL)
+const cliSkillSteps = (cli: CliLinks): CliStep[] =>
+  cli.skill
+    ? [
+        {
+          labelKey: 'cli_step_skill',
+          label: 'Install the skill for your AI agent',
+          code: `npx skills add ${cli.skill}`,
+        },
+      ]
+    : [];
+
+export const getLocalCliSteps = (cli: CliLinks): CliStep[] => [
+  cliInstallStep(cli),
   {
-    label: 'Install the CLI',
-    code: 'npm install -g postiz',
+    labelKey: 'cli_step_login',
+    label: `Run: ${cli.command} auth:login`,
+    code: `${cli.command} auth:login`,
   },
+  ...cliSkillSteps(cli),
+];
+
+export const getCiCliSteps = (cli: CliLinks): CliStep[] => [
+  cliInstallStep(cli),
   {
+    labelKey: 'cli_step_env',
     label: 'Set your API key as an environment variable',
     code: 'export POSTIZ_API_KEY="{API_KEY}"',
   },
-  {
-    label: 'Install the skill for your AI agent',
-    code: 'npx skills add gitroomhq/postiz-agent',
-  },
-] as const;
+  ...cliSkillSteps(cli),
+];
 
-const CliSection = ({ apiKey }: { apiKey: string }) => {
+const CliSection = ({ apiKey, cli }: { apiKey: string; cli: CliLinks }) => {
   const t = useT();
+  const { docsLink } = useExternalLinks();
   const [mode, setMode] = useState<'local' | 'ci'>('local');
   const [revealed, setRevealed] = useState(false);
+  const cliDocs = docsLink('/cli/introduction');
 
   const steps =
     mode === 'local'
-      ? localCliSteps.map((step) => ({ ...step }))
-      : ciCliSteps.map((step) => ({
+      ? getLocalCliSteps(cli)
+      : getCiCliSteps(cli).map((step) => ({
           ...step,
           code: step.code.replace('{API_KEY}', apiKey),
         }));
@@ -640,16 +667,18 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-[6px] shrink-0 pt-[2px]">
-          <a
-            className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-            href="https://docs.postiz.com/cli/introduction"
-            target="_blank"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-            {t('read_the_docs', 'Docs')}
-          </a>
-        </div>
+        {!!cliDocs && (
+          <div className="flex flex-wrap gap-[6px] shrink-0 pt-[2px]">
+            <a
+              className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+              href={cliDocs}
+              target="_blank"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+              {t('read_the_docs', 'Docs')}
+            </a>
+          </div>
+        )}
       </div>
       <div className="p-[20px] mobile:p-[14px] flex flex-col gap-[16px]">
         <div className="flex gap-[6px]">
@@ -674,7 +703,11 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
         {displaySteps.map((step, i) => (
           <div key={i} className="flex flex-col gap-[6px]">
             <div className="text-[13px] font-[600] text-customColor18">
-              {i + 1}. {step.label}
+              {i + 1}.{' '}
+              {t(step.labelKey, step.label, {
+                command: cli.command,
+                interpolation: { escapeValue: false },
+              })}
             </div>
             <pre className="bg-newBgColorInner border border-newBorder rounded-[8px] p-[16px] text-[13px] whitespace-pre-wrap break-all overflow-x-auto leading-[1.6]">
               {step.code}
@@ -727,6 +760,7 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
 const PublicApiContent = () => {
   const user = useUser();
   const { backendUrl, frontEndUrl, mcpUrl } = useVariables();
+  const { docsLink, n8nNodeUrl, cli } = useExternalLinks();
   const toaster = useToaster();
   const fetch = useFetch();
   const decision = useDecisionModal();
@@ -759,6 +793,7 @@ const PublicApiContent = () => {
   }
 
   const mcpBase = mcpUrl || backendUrl;
+  const apiDocs = docsLink('/public-api');
 
   return (
     <div className="flex flex-col gap-[40px]">
@@ -797,22 +832,26 @@ const PublicApiContent = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-[6px] shrink-0 pt-[2px]">
-            <a
-              className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-              href="https://docs.postiz.com/public-api"
-              target="_blank"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-            {t('read_the_docs', 'Docs')}
-            </a>
-            <a
-              className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-              href="https://www.npmjs.com/package/n8n-nodes-postiz"
-              target="_blank"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-              {t('n8n_node', 'N8N Node')}
-            </a>
+            {!!apiDocs && (
+              <a
+                className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+                href={apiDocs}
+                target="_blank"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                {t('read_the_docs', 'Docs')}
+              </a>
+            )}
+            {!!n8nNodeUrl && (
+              <a
+                className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+                href={n8nNodeUrl}
+                target="_blank"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                {t('n8n_node', 'N8N Node')}
+              </a>
+            )}
           </div>
         </div>
         <div className="p-[20px] mobile:p-[14px] flex flex-col gap-[16px]">
@@ -914,7 +953,7 @@ const PublicApiContent = () => {
         </div>
       </div>
 
-      <CliSection apiKey={user.publicApi} />
+      {!!cli && <CliSection apiKey={user.publicApi} cli={cli} />}
 
       <McpSection user={user} mcpBase={mcpBase} />
     </div>

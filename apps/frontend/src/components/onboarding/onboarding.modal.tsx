@@ -11,17 +11,17 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { useExternalLinks } from '@gitroom/react/helpers/external.links';
 import {
   AnyMcpClient,
   CopyButton,
+  getLocalCliSteps,
   getMcpConfig,
   isChatOnlyMcpClient,
   isSelfHosted,
-  localCliSteps,
   McpAuth,
   McpClient,
   mcpClients,
-  mcpConnectorUrls,
 } from '@gitroom/frontend/components/public-api/public.component';
 import { McpClientIcon } from '@gitroom/frontend/components/public-api/mcp.client.icons';
 import {
@@ -338,15 +338,14 @@ const otherAgents = mcpClients.filter(
 const apiTab = 'API' as const;
 type OnboardingTab = OnboardingAgent | typeof otherTab | typeof apiTab;
 
-const cliCommands = localCliSteps.map((step) => step.code);
-
 const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
   onBack,
   onNext,
 }) => {
   const t = useT();
   const user = useUser();
-  const { backendUrl, mcpUrl, billingEnabled } = useVariables();
+  const { backendUrl, mcpUrl } = useVariables();
+  const { mcpConnectorUrls, cli, docsLink } = useExternalLinks();
   const [tab, setTab] = useState<OnboardingTab>('Claude');
   const [otherAgent, setOtherAgent] = useState<McpClient>(otherAgents[0]);
   // The client the cards describe: the tab itself, or the pick inside "Other agents"
@@ -357,13 +356,19 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
   const mcpBase = mcpUrl || backendUrl;
   const apiKey = user?.publicApi || '';
   const available = !!apiKey && !!user?.tier?.public_api;
-  // the official connectors work for self-hosted installs too
-  const officialConnectors = billingEnabled || isSelfHosted;
+  // Grok Bot needs the CLI (chat instructions) or its one-click connector
+  const agents = onboardingAgents.filter(
+    (item) => item !== 'Grok Bot' || !!cli || !!mcpConnectorUrls['Grok Bot']
+  );
+  const cliCommands = cli
+    ? getLocalCliSteps(cli).map((step) => step.code)
+    : [];
+  const apiDocs = docsLink('/public-api/introduction');
 
   const { config, hint } =
     agent === apiTab
       ? { config: '', hint: '' }
-      : getMcpConfig(agent, auth, mcpBase, apiKey);
+      : getMcpConfig(agent, auth, mcpBase, apiKey, cli);
 
   const maskedConfig =
     revealed || auth === 'oauth' || !apiKey
@@ -373,23 +378,25 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
           '*'.repeat(apiKey.length)
         );
 
+  // the official connectors only show when their URL is configured, they work
+  // for self-hosted installs too
   const connector =
-    agent === 'Claude' && officialConnectors
+    agent === 'Claude' && mcpConnectorUrls.Claude
       ? {
           href: mcpConnectorUrls.Claude,
           label: t('add_to_claude', 'Add to Claude'),
         }
-      : agent === 'ChatGPT' && officialConnectors
+      : agent === 'ChatGPT' && mcpConnectorUrls.ChatGPT
       ? {
           href: mcpConnectorUrls.ChatGPT,
           label: t('add_to_chatgpt', 'Add to ChatGPT'),
         }
-      : agent === 'Cursor' && officialConnectors
+      : agent === 'Cursor' && mcpConnectorUrls.Cursor
       ? {
           href: mcpConnectorUrls.Cursor,
           label: t('add_to_cursor', 'Add to Cursor'),
         }
-      : agent === 'Grok Bot' && officialConnectors
+      : agent === 'Grok Bot' && mcpConnectorUrls['Grok Bot']
       ? {
           href: mcpConnectorUrls['Grok Bot'],
           label: t('add_to_grok_bot', 'Add to Grok Bot'),
@@ -442,27 +449,29 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
 
   const apiSection = (
     <>
-      <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder px-[20px] py-[14px] flex items-center justify-between gap-[12px]">
-        <div>
-          <div className="text-[15px] font-[600]">
-            {t('documentation', 'Documentation')}
+      {!!apiDocs && (
+        <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder px-[20px] py-[14px] flex items-center justify-between gap-[12px]">
+          <div>
+            <div className="text-[15px] font-[600]">
+              {t('documentation', 'Documentation')}
+            </div>
+            <div className="text-[13px] text-customColor18 mt-[2px]">
+              {t(
+                'api_onboarding_description',
+                'Use the PostCherry API from your own code, n8n or any other automation'
+              )}
+            </div>
           </div>
-          <div className="text-[13px] text-customColor18 mt-[2px]">
-            {t(
-              'api_onboarding_description',
-              'Use the PostCherry API from your own code, n8n or any other automation'
-            )}
-          </div>
+          <a
+            className="cursor-pointer px-[24px] h-[44px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[14px] font-[600] flex items-center gap-[8px] shrink-0"
+            href={apiDocs}
+            target="_blank"
+          >
+            <McpClientIcon client={apiTab} size={18} />
+            {t('read_the_api_docs', 'Read the API docs')}
+          </a>
         </div>
-        <a
-          className="cursor-pointer px-[24px] h-[44px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[14px] font-[600] flex items-center gap-[8px] shrink-0"
-          href="https://docs.postiz.com/public-api/introduction"
-          target="_blank"
-        >
-          <McpClientIcon client={apiTab} size={18} />
-          {t('read_the_api_docs', 'Read the API docs')}
-        </a>
-      </div>
+      )}
       <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder overflow-hidden">
         <div className="bg-newBgColorInner px-[20px] py-[14px] border-b border-newBorder">
           <div className="text-[15px] font-[600]">
@@ -589,7 +598,7 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
     </div>
   );
 
-  const cliSection = (
+  const cliSection = !!cli && (
     <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder overflow-hidden flex flex-col">
       <div className="bg-newBgColorInner px-[20px] py-[14px] border-b border-newBorder">
         <div className="text-[15px] font-[600]">{t('cli', 'CLI')}</div>
@@ -631,7 +640,7 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
       {available ? (
         <div className="flex flex-col gap-[16px] w-full max-w-[1100px] mx-auto">
           <div className="flex flex-wrap justify-center gap-[6px]">
-            {[...onboardingAgents, otherTab, apiTab].map((item) => (
+            {[...agents, otherTab, apiTab].map((item) => (
               <button
                 key={item}
                 type="button"
@@ -676,15 +685,19 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
           ) : isChatOnlyMcpClient(agent) ? (
             <>
               {connectorSection}
-              {chatSection}
+              {!!cli && chatSection}
             </>
           ) : (
             <>
               {connectorSection}
-              <div className="grid grid-cols-2 gap-[16px]">
-                {mcpSection}
-                {cliSection}
-              </div>
+              {cliSection ? (
+                <div className="grid grid-cols-2 gap-[16px]">
+                  {mcpSection}
+                  {cliSection}
+                </div>
+              ) : (
+                mcpSection
+              )}
             </>
           )}
         </div>
