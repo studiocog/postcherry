@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  BillingTier,
+  isLegacyTier,
+  isNewTier,
+  PaidTier,
+  PlanFeatureFlag,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
@@ -31,6 +38,58 @@ export class SubscriptionService {
 
   getCode(code: string) {
     return this._subscriptionRepository.getCode(code);
+  }
+
+  // Whether the organization's plan includes a feature. It never locks a
+  // workspace out by mistake: billing disabled (self-hosted), no subscription
+  // (a lapsed workspace is already stopped by the billing wall), an unknown
+  // tier or a failed lookup all count as allowed
+  async hasPlanFeature(organizationId: string, feature: PlanFeatureFlag) {
+    if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+      return true;
+    }
+
+    try {
+      const subscription =
+        await this._subscriptionRepository.getSubscriptionByOrganizationId(
+          organizationId
+        );
+      if (!subscription) {
+        return true;
+      }
+
+      const plan = pricing[subscription.subscriptionTier];
+      if (!plan) {
+        console.warn('subscription_unknown_tier', {
+          organizationId,
+          tier: subscription.subscriptionTier,
+        });
+        return true;
+      }
+
+      return !!plan[feature];
+    } catch (err) {
+      console.error('Error checking the plan feature:', err);
+      return true;
+    }
+  }
+
+  // The new plans can always be bought, the legacy tiers only by a workspace
+  // that is still on one of them (to switch period or move between them)
+  async canPurchaseTier(organizationId: string, tier: string) {
+    if (isNewTier(tier)) {
+      return true;
+    }
+
+    if (!isLegacyTier(tier)) {
+      return false;
+    }
+
+    const subscription =
+      await this._subscriptionRepository.getSubscriptionByOrganizationId(
+        organizationId
+      );
+    return isLegacyTier(subscription?.subscriptionTier);
   }
 
   // Customer-keyed flows must never touch a subscription owned by another provider
@@ -101,9 +160,14 @@ export class SubscriptionService {
   async modifySubscriptionByOrg(
     organizationId: string,
     totalChannels: number,
-    billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE'
+    billing: BillingTier
   ) {
     if (!organizationId) {
+      return false;
+    }
+
+    if (!pricing[billing]) {
+      console.error('subscription_unknown_tier', { organizationId, billing });
       return false;
     }
 
@@ -171,9 +235,14 @@ export class SubscriptionService {
   async modifySubscription(
     customerId: string,
     totalChannels: number,
-    billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE'
+    billing: BillingTier
   ) {
     if (!customerId) {
+      return false;
+    }
+
+    if (!pricing[billing]) {
+      console.error('subscription_unknown_tier', { customerId, billing });
       return false;
     }
 
@@ -258,7 +327,7 @@ export class SubscriptionService {
     identifier: string,
     customerId: string,
     totalChannels: number,
-    billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+    billing: PaidTier,
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null,
     code?: string,
@@ -302,7 +371,7 @@ export class SubscriptionService {
     provider: string,
     identifier: string,
     totalChannels: number,
-    billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+    billing: PaidTier,
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null
   ) {
@@ -430,7 +499,7 @@ export class SubscriptionService {
   async addSubscription(
     orgId: string,
     userId: string,
-    subscription: any,
+    subscription: PaidTier,
     provider: string
   ) {
     await this._subscriptionRepository.setCustomerId(orgId, userId);

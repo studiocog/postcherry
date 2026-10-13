@@ -1782,6 +1782,13 @@ enum SubscriptionTier {
   PRO
   TEAM
   ULTIMATE
+  PERSONAL
+  CREATOR
+  BUSINESS
+  BUSINESS_PLUS
+  FREELANCER
+  AGENCY
+  AGENCY_PRO
 }
 
 enum Period {
