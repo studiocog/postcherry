@@ -79,13 +79,13 @@ export const OAuthSelfHosted: FC<{
       <div className="flex flex-col gap-[4px]">
         <div className="text-[16px] font-semibold">Use self-hosted</div>
         <div className="text-[14px] text-gray-400">
-          {appName} will work with your own Postiz instance. Postiz Cloud
+          {appName} will work with your own PostCherry instance. PostCherry Cloud
           relays its requests, and your API key is stored encrypted.
         </div>
       </div>
 
       {/* plain text fields: a password field makes browsers autofill the
-          saved Postiz login (email + password) into this form */}
+          saved PostCherry login (email + password) into this form */}
       <Input
         name="instance_url"
         label="Instance URL"
@@ -93,7 +93,7 @@ export const OAuthSelfHosted: FC<{
         removeError={true}
         value={instanceUrl}
         onChange={(e) => setInstanceUrl(e.target.value)}
-        placeholder="https://postiz.example.com"
+        placeholder="https://postcherry.example.com"
         inputMode="url"
         autoComplete="off"
         spellCheck={false}
@@ -144,7 +144,7 @@ export const OAuthSelfHosted: FC<{
           disabled={
             submitting || !instanceUrl.trim() || (askEmail && !email.trim())
           }
-          className="flex-1 bg-[#612BD3] hover:bg-[#7B3FF2] disabled:opacity-50 text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors"
+          className="flex-1 bg-[#D21F3C] hover:bg-[#7B3FF2] disabled:opacity-50 text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors"
         >
           {submitting ? 'Connecting...' : 'Connect'}
         </button>

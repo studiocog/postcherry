@@ -21,3 +21,5 @@ dist
 .git
 .github
 reports
+# Secrets for docker compose, never bake them into the image
+.env

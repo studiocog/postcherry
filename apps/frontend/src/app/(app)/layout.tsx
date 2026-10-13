@@ -44,7 +44,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         {!!process.env.DATAFAST_WEBSITE_ID && (
           <Script
             data-website-id={process.env.DATAFAST_WEBSITE_ID}
-            data-domain="postiz.com"
+            data-domain="postcherry.com"
             src="https://datafa.st/js/script.js"
             strategy="afterInteractive"
           />
@@ -88,6 +88,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           googleAdsTrialTracking={process.env.NEXT_PUBLIC_TRACKING_TRIAL}
           language={language}
           recaptchaSiteKey={process.env.RECAPTCHA_SITE_KEY || ''}
+          sourceCodeUrl={
+            process.env.SOURCE_CODE_URL ||
+            'https://github.com/gitroomhq/postiz-app'
+          }
           mediaProcessing={
             process.env.STORAGE_PROVIDER === 'cloudflare' &&
             !!process.env.RUNPOD_API_KEY &&
@@ -109,7 +113,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <FacebookComponent />
             <GoogleTagManagerComponent gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
             <Plausible
-              domain={!!process.env.IS_GENERAL ? 'postiz.com' : 'gitroom.com'}
+              domain="postcherry.com"
             >
               <PHProvider
                 phkey={process.env.NEXT_PUBLIC_POSTHOG_KEY}

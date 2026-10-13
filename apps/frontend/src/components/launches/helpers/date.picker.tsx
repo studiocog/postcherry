@@ -153,7 +153,7 @@ export const DatePickerPanel: FC<{
                   : modifiers.outside
                   ? '!text-newTextColor/20 !font-[400]'
                   : dayjs(day).isSame(dayjs(), 'day')
-                  ? '!text-[#FC69FF] !font-[600]'
+                  ? '!text-[#FF7A90] !font-[600]'
                   : '!text-textItemBlur !font-[400]'
               )
             }

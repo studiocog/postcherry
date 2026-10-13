@@ -18,6 +18,7 @@ export const UserContext = createContext<
       impersonate: boolean;
       allowTrial: boolean;
       isTrailing: boolean;
+      accountType: 'INDIVIDUAL' | 'BUSINESS' | 'AGENCY' | null;
       streakSince: string | null;
     })
 >(undefined);

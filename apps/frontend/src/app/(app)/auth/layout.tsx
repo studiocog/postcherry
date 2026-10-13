@@ -3,7 +3,6 @@ import { getT } from '@gitroom/react/translation/get.translation.service.backend
 export const dynamic = 'force-dynamic';
 import { ReactNode } from 'react';
 import loadDynamic from 'next/dynamic';
-import { TestimonialComponent } from '@gitroom/frontend/components/auth/testimonial.component';
 import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.component';
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 import { Toaster } from '@gitroom/react/toaster/toaster';
@@ -29,12 +28,13 @@ export default async function AuthLayout({
         </div>
         <div className="text-[36px] flex-1 pt-[88px] hidden lg:flex flex-col items-center">
           <div className="text-center">
-            Over <span className="text-[42px] text-[#FC69FF]">20,000+</span>{' '}
-            Entrepreneurs use
+            The cherry on top of your
             <br />
-            Postiz To Grow Their Social Presence
+            <span className="text-[42px] text-[#FF7A90]">social media</span>
           </div>
-          <TestimonialComponent />
+          <div className="text-[18px] text-center mt-[16px] opacity-70">
+            Schedule, approve and report for every client, all in one place.
+          </div>
         </div>
       </div>
     </MantineWrapper>

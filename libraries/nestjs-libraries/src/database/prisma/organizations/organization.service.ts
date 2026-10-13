@@ -8,7 +8,12 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import { Organization, ShortLinkPreference, User } from '@prisma/client';
+import {
+  AccountType,
+  Organization,
+  ShortLinkPreference,
+  User,
+} from '@prisma/client';
 import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
 
 @Injectable()
@@ -136,7 +141,7 @@ export class OrganizationService {
       body.email
     );
     if (!users.length) {
-      throw new HttpException('No Postiz account found for this email', 400);
+      throw new HttpException('No PostCherry account found for this email', 400);
     }
 
     if (users.length > 1) {
@@ -211,5 +216,9 @@ export class OrganizationService {
       orgId,
       shortlink
     );
+  }
+
+  updateAccountType(orgId: string, accountType: AccountType) {
+    return this._organizationRepository.updateAccountType(orgId, accountType);
   }
 }

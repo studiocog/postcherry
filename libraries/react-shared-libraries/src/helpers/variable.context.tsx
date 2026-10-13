@@ -35,6 +35,7 @@ interface VariableContextInterface {
   googleAdsId?: string;
   googleAdsTrialTracking?: string;
   recaptchaSiteKey?: string;
+  sourceCodeUrl?: string;
 }
 const VariableContext = createContext({
   stripeClient: '',
@@ -69,6 +70,7 @@ const VariableContext = createContext({
   sentryDsn: '',
   extensionId: '',
   recaptchaSiteKey: '',
+  sourceCodeUrl: '',
 } as VariableContextInterface);
 export const VariableContextComponent: FC<
   VariableContextInterface & {

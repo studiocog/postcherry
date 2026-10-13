@@ -21,10 +21,7 @@ export const BillingAfter = () => {
       </div>
       <div className="text-center mb-[20px] text-xl [@media(max-width:1024px)]:text-xl">
         <h1 className="text-3xl [@media(max-width:1024px)]:text-xl">
-          {t(
-            'join_10000_entrepreneurs_who_use_postiz',
-            'Join 10,000+ Entrepreneurs Who Use Postiz'
-          )}
+          {t('grow_with_postcherry', 'Grow With PostCherry')}
           <br />
           {t(
             'to_manage_all_your_social_media_channels',

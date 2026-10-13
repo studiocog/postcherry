@@ -213,7 +213,7 @@ const PlanCard: FC<{
               fill="none"
               className={clsx(
                 'shrink-0',
-                current ? 'text-white/75' : 'text-[#8b5cf6]'
+                current ? 'text-white/75' : 'text-[#E04A63]'
               )}
             >
               <circle
@@ -740,7 +740,7 @@ export const MainBillingComponent: FC<{
       </div>
       {!!subscription?.id && (
         <div className="flex items-center gap-[16px] rounded-[12px] border border-newTableBorder bg-newBgColorInner shadow-previewShadow px-[24px] py-[20px] mobile:flex-col mobile:items-stretch mobile:p-[16px]">
-          <div className="w-[48px] h-[48px] rounded-full bg-[#612bd3]/10 text-[#612bd3] flex items-center justify-center shrink-0 mobile:hidden">
+          <div className="w-[48px] h-[48px] rounded-full bg-[#D21F3C]/10 text-[#D21F3C] flex items-center justify-center shrink-0 mobile:hidden">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"

@@ -34,6 +34,7 @@ import { GlobalSettings } from '@gitroom/frontend/components/settings/global.set
 import { AppsComponent } from '@gitroom/frontend/components/settings/apps.component';
 import { ThirdPartyComponent } from '@gitroom/frontend/components/third-parties/third-party.component';
 import { Plugs } from '@gitroom/frontend/components/plugs/plugs';
+import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -43,6 +44,7 @@ export const SettingsPopup: FC<{
   const toast = useToaster();
   const swr = useSWRConfig();
   const user = useUser();
+  const { isSimple, isIndividual } = useAccountType();
   const resolver = useMemo(() => {
     return classValidatorResolver(UserDetailDto);
   }, []);
@@ -87,31 +89,39 @@ export const SettingsPopup: FC<{
   const list = useMemo(() => {
     const arr = [];
     arr.push({ tab: 'global_settings', label: t('global_settings', 'Global Settings') });
-    // Populate tabs based on user permissions
+    // Populate tabs based on user permissions, individuals and businesses only see the basics
+    // (everyone keeps Agents and Apps: connecting an AI app over MCP is for all account types)
     if (user?.tier?.public_api && isGeneral && showLogout) {
       arr.push({ tab: 'agents', label: t('agents', 'Agents') });
     }
-    if (user?.tier?.team_members && isGeneral && user?.role !== 'USER') {
+    if (
+      user?.tier?.team_members &&
+      isGeneral &&
+      user?.role !== 'USER' &&
+      !isIndividual
+    ) {
       arr.push({ tab: 'teams', label: t('teams', 'Teams') });
     }
-    if (user?.tier?.webhooks) {
+    if (user?.tier?.webhooks && !isSimple) {
       arr.push({ tab: 'webhooks', label: t('webhooks_1', 'Webhooks') });
     }
-    if (user?.tier?.autoPost) {
+    if (user?.tier?.autoPost && !isIndividual) {
       arr.push({ tab: 'autopost', label: t('auto_post', 'Auto Post') });
     }
-    if (user?.tier.current !== 'FREE') {
+    if (user?.tier.current !== 'FREE' && !isSimple) {
       arr.push({ tab: 'sets', label: t('sets', 'Sets') });
     }
     if (user?.tier.current !== 'FREE') {
       arr.push({ tab: 'signatures', label: t('signatures', 'Signatures') });
     }
-    arr.push({ tab: 'integrations', label: t('integrations', 'Integrations') });
-    arr.push({ tab: 'plugs', label: t('plugs', 'Plugs') });
+    if (!isSimple) {
+      arr.push({ tab: 'integrations', label: t('integrations', 'Integrations') });
+      arr.push({ tab: 'plugs', label: t('plugs', 'Plugs') });
+    }
     arr.push({ tab: 'apps', label: t('apps', 'Apps') });
 
     return arr;
-  }, [user, isGeneral, showLogout, t]);
+  }, [user, isGeneral, showLogout, isSimple, isIndividual, t]);
 
   const [tab, setTab] = useState(() => {
     const requested = url.get('tab');

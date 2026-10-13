@@ -15,6 +15,7 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.team.member.dto';
 import { AdminAddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/admin.add.team.member.dto';
 import { ShortlinkPreferenceDto } from '@gitroom/nestjs-libraries/dtos/settings/shortlink-preference.dto';
+import { AccountTypeDto } from '@gitroom/nestjs-libraries/dtos/settings/account-type.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
@@ -86,6 +87,18 @@ export class SettingsController {
     return this._organizationService.updateShortlinkPreference(
       org.id,
       body.shortlink
+    );
+  }
+
+  @Post('/account-type')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  async updateAccountType(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: AccountTypeDto
+  ) {
+    return this._organizationService.updateAccountType(
+      org.id,
+      body.accountType
     );
   }
 }

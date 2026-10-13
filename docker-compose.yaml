@@ -1,20 +1,27 @@
 services:
-  postiz:
-    image: ghcr.io/gitroomhq/postiz-app:latest
-    container_name: postiz
+  postcherry:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: postcherry:local
+    container_name: postcherry
     restart: always
     environment:
       # === Required Settings
-      MAIN_URL: 'http://localhost:4007'
-      FRONTEND_URL: 'http://localhost:4007'
-      NEXT_PUBLIC_BACKEND_URL: 'http://localhost:4007/api'
-      JWT_SECRET: 'random string that is unique to every install - just type random characters here!'
-      DATABASE_URL: 'postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local'
-      REDIS_URL: 'redis://postiz-redis:6379'
+      MAIN_URL: 'http://localhost:4010'
+      FRONTEND_URL: 'http://localhost:4010'
+      NEXT_PUBLIC_BACKEND_URL: 'http://localhost:4010/api'
+      JWT_SECRET: '${JWT_SECRET:?Set JWT_SECRET in the .env file}'
+      DATABASE_URL: 'postgresql://postcherry-user:postcherry-password@postcherry-postgres:5432/postcherry-db'
+      REDIS_URL: 'redis://postcherry-redis:6379'
       BACKEND_INTERNAL_URL: 'http://localhost:3000'
       TEMPORAL_ADDRESS: 'temporal:7233'
       IS_GENERAL: 'true'
       DISABLE_REGISTRATION: 'false'
+      # AGPL-3.0: link to the public repository with this app's source code
+      SOURCE_CODE_URL: '${SOURCE_CODE_URL:-https://github.com/gitroomhq/postiz-app}'
+      # Receives new agency submissions
+      # ADMIN_EMAIL: ''
 
       # === Storage Settings
       STORAGE_PROVIDER: 'local'
@@ -120,39 +127,39 @@ services:
       # LINK_DRIP_SHORT_LINK_DOMAIN: "dripl.ink"
 
     volumes:
-      - postiz-config:/config/
-      - postiz-uploads:/uploads/
+      - postcherry-config:/config/
+      - postcherry-uploads:/uploads/
     ports:
-      - '4007:5000'
+      - '4010:5000'
     networks:
-      - postiz-network
+      - postcherry-network
       - temporal-network
     depends_on:
-      postiz-postgres:
+      postcherry-postgres:
         condition: service_healthy
-      postiz-redis:
+      postcherry-redis:
         condition: service_healthy
 
-  postiz-postgres:
+  postcherry-postgres:
     image: postgres:17-alpine
-    container_name: postiz-postgres
+    container_name: postcherry-postgres
     restart: always
     environment:
-      POSTGRES_PASSWORD: postiz-password
-      POSTGRES_USER: postiz-user
-      POSTGRES_DB: postiz-db-local
+      POSTGRES_PASSWORD: postcherry-password
+      POSTGRES_USER: postcherry-user
+      POSTGRES_DB: postcherry-db
     volumes:
       - postgres-volume:/var/lib/postgresql/data
     networks:
-      - postiz-network
+      - postcherry-network
     healthcheck:
-      test: pg_isready -U postiz-user -d postiz-db-local
+      test: pg_isready -U postcherry-user -d postcherry-db
       interval: 10s
       timeout: 3s
       retries: 3
-  postiz-redis:
+  postcherry-redis:
     image: redis:7.2
-    container_name: postiz-redis
+    container_name: postcherry-redis
     restart: always
     healthcheck:
       test: redis-cli ping
@@ -160,25 +167,26 @@ services:
       timeout: 3s
       retries: 3
     volumes:
-      - postiz-redis-data:/data
+      - postcherry-redis-data:/data
     networks:
-      - postiz-network
+      - postcherry-network
 
   # For Application Monitoring / Debugging
   spotlight:
     pull_policy: always
-    container_name: spotlight
+    container_name: postcherry-spotlight
     ports:
-      - 8969:8969/tcp
+      - 8970:8969/tcp
     image: ghcr.io/getsentry/spotlight:latest
     networks:
-      - postiz-network
+      - postcherry-network
 
   # -----------------------
   # Temporal Stack
   # -----------------------
   temporal-elasticsearch:
-    container_name: temporal-elasticsearch
+    container_name: postcherry-temporal-elasticsearch
+    restart: always
     image: elasticsearch:7.17.27
     environment:
       - cluster.routing.allocation.disk.threshold_enabled=true
@@ -196,7 +204,8 @@ services:
       - /var/lib/elasticsearch/data
 
   temporal-postgresql:
-    container_name: temporal-postgresql
+    container_name: postcherry-temporal-postgresql
+    restart: always
     image: postgres:16
     environment:
       POSTGRES_PASSWORD: temporal
@@ -209,9 +218,10 @@ services:
       - /var/lib/postgresql/data
 
   temporal:
-    container_name: temporal
+    container_name: postcherry-temporal
+    restart: always
     ports:
-      - '7233:7233'
+      - '7234:7233'
     image: temporalio/auto-setup:1.28.1
     depends_on:
       - temporal-postgresql
@@ -235,7 +245,7 @@ services:
       kompose.volume.type: configMap
 
   temporal-admin-tools:
-    container_name: temporal-admin-tools
+    container_name: postcherry-temporal-admin-tools
     image: temporalio/admin-tools:1.28.1-tctl-1.18.4-cli-1.4.1
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
@@ -248,7 +258,7 @@ services:
     tty: true
 
   temporal-ui:
-    container_name: temporal-ui
+    container_name: postcherry-temporal-ui
     image: temporalio/ui:2.34.0
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
@@ -256,24 +266,24 @@ services:
     networks:
       - temporal-network
     ports:
-      - '8080:8080'
+      - '8081:8080'
 
 volumes:
   postgres-volume:
     external: false
 
-  postiz-redis-data:
+  postcherry-redis-data:
     external: false
 
-  postiz-config:
+  postcherry-config:
     external: false
 
-  postiz-uploads:
+  postcherry-uploads:
     external: false
 
 networks:
-  postiz-network:
+  postcherry-network:
     external: false
   temporal-network:
     driver: bridge
-    name: temporal-network
+    name: postcherry-temporal-network

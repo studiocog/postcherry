@@ -3,6 +3,7 @@
 import { FC, ReactNode, useCallback } from 'react';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { MenuItem } from '@gitroom/frontend/components/new-layout/menu-item';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
@@ -19,7 +20,8 @@ interface MenuItemInterface {
 }
 
 export const useMenuItem = () => {
-  const { isGeneral } = useVariables();
+  const { isGeneral, sourceCodeUrl } = useVariables();
+  const { isIndividual } = useAccountType();
   const t = useT();
   const { openModal } = useModals();
 
@@ -216,6 +218,7 @@ export const useMenuItem = () => {
       path: '#',
       role: ['ADMIN', 'SUPERADMIN', 'USER'],
       requireBilling: true,
+      hide: isIndividual,
       onClick: handleAgentMediaClick,
     },
     {
@@ -272,7 +275,7 @@ export const useMenuItem = () => {
           />
         </svg>
       ),
-      path: 'https://affiliate.postiz.com',
+      path: 'https://postcherry.com/affiliate',
       role: ['ADMIN', 'SUPERADMIN', 'USER'],
       requireBilling: true,
     },
@@ -298,6 +301,29 @@ export const useMenuItem = () => {
       path: '/billing',
       role: ['ADMIN', 'SUPERADMIN'],
       requireBilling: true,
+    },
+    {
+      // AGPL-3.0: every user must be able to get the source code of this app
+      name: t('source_code', 'Source code'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="21"
+          viewBox="0 0 20 21"
+          fill="none"
+        >
+          <path
+            d="M13.3333 15.5L18.3333 10.5L13.3333 5.5M6.66667 5.5L1.66667 10.5L6.66667 15.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      path: sourceCodeUrl || 'https://github.com/gitroomhq/postiz-app',
+      role: ['ADMIN', 'USER', 'SUPERADMIN'],
     },
     {
       name: t('settings', 'Settings'),

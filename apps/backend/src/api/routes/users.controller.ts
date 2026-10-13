@@ -129,6 +129,7 @@ export class UsersController {
         ? false
         : organization?.isTrailing,
       allowTrial: organization?.allowTrial,
+      accountType: organization?.accountType || null,
       streakSince: organization?.streakSince || null,
       publicApi:
         // @ts-ignore
