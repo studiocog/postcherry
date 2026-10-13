@@ -31,6 +31,7 @@ import { UpdatePostSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/upda
 import {
   AuthorizationActions,
   Sections,
+  SubscriptionException,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
 import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
@@ -150,6 +151,19 @@ export class PublicIntegrationsController {
       rawBody?.type === 'draft' || true
     );
     body.type = rawBody.type;
+
+    if (
+      body.inter &&
+      !(await this._subscriptionService.hasPlanFeature(
+        org.id,
+        'recurring_posts'
+      ))
+    ) {
+      throw new SubscriptionException({
+        action: AuthorizationActions.Create,
+        section: Sections.RECURRING_POSTS,
+      });
+    }
 
     if (
       process.env.RESTRICT_UPLOAD_DOMAINS &&

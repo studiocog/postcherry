@@ -3,6 +3,7 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { AllProvidersSettings } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/all.providers.settings';
@@ -31,7 +32,8 @@ const attachmentUrl = z
 export class IntegrationSchedulePostTool implements AgentToolInterface {
   constructor(
     private _postsService: PostsService,
-    private _integrationService: IntegrationService
+    private _integrationService: IntegrationService,
+    private _subscriptionService: SubscriptionService
   ) {}
   name = 'integrationSchedulePostTool';
 
@@ -60,7 +62,7 @@ A single LinkedIn post with one comment
 - postsAndComments array length will be one
 
 Do not use this to update or delete existing posts.
-On success, each item in output contains a previewUrl the user can open to see the post.
+On success, when the plan includes preview links, each item in output contains a previewUrl the user can open to see the post.
 If validation fails, the result contains output.errors describing what to fix; the call can be retried with corrected parameters.
 `,
       inputSchema: z.object({
@@ -130,8 +132,9 @@ If validation fails, the result contains output.errors describing what to fix; t
               integration: z.string(),
               previewUrl: z
                 .string()
+                .optional()
                 .describe(
-                  'Public preview page of the created post, share it with the user'
+                  'Public preview page of the created post, share it with the user (only when the plan includes preview links)'
                 ),
             })
           )
@@ -143,6 +146,10 @@ If validation fails, the result contains output.errors describing what to fix; t
           (context?.requestContext as any)?.get('organization') as string
         ).id;
         const finalOutput = [];
+        const previewLinks = await this._subscriptionService.hasPlanFeature(
+          organizationId,
+          'preview_links'
+        );
 
         const integrations = {} as Record<string, Integration>;
         for (const platform of inputData.socialPost) {
@@ -256,7 +263,11 @@ If validation fails, the result contains output.errors describing what to fix; t
           finalOutput.push(
             ...output.map((p) => ({
               ...p,
-              previewUrl: `${process.env.FRONTEND_URL}/p/${p.postId}?share=true`,
+              ...(previewLinks
+                ? {
+                    previewUrl: `${process.env.FRONTEND_URL}/p/${p.postId}?share=true`,
+                  }
+                : {}),
             }))
           );
         }

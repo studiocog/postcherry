@@ -1554,6 +1554,11 @@ export class PostsService {
     return date.clone().add(num, 'minutes').format('YYYY-MM-DDTHH:mm:00');
   }
 
+  async getPostOrganizationId(id: string) {
+    return (await this._postRepository.getPostOrganizationId(id))
+      ?.organizationId;
+  }
+
   async getComments(previewId: string) {
     const posts = await this.getPostsRecursively(previewId, false);
     const comments = await this._postRepository.getCommentsForPosts(

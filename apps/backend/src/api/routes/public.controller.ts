@@ -21,7 +21,10 @@ import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.man
 import { AgentGraphInsertService } from '@gitroom/nestjs-libraries/agent/agent.graph.insert.service';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  BillingTier,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { Readable, pipeline } from 'stream';
 import { promisify } from 'util';
 import { OnlyURL } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
@@ -52,30 +55,55 @@ export class PublicController {
     return this._agentGraphInsertService.newPost(body.text);
   }
 
+  // preview links are a plan feature, without it the preview shows
+  // "Post not found" and its comments are closed
+  private async previewAllowed(postId: string) {
+    const organizationId = await this._postsService.getPostOrganizationId(
+      postId
+    );
+    return (
+      !organizationId ||
+      this._subscriptionService.hasPlanFeature(organizationId, 'preview_links')
+    );
+  }
+
   @Get(`/posts/:id`)
   async getPreview(@Param('id') id: string) {
+    const posts = await this._postsService.getPostsRecursively(id, true);
+    if (
+      posts.length &&
+      !(await this._subscriptionService.hasPlanFeature(
+        posts[0].organizationId,
+        'preview_links'
+      ))
+    ) {
+      return [];
+    }
+
     // the batch only links the posts in the dashboard, it stays out of the
     // public preview
-    return (await this._postsService.getPostsRecursively(id, true)).map(
-      ({ childrenPost, batchId, ...p }) => ({
-        ...p,
-        ...(p.integration
-          ? {
-              integration: {
-                id: p.integration.id,
-                name: p.integration.name,
-                picture: p.integration.picture,
-                providerIdentifier: p.integration.providerIdentifier,
-                profile: p.integration.profile,
-              },
-            }
-          : {}),
-      })
-    );
+    return posts.map(({ childrenPost, batchId, ...p }) => ({
+      ...p,
+      ...(p.integration
+        ? {
+            integration: {
+              id: p.integration.id,
+              name: p.integration.name,
+              picture: p.integration.picture,
+              providerIdentifier: p.integration.providerIdentifier,
+              profile: p.integration.profile,
+            },
+          }
+        : {}),
+    }));
   }
 
   @Get(`/posts/:id/comments`)
   async getComments(@Param('id') postId: string) {
+    if (!(await this.previewAllowed(postId))) {
+      return { comments: [] };
+    }
+
     return { comments: await this._postsService.getComments(postId) };
   }
 
@@ -85,6 +113,10 @@ export class PublicController {
     @Body() body: CreatePublicCommentDto,
     @RealIP() ip: string
   ) {
+    if (!(await this.previewAllowed(postId))) {
+      return { ok: false };
+    }
+
     return this._postsService.createPublicComment(postId, body, null, ip);
   }
 
@@ -145,7 +177,7 @@ export class PublicController {
     try {
       const load = AuthService.verifyJWT(params) as {
         orgId: string;
-        billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
+        billing: BillingTier;
       };
 
       if (!load || !load.orgId || !load.billing || !pricing[load.billing]) {

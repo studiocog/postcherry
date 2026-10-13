@@ -27,6 +27,7 @@ import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dt
 import {
   AuthorizationActions,
   Sections,
+  SubscriptionException,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { PostValidationException } from '@gitroom/backend/api/routes/posts.validation.exception';
 import {
@@ -34,6 +35,7 @@ import {
   ResolveCommentDto,
 } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
 import { RealIP } from 'nestjs-real-ip';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 
 @ApiTags('Posts')
 @Controller('/posts')
@@ -41,7 +43,8 @@ export class PostsController {
   constructor(
     private _postsService: PostsService,
     private _agentGraphService: AgentGraphService,
-    private _shortLinkService: ShortLinkService
+    private _shortLinkService: ShortLinkService,
+    private _subscriptionService: SubscriptionService
   ) {}
 
   @Get('/:id/statistics')
@@ -245,6 +248,19 @@ export class PostsController {
     }
 
     const body = await this._postsService.mapTypeToPost(rawBody, org.id);
+    if (
+      body.inter &&
+      !(await this._subscriptionService.hasPlanFeature(
+        org.id,
+        'recurring_posts'
+      ))
+    ) {
+      throw new SubscriptionException({
+        action: AuthorizationActions.Create,
+        section: Sections.RECURRING_POSTS,
+      });
+    }
+
     return this._postsService.createPost(org.id, body, 'WEB');
   }
 
