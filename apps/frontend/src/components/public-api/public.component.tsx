@@ -658,13 +658,20 @@ const CliSection = ({ apiKey, cli }: { apiKey: string; cli: CliLinks }) => {
       <div className="bg-newBgColorInner px-[20px] mobile:px-[14px] py-[14px] border-b border-newBorder flex items-start justify-between gap-[12px] mobile:flex-col">
         <div>
           <div className="text-[15px] font-[600]">
-            {t('cli_and_skills', 'CLI & AI Skills')}
+            {cli.skill
+              ? t('cli_and_skills', 'CLI & AI Skills')
+              : t('cli', 'CLI')}
           </div>
           <div className="text-[13px] text-customColor18 mt-[2px]">
-            {t(
-              'cli_description',
-              'Use the CLI to automate posting from your terminal, or install the skill to let your AI agent schedule posts for you.'
-            )}
+            {cli.skill
+              ? t(
+                  'cli_description',
+                  'Use the CLI to automate posting from your terminal, or install the skill to let your AI agent schedule posts for you.'
+                )
+              : t(
+                  'cli_description_no_skill',
+                  'Use the CLI to automate posting from your terminal.'
+                )}
           </div>
         </div>
         {!!cliDocs && (

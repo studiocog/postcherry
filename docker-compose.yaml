@@ -20,17 +20,18 @@ services:
       DISABLE_REGISTRATION: 'false'
       # AGPL-3.0: link to the public repository with this app's source code
       SOURCE_CODE_URL: '${SOURCE_CODE_URL:-https://github.com/gitroomhq/postiz-app}'
-      # External links (see .env.example): empty hides the button, unset DOCS_URL = docs.postcherry.com
-      # DOCS_URL: 'https://docs.postcherry.com'
-      # EXTENSION_STORE_URL: ''
-      # MCP_CONNECTOR_CLAUDE_URL: ''
-      # MCP_CONNECTOR_CHATGPT_URL: ''
-      # MCP_CONNECTOR_CURSOR_URL: ''
-      # MCP_CONNECTOR_GROK_URL: ''
-      # CLI_PACKAGE: ''
-      # CLI_COMMAND: ''
-      # CLI_SKILL: ''
-      # N8N_NODE_URL: ''
+      # External links, set them in the .env file (see .env.example): empty hides the button.
+      # DOCS_URL uses "-" (not ":-"): unset = docs.postcherry.com, DOCS_URL="" in .env = hide the Docs buttons
+      DOCS_URL: '${DOCS_URL-https://docs.postcherry.com}'
+      EXTENSION_STORE_URL: '${EXTENSION_STORE_URL:-}'
+      MCP_CONNECTOR_CLAUDE_URL: '${MCP_CONNECTOR_CLAUDE_URL:-}'
+      MCP_CONNECTOR_CHATGPT_URL: '${MCP_CONNECTOR_CHATGPT_URL:-}'
+      MCP_CONNECTOR_CURSOR_URL: '${MCP_CONNECTOR_CURSOR_URL:-}'
+      MCP_CONNECTOR_GROK_URL: '${MCP_CONNECTOR_GROK_URL:-}'
+      CLI_PACKAGE: '${CLI_PACKAGE:-}'
+      CLI_COMMAND: '${CLI_COMMAND:-}'
+      CLI_SKILL: '${CLI_SKILL:-}'
+      N8N_NODE_URL: '${N8N_NODE_URL:-}'
       # Receives new agency submissions
       # ADMIN_EMAIL: ''
 

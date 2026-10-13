@@ -289,7 +289,7 @@ const ExtensionNotFound: FC = () => {
             )
           : t(
               'extension_not_available_no_store',
-              'The browser extension is not installed. Ask your PostCherry administrator how to install it, then try again.'
+              "The browser extension is not installed, so this channel can't be connected yet."
             )}
       </p>
       <div className="flex gap-[10px]">

@@ -603,10 +603,15 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
       <div className="bg-newBgColorInner px-[20px] py-[14px] border-b border-newBorder">
         <div className="text-[15px] font-[600]">{t('cli', 'CLI')}</div>
         <div className="text-[13px] text-customColor18 mt-[2px]">
-          {t(
-            'cli_onboarding_description',
-            'Install the CLI and the skill that teaches your agent how to use it'
-          )}
+          {cli?.skill
+            ? t(
+                'cli_onboarding_description',
+                'Install the CLI and the skill that teaches your agent how to use it'
+              )
+            : t(
+                'cli_onboarding_description_no_skill',
+                'Install the CLI to schedule posts from your terminal'
+              )}
         </div>
       </div>
       <div className="p-[20px] flex flex-col gap-[8px] flex-1">
