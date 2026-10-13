@@ -63,6 +63,11 @@ import {
 } from '@gitroom/frontend/components/ui/bottom.sheet.component';
 import { useHasScroll } from '@gitroom/frontend/components/ui/is.scroll.hook';
 import { useShortlinkPreference } from '@gitroom/frontend/components/settings/shortlink-preference.component';
+import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
+import {
+  RequestApprovalButton,
+  RequestApprovalSheetRow,
+} from '@gitroom/frontend/components/post-approvals/request.approval.button';
 import dayjs from 'dayjs';
 import { Button } from '@gitroom/react/form/button';
 import { useClickOutside } from '@mantine/hooks';
@@ -85,8 +90,18 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     setShowPostNow(false);
   });
   const { data: shortlinkPreferenceData } = useShortlinkPreference();
+  const { isIndividual } = useAccountType();
 
   const { addEditSets, mutate, customClose, dummy } = props;
+
+  // a client can approve a saved post, individuals don't have clients
+  const approvalPostId = existingData?.posts?.[0]?.id;
+  const canRequestApproval =
+    !!existingData?.integration &&
+    !!approvalPostId &&
+    !dummy &&
+    !addEditSets &&
+    !isIndividual;
 
   const {
     selectedIntegrations,
@@ -1107,6 +1122,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             )}
           </div>
           <div className="pe-[20px] flex items-center justify-end gap-[8px]">
+            {canRequestApproval && (
+              <RequestApprovalButton postId={approvalPostId!} />
+            )}
             {existingData?.integration && (
               <button
                 onClick={deletePost}
@@ -1265,6 +1283,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               label={t('repeat_post', 'Repeat Post')}
               onClick={() => setMobileSheet('repeat')}
             />
+            {canRequestApproval && (
+              <RequestApprovalSheetRow
+                postId={approvalPostId!}
+                onOpen={() => setMobileSheet(null)}
+              />
+            )}
             {existingData?.integration && (
               <div
                 onClick={deletePost}

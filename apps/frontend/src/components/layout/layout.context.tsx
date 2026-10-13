@@ -29,6 +29,7 @@ function LayoutContextInner(params: { children: ReactNode }) {
       if (
         typeof window !== 'undefined' &&
         (window.location.href.includes('/p/') ||
+          window.location.pathname.startsWith('/approve/') ||
           window.location.pathname.startsWith('/provider/'))
       ) {
         return true;

@@ -23,6 +23,12 @@ import useCookie from 'react-use-cookie';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { expandPostsList, expandPosts } from '@gitroom/helpers/utils/posts.list.minify';
+import { uniq } from 'lodash';
+import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
+import {
+  PostApprovalBadgeData,
+  usePostApprovalStatuses,
+} from '@gitroom/frontend/components/post-approvals/post.approval.hooks';
 extend(isoWeek);
 extend(weekOfYear);
 
@@ -89,6 +95,8 @@ export const CalendarContext = createContext({
     /** empty **/
   },
   currentHour: newDayjs().startOf('hour'),
+  // the latest client approval of the posts on screen, by post id
+  approvalStatuses: {} as Record<string, PostApprovalBadgeData>,
 });
 
 export interface Integrations {
@@ -353,6 +361,20 @@ export const CalendarWeekProvider: FC<{
   const listTotal = listData?.total || 0;
   const listTotalPages = Math.ceil(listTotal / 100);
 
+  // client approvals are not part of the individual (simple) interface
+  const { isIndividual } = useAccountType();
+  const approvalPostIds = useMemo(
+    () =>
+      uniq(
+        (
+          (filters.display === 'list' ? listPosts : posts) as { id: string }[]
+        ).map((post) => post.id)
+      ),
+    [filters.display, listPosts, posts]
+  );
+  const { data: approvalStatuses, mutate: mutateApprovalStatuses } =
+    usePostApprovalStatuses(approvalPostIds, !isIndividual);
+
   const changeDate = useCallback(
     (id: string, date: dayjs.Dayjs) => {
       setInternalData((d) =>
@@ -380,7 +402,8 @@ export const CalendarWeekProvider: FC<{
   const reloadCalendarView = useCallback(() => {
     mutateCalendar();
     mutateList();
-  }, [mutateCalendar, mutateList]);
+    mutateApprovalStatuses();
+  }, [mutateCalendar, mutateList, mutateApprovalStatuses]);
 
   // Determine loading state based on current view
   const loading = filters.display === 'list' ? listIsLoading : calendarIsLoading;
@@ -412,6 +435,7 @@ export const CalendarWeekProvider: FC<{
         selectedChannels,
         setSelectedChannels,
         currentHour,
+        approvalStatuses: approvalStatuses || {},
       }}
     >
       {children}
