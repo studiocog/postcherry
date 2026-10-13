@@ -35,6 +35,7 @@ import { AppsComponent } from '@gitroom/frontend/components/settings/apps.compon
 import { ThirdPartyComponent } from '@gitroom/frontend/components/third-parties/third-party.component';
 import { Plugs } from '@gitroom/frontend/components/plugs/plugs';
 import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
+import { BrandKitComponent } from '@gitroom/frontend/components/settings/brand-kit.component';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -89,6 +90,8 @@ export const SettingsPopup: FC<{
   const list = useMemo(() => {
     const arr = [];
     arr.push({ tab: 'global_settings', label: t('global_settings', 'Global Settings') });
+    // every account type has a brand
+    arr.push({ tab: 'brand_kit', label: t('brand_kit', 'Brand kit') });
     // Populate tabs based on user permissions, individuals and businesses only see the basics
     // (everyone keeps Agents and Apps: connecting an AI app over MCP is for all account types)
     if (user?.tier?.public_api && isGeneral && showLogout) {
@@ -182,6 +185,11 @@ export const SettingsPopup: FC<{
               {tab === 'global_settings' && (
                 <div>
                   <GlobalSettings />
+                </div>
+              )}
+              {tab === 'brand_kit' && (
+                <div>
+                  <BrandKitComponent />
                 </div>
               )}
               {tab === 'teams' &&

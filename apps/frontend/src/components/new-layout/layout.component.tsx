@@ -43,6 +43,7 @@ import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/se
 import { FirstBillingComponent } from '@gitroom/frontend/components/billing/first.billing.component';
 import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component';
 import { setSentryUser } from '@gitroom/react/sentry/initialize.sentry.client';
+import { BrandVoiceCopilotContext } from '@gitroom/frontend/components/settings/brand-voice.copilot';
 
 const jakartaSans = Plus_Jakarta_Sans({
   weight: ['600', '500', '700'],
@@ -89,6 +90,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
         useSingleEndpoint={true}
         showDevConsole={false}
       >
+        <BrandVoiceCopilotContext />
         <MantineWrapper>
           <ToolTip />
           <Toaster />
