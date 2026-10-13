@@ -11,8 +11,12 @@ import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/se
 import NotificationComponent from '@gitroom/frontend/components/notifications/notification.component';
 import dynamic from 'next/dynamic';
 import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.component';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
-import { capitalize } from 'lodash';
+import {
+  isNewTier,
+  PLAN_GROUPS,
+  POPULAR_PLAN,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import clsx from 'clsx';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { CheckIconComponent } from '@gitroom/frontend/components/ui/check.icon.component';
@@ -26,6 +30,12 @@ import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics'
 import useCookie from 'react-use-cookie';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
 import { DeveloperIconComponent } from '@gitroom/frontend/components/developer/developer.icon.component';
+import {
+  PlanView,
+  usePlanName,
+  useVisiblePlans,
+} from '@gitroom/frontend/components/billing/use.plans';
+import { PlanAudienceTabs } from '@gitroom/frontend/components/billing/plan.audience.tabs';
 
 const ModeComponent = dynamic(
   () => import('@gitroom/frontend/components/layout/mode.component'),
@@ -50,7 +60,11 @@ export const FirstBillingComponent = () => {
   const dub = useDubClickId();
   const [stripe, setStripe] = useState<null | Promise<Stripe>>(null);
   const [stripeFailed, setStripeFailed] = useState(false);
-  const [tier, setTier] = useState('STANDARD');
+  const { view, setView, plans, popular } = useVisiblePlans();
+  const planName = usePlanName();
+  const [tier, setTier] = useState<string>(() =>
+    view === 'ALL' ? POPULAR_PLAN.AGENCY : POPULAR_PLAN[view]
+  );
   const [period, setPeriod] = useState('MONTHLY');
   const fetch = useFetch();
   const { mutate } = useSWRConfig();
@@ -98,9 +112,18 @@ export const FirstBillingComponent = () => {
     }
   }, [data?.blocked, mutate]);
 
-  const price = useMemo(
-    () => Object.entries(pricing).filter(([key, value]) => key !== 'FREE'),
-    []
+  // another audience selects its most popular plan, unless the selected plan is in it
+  const changeView = useCallback(
+    (value: PlanView) => {
+      setView(value);
+      if (
+        value !== 'ALL' &&
+        !(PLAN_GROUPS[value] as string[]).includes(tier)
+      ) {
+        setTier(POPULAR_PLAN[value]);
+      }
+    },
+    [tier]
   );
 
   const JoinOver = () => {
@@ -207,7 +230,7 @@ export const FirstBillingComponent = () => {
             <div className="hidden tablet:block">
               <JoinOver />
             </div>
-            <div className="flex mb-[24px] mobile:flex-col">
+            <div className="flex mb-[16px] mobile:flex-col">
               <div className="flex-1 text-[24px] font-[700]">
                 {t('billing_choose_plan', 'Choose a Plan')}
               </div>
@@ -234,44 +257,53 @@ export const FirstBillingComponent = () => {
                 >
                   <div>{t('billing_yearly', 'Yearly')}</div>
                   <div className="bg-[#AA0FA4] text-[white] px-[8px] rounded-[4px] mobile:hidden">
-                    {t('billing_20_percent_off', '20% Off')}
+                    {t('billing_two_months_free', '2 months free')}
                   </div>
                 </div>
               </div>
             </div>
+            <PlanAudienceTabs
+              value={view}
+              onChange={changeView}
+              className="mb-[16px] w-fit mobile:w-full"
+            />
             <div className="grid grid-cols-2 gap-[8px] mobile:!grid-cols-2 tablet:grid-cols-4">
-              {price.map(
-                ([key, value]) => (
-                  <div
-                    onClick={() => setTier(key)}
-                    key={key}
-                    className={clsx(
-                      'cursor-pointer select-none w-[266px] h-[138px] tablet:w-full tablet:h-[124px] p-[24px] tablet:p-[15px] rounded-[20px] flex flex-col',
-                      key === tier
-                        ? 'border-[1.5px] border-[#618DFF]'
-                        : 'border-[1.5px] border-newColColor'
+              {plans.map((key) => (
+                <div
+                  onClick={() => setTier(key)}
+                  key={key}
+                  className={clsx(
+                    'cursor-pointer select-none w-[266px] h-[138px] tablet:w-full tablet:h-[124px] p-[24px] tablet:p-[15px] rounded-[20px] flex flex-col',
+                    key === tier
+                      ? 'border-[1.5px] border-[#618DFF]'
+                      : 'border-[1.5px] border-newColColor'
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-[8px]">
+                    <div className="text-[20px] mobile:text-[18px] font-[500] truncate">
+                      {planName(key)}
+                    </div>
+                    {popular.includes(key) && (
+                      <div className="bg-[#AA0FA4] text-white text-[12px] px-[6px] rounded-[4px] whitespace-nowrap mobile:hidden">
+                        {t('billing_most_popular', 'Most popular')}
+                      </div>
                     )}
-                  >
-                    <div className="text-[20px] mobile:text-[18px] font-[500]">
-                      {capitalize(key)}
-                    </div>
-                    <div className="text-[24px] mobile:text-[18px] font-[400]">
-                      <span className="text-[44px] mobile:text-[30px] font-[600]">
-                        $
-                        {
-                          value[
-                            period === 'MONTHLY' ? 'month_price' : 'year_price'
-                          ]
-                        }
-                      </span>{' '}
-                      {period === 'MONTHLY'
-                        ? t('billing_per_month', '/ month')
-                        : t('billing_per_year', '/ year')}
-                    </div>
                   </div>
-                ),
-                []
-              )}
+                  <div className="text-[24px] mobile:text-[18px] font-[400]">
+                    <span className="text-[44px] mobile:text-[30px] font-[600]">
+                      $
+                      {
+                        pricing[key][
+                          period === 'MONTHLY' ? 'month_price' : 'year_price'
+                        ]
+                      }
+                    </span>{' '}
+                    {period === 'MONTHLY'
+                      ? t('billing_per_month', '/ month')
+                      : t('billing_per_year', '/ year')}
+                  </div>
+                </div>
+              ))}
             </div>
             <div className="flex flex-col mt-[54px] gap-[24px] tablet:mt-[40px]">
               <div className="text-[24px] font-[700]">
@@ -294,6 +326,7 @@ type FeatureItem = {
   key: string;
   defaultValue: string;
   prefix?: string | number;
+  values?: Record<string, string | number>;
 };
 
 export const useBillingFeatures = (tier: string) => {
@@ -302,6 +335,86 @@ export const useBillingFeatures = (tier: string) => {
     const currentPricing = pricing[tier];
     const channelsOr = currentPricing.channel;
     const list: FeatureItem[] = [];
+
+    // the PostCherry plans list what the website sells, every line is
+    // enforced by the plan limits
+    if (isNewTier(tier)) {
+      list.push(
+        currentPricing.brands === 1
+          ? {
+              key: 'billing_brands_one',
+              defaultValue: '1 brand ({{channels}} social accounts)',
+              values: { channels: channelsOr },
+            }
+          : {
+              key: 'billing_brands_many',
+              defaultValue:
+                'Up to {{brands}} brands ({{channels}} social accounts)',
+              values: { brands: currentPricing.brands, channels: channelsOr },
+            }
+      );
+      list.push({
+        key: 'billing_all_channel_types',
+        defaultValue: 'All 30+ channel types',
+      });
+      list.push(
+        currentPricing.team_members
+          ? {
+              key: 'billing_unlimited_team_members',
+              defaultValue: 'Unlimited team members',
+            }
+          : { key: 'billing_single_user', defaultValue: 'Single user' }
+      );
+      if (currentPricing.ai) {
+        list.push({
+          key: 'billing_ai_writing_assistant',
+          defaultValue: 'AI writing assistant',
+        });
+      }
+      if (currentPricing.image_generator) {
+        list.push({
+          key: 'billing_ai_images_per_month',
+          defaultValue: 'AI Images per month',
+          prefix: currentPricing.image_generation_count,
+        });
+        list.push({
+          key: 'billing_ai_videos_per_month',
+          defaultValue: 'AI Videos per month',
+          prefix: currentPricing.generate_videos,
+        });
+        list.push({
+          key: 'billing_clipping_minutes_per_month',
+          defaultValue: 'minutes of AI video clipping per month',
+          prefix: currentPricing.clipping_minutes,
+        });
+      }
+      if (currentPricing.recurring_posts) {
+        list.push({
+          key: 'billing_recurring_posts',
+          defaultValue: 'Recurring posts',
+        });
+      }
+      if (currentPricing.preview_links) {
+        list.push({
+          key: 'billing_preview_links',
+          defaultValue: 'Preview links to share',
+        });
+      }
+      if (currentPricing.autoPost) {
+        list.push({
+          key: 'billing_rss_auto_posting',
+          defaultValue: 'RSS auto-posting',
+        });
+      }
+      if (currentPricing.developer_api) {
+        list.push({
+          key: 'billing_public_api_webhooks_agents',
+          defaultValue: 'Public API, webhooks and AI agent skills',
+        });
+      }
+      list.push({ key: 'billing_analytics', defaultValue: 'Analytics' });
+      return list;
+    }
 
     list.push({
       key: channelsOr === 1 ? 'billing_channel' : 'billing_channels',
@@ -364,7 +477,11 @@ export const useBillingFeatures = (tier: string) => {
   }, [tier]);
 
   const renderFeature = (feature: FeatureItem) => {
-    const translatedText = t(feature.key, feature.defaultValue);
+    const translatedText = t(
+      feature.key,
+      feature.defaultValue,
+      feature.values || {}
+    );
     if (feature.prefix === 'unlimited') {
       return `${t('billing_unlimited', 'Unlimited')} ${translatedText}`;
     }

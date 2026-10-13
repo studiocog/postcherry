@@ -10,8 +10,11 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import dayjs from 'dayjs';
 import clsx from 'clsx';
-import { capitalize } from 'lodash';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  BillingTier,
+  PaidTier,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { FAQComponent } from '@gitroom/frontend/components/billing/faq.component';
 import { useBillingFeatures } from '@gitroom/frontend/components/billing/first.billing.component';
 import { BillingHistory } from '@gitroom/frontend/components/billing/billing.history.component';
@@ -30,6 +33,12 @@ import { FinishTrial } from '@gitroom/frontend/components/billing/finish.trial';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
+import {
+  usePlanName,
+  usePlanTagline,
+  useVisiblePlans,
+} from '@gitroom/frontend/components/billing/use.plans';
+import { PlanAudienceTabs } from '@gitroom/frontend/components/billing/plan.audience.tabs';
 
 type SubscriptionWithPlatform = Subscription & {
   platform?: 'web' | 'mobile';
@@ -37,7 +46,7 @@ type SubscriptionWithPlatform = Subscription & {
 
 export const Prorate: FC<{
   period: 'MONTHLY' | 'YEARLY';
-  pack: 'STANDARD' | 'PRO';
+  pack: PaidTier;
 }> = (props) => {
   const { period, pack } = props;
   const t = useT();
@@ -87,20 +96,40 @@ const planButton = {
   danger: 'bg-red-500 text-white hover:bg-red-600',
 };
 
+// Tailwind only ships class names written in full
+const gridColumns: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+};
+
 const PlanCard: FC<{
   name: string;
   price: number;
   yearly: boolean;
   current: boolean;
+  popular: boolean;
   action: PlanAction;
   loading: boolean;
   disabled: boolean;
   note?: React.ReactNode;
 }> = (props) => {
-  const { name, price, yearly, current, action, loading, disabled, note } =
-    props;
+  const {
+    name,
+    price,
+    yearly,
+    current,
+    popular,
+    action,
+    loading,
+    disabled,
+    note,
+  } = props;
   const t = useT();
   const features = useBillingFeatures(name);
+  const planName = usePlanName();
+  const planTagline = usePlanTagline();
+  const tagline = planTagline(name);
 
   return (
     <div
@@ -128,12 +157,30 @@ const PlanCard: FC<{
           )}
         />
       ))}
-      <div className="flex items-center justify-between gap-[8px] min-h-[26px]">
-        <div className="text-[18px] font-[600]">{capitalize(name)}</div>
-        {current && (
-          <div className="flex items-center gap-[6px] h-[26px] px-[10px] rounded-full bg-white/15 text-[12px] font-[600] uppercase whitespace-nowrap">
-            <span className="w-[6px] h-[6px] rounded-full bg-[#32D583]" />
-            {t('active', 'Active')}
+      <div className="flex flex-col gap-[4px]">
+        <div className="flex items-center justify-between gap-[8px] min-h-[26px]">
+          <div className="text-[18px] font-[600]">{planName(name)}</div>
+          {current ? (
+            <div className="flex items-center gap-[6px] h-[26px] px-[10px] rounded-full bg-white/15 text-[12px] font-[600] uppercase whitespace-nowrap">
+              <span className="w-[6px] h-[6px] rounded-full bg-[#32D583]" />
+              {t('active', 'Active')}
+            </div>
+          ) : (
+            popular && (
+              <div className="bg-[#AA0FA4] text-white text-[12px] px-[6px] rounded-[4px] whitespace-nowrap">
+                {t('billing_most_popular', 'Most popular')}
+              </div>
+            )
+          )}
+        </div>
+        {!!tagline && (
+          <div
+            className={clsx(
+              'text-[13px]',
+              current ? 'text-white/70' : 'text-textItemBlur'
+            )}
+          >
+            {tagline}
           </div>
         )}
       </div>
@@ -335,6 +382,12 @@ export const MainBillingComponent: FC<{
   const [subscription, setSubscription] = useState<SubscriptionWithPlatform | undefined>(
     sub
   );
+  const {
+    view,
+    setView,
+    plans: visiblePlans,
+    popular,
+  } = useVisiblePlans(subscription?.subscriptionTier);
   const [loading, setLoading] = useState<boolean>(false);
   // which button started the request, so only that one shows a spinner
   const [clicked, setClicked] = useState('');
@@ -376,7 +429,7 @@ export const MainBillingComponent: FC<{
     return subscription?.subscriptionTier;
   }, [subscription, initialChannels, monthlyOrYearly, period]);
   const moveToCheckout = useCallback(
-    (billing: 'STANDARD' | 'PRO' | 'FREE', reactivate = false) =>
+    (billing: BillingTier, reactivate = false) =>
       async () => {
         if (reactivate) {
           setLoading(true);
@@ -588,9 +641,8 @@ export const MainBillingComponent: FC<{
     );
   }
   const yearly = monthlyOrYearly === 'on';
-  const tiers = Object.keys(pricing);
   const currentTier = subscription?.subscriptionTier || 'FREE';
-  const plans = tiers.filter((name) => !isGeneral || name !== 'FREE');
+  const plans = [...(isGeneral ? [] : ['FREE']), ...visiblePlans];
 
   const planAction = (name: string): PlanAction => {
     if (currentPackage === name && subscription?.cancelAt) {
@@ -622,20 +674,24 @@ export const MainBillingComponent: FC<{
         variant: 'danger',
       };
     }
-    const direction = tiers.indexOf(name) - tiers.indexOf(currentTier);
+    // the plans are grouped by audience, so the price tells the direction
+    const direction =
+      pricing[name].month_price - (pricing[currentTier]?.month_price || 0);
     return {
       label: !subscription
         ? user?.tier?.current === 'FREE' && user.allowTrial
           ? t('start_7_days_free_trial', 'Start 7 days free trial')
           : t('billing_purchase', 'Purchase')
+        : name === currentTier
+        ? yearly
+          ? t('billing_switch_to_yearly', 'Switch to yearly')
+          : t('billing_switch_to_monthly', 'Switch to monthly')
         : direction > 0
         ? t('billing_upgrade', 'Upgrade')
         : direction < 0
         ? t('billing_downgrade', 'Downgrade')
-        : yearly
-        ? t('billing_switch_to_yearly', 'Switch to yearly')
-        : t('billing_switch_to_monthly', 'Switch to monthly'),
-      onClick: moveToCheckout(name as 'STANDARD' | 'PRO'),
+        : t('billing_switch_plan', 'Switch plan'),
+      onClick: moveToCheckout(name as PaidTier),
       variant: !!subscription && direction < 0 ? 'simple' : 'primary',
     };
   };
@@ -673,8 +729,8 @@ export const MainBillingComponent: FC<{
             )}
           >
             {t('billing_yearly', 'Yearly')}
-            <div className="bg-[#AA0FA4] text-white text-[12px] px-[6px] rounded-[4px]">
-              {t('billing_20_percent_off', '20% Off')}
+            <div className="bg-[#AA0FA4] text-white text-[12px] px-[6px] rounded-[4px] whitespace-nowrap">
+              {t('billing_two_months_free', '2 months free')}
             </div>
           </div>
         </div>
@@ -698,10 +754,15 @@ export const MainBillingComponent: FC<{
           </div>
         </div>
       )}
+      <PlanAudienceTabs
+        value={view}
+        onChange={setView}
+        className="self-start mobile:self-stretch"
+      />
       <div
         className={clsx(
           'grid gap-[16px] tablet:grid-cols-2 mobile:!grid-cols-1',
-          plans.length > 4 ? 'grid-cols-5' : 'grid-cols-4'
+          gridColumns[plans.length] || 'grid-cols-4'
         )}
       >
         {plans.map((name) => {
@@ -715,6 +776,7 @@ export const MainBillingComponent: FC<{
               }
               yearly={yearly}
               current={currentPackage === name}
+              popular={popular.includes(name)}
               action={{
                 ...action,
                 onClick: () => {
@@ -730,7 +792,7 @@ export const MainBillingComponent: FC<{
                 name !== 'FREE' && (
                   <Prorate
                     period={yearly ? 'YEARLY' : 'MONTHLY'}
-                    pack={name as 'STANDARD' | 'PRO'}
+                    pack={name as PaidTier}
                   />
                 )
               }
