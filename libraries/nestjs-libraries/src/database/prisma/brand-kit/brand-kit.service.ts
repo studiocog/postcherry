@@ -3,6 +3,7 @@ import { uniq, uniqBy } from 'lodash';
 import { BrandKitRepository } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.repository';
 import {
   BrandKitDto,
+  brandKitLimits,
   BrandKitView,
   LearnVoiceResult,
 } from '@gitroom/nestjs-libraries/dtos/brand-kit/brand-kit.dto';
@@ -22,6 +23,10 @@ const toList = (values: string[] = [], maxItems: number, maxLength: number) =>
       .map((value) => (value || '').trim().slice(0, maxLength))
       .filter((value) => !!value)
   ).slice(0, maxItems);
+
+// Uploads never set Media.type, the media library tells videos apart by the extension
+const isVideoPath = (path: string) =>
+  /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(path.split('?')[0]);
 
 @Injectable()
 export class BrandKitService {
@@ -45,11 +50,13 @@ export class BrandKitService {
   }
 
   async saveBrandKit(orgId: string, body: BrandKitDto) {
-    // the path is never taken from the client, only from the media of the workspace
+    // the path is never taken from the client, only from the media of the workspace,
+    // and a logo must be a picture
     const logoMediaId = toNullable(body.logoMediaId);
-    const logo = logoMediaId
+    const media = logoMediaId
       ? await this._brandKitRepository.getOrgMediaPath(orgId, logoMediaId)
       : null;
+    const logo = media && !isVideoPath(media.path) ? media : null;
 
     return this._brandKitRepository.upsertBrandKit(orgId, {
       brandName: toNullable(body.brandName),
@@ -61,15 +68,19 @@ export class BrandKitService {
       headingFont: toNullable(body.headingFont),
       bodyFont: toNullable(body.bodyFont),
       voice: toNullable(body.voice),
-      dos: toList(body.dos, 20, 200),
-      donts: toList(body.donts, 20, 200),
+      dos: toList(body.dos, brandKitLimits.rules, brandKitLimits.ruleLength),
+      donts: toList(
+        body.donts,
+        brandKitLimits.rules,
+        brandKitLimits.ruleLength
+      ),
       hashtags: toList(
         (body.hashtags || []).map((hashtag) => {
           const value = (hashtag || '').replace(/[\s#]+/g, '');
           return value ? `#${value}` : '';
         }),
-        30,
-        100
+        brandKitLimits.hashtags,
+        brandKitLimits.hashtagLength
       ),
       website: toNullable(body.website),
     });
@@ -134,8 +145,8 @@ export class BrandKitService {
       return {
         status: 'ok',
         voice: (voice || '').trim().slice(0, 2000),
-        dos: toList(dos, 20, 200),
-        donts: toList(donts, 20, 200),
+        dos: toList(dos, brandKitLimits.rules, brandKitLimits.ruleLength),
+        donts: toList(donts, brandKitLimits.rules, brandKitLimits.ruleLength),
         postsUsed: posts.length,
       };
     } catch (err) {

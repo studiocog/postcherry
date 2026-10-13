@@ -15,8 +15,10 @@ import { Textarea } from '@gitroom/react/form/textarea';
 import { Select } from '@gitroom/react/form/select';
 import { ColorPicker } from '@gitroom/react/form/color.picker';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
+import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import {
   brandKitFonts,
+  brandKitLimits,
   BrandKitView,
   LearnVoiceResult,
 } from '@gitroom/nestjs-libraries/dtos/brand-kit/brand-kit.dto';
@@ -25,7 +27,11 @@ export const useBrandKit = () => {
   const fetch = useFetch();
 
   const load = useCallback(async () => {
-    return (await fetch('/brand-kit')).json();
+    const response = await fetch('/brand-kit');
+    if (!response.ok) {
+      throw new Error('Failed to load the brand kit');
+    }
+    return response.json();
   }, []);
 
   return useSWR<Partial<BrandKitView>>('brand-kit', load, {
@@ -78,9 +84,54 @@ const toLines = (value: string) =>
 const fontStyle = (font: string) =>
   font ? { fontFamily: `'${font}', sans-serif` } : {};
 
+// Black or white, whichever is easier to read on the color
+const textColorOn = (color: string) => {
+  const hex = /^#([0-9a-f]{6})$/i.exec(color)?.[1];
+  if (!hex) {
+    return undefined;
+  }
+
+  const [r, g, b] = [0, 2, 4].map((index) => {
+    const value = parseInt(hex.slice(index, index + 2), 16) / 255;
+    return value <= 0.03928
+      ? value / 12.92
+      : Math.pow((value + 0.055) / 1.055, 2.4);
+  });
+
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179 ? '#000000' : '#FFFFFF';
+};
+
+// The color picker shows its label only once it is enabled, so it is always shown here
+const BrandColor: FC<{ name: keyof BrandKitForm; label: string }> = ({
+  name,
+  label,
+}) => (
+  <div
+    role="group"
+    aria-label={label}
+    className="flex flex-col gap-[6px] min-w-0"
+  >
+    <div className="text-[14px]">{label}</div>
+    <ColorPicker name={name} label="" enabled={true} canBeCancelled={true} />
+  </div>
+);
+
 export const BrandKitComponent = () => {
   const t = useT();
-  const { data, isLoading, mutate } = useBrandKit();
+  const { data, isLoading, isValidating, error, mutate } = useBrandKit();
+
+  if (error && !data) {
+    return (
+      <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col items-start gap-[12px]">
+        <div>
+          {t('brand_kit_load_failed', 'We could not load your brand kit.')}
+        </div>
+        <Button onClick={() => mutate()} loading={isValidating}>
+          {t('try_again', 'Try Again')}
+        </Button>
+      </div>
+    );
+  }
 
   if (isLoading || !data) {
     return (
@@ -120,9 +171,29 @@ const BrandKitFormComponent: FC<{
   const values = form.watch();
 
   const chooseLogo = useCallback(() => {
-    showMediaBox(({ id, path }) => {
-      form.setValue('logo', { id, path }, { shouldDirty: true });
-    });
+    showMediaBox((media) => {
+      if (!media?.path) {
+        return;
+      }
+
+      // the library only lists pictures here, this also covers anything picked another way
+      if (hasExtension(media.path, 'mp4')) {
+        toaster.show(
+          t(
+            'brand_logo_image_only',
+            'The logo must be a picture, not a video'
+          ),
+          'warning'
+        );
+        return;
+      }
+
+      form.setValue(
+        'logo',
+        { id: media.id, path: media.path },
+        { shouldDirty: true }
+      );
+    }, 'image');
   }, [form]);
 
   const removeLogo = useCallback(() => {
@@ -132,55 +203,124 @@ const BrandKitFormComponent: FC<{
   const save = useCallback(
     async (value: BrandKitForm) => {
       const website = value.website.trim();
-      setSaving(true);
-      const response = await fetch('/brand-kit', {
-        method: 'PUT',
-        body: JSON.stringify({
-          brandName: value.brandName || null,
-          logoMediaId: value.logo?.id || null,
-          primaryColor: value.primaryColor || null,
-          secondaryColor: value.secondaryColor || null,
-          accentColor: value.accentColor || null,
-          headingFont: value.headingFont || null,
-          bodyFont: value.bodyFont || null,
-          website: !website
-            ? null
-            : /^https?:\/\//i.test(website)
-            ? website
-            : `https://${website}`,
-          voice: value.voice || null,
-          dos: toLines(value.dos),
-          donts: toLines(value.donts),
-          hashtags: value.hashtags.split(/[\s,]+/).filter((tag) => !!tag),
-        }),
-      });
-      setSaving(false);
+      const dos = toLines(value.dos);
+      const donts = toLines(value.donts);
+      const hashtags = value.hashtags.split(/[\s,]+/).filter((tag) => !!tag);
 
-      if (!response.ok) {
+      // the same limits as the server, so the field that is wrong is marked
+      const rulesError = (lines: string[]) =>
+        lines.length > brandKitLimits.rules
+          ? t('brand_rules_too_many', 'Use up to {{max}} lines', {
+              max: brandKitLimits.rules,
+            })
+          : lines.some((line) => line.length > brandKitLimits.ruleLength)
+          ? t(
+              'brand_rules_too_long',
+              'Each line can have up to {{max}} characters',
+              { max: brandKitLimits.ruleLength }
+            )
+          : '';
+
+      const errors = {
+        dos: rulesError(dos),
+        donts: rulesError(donts),
+        hashtags:
+          hashtags.length > brandKitLimits.hashtags
+            ? t('brand_hashtags_too_many', 'Use up to {{max}} hashtags', {
+                max: brandKitLimits.hashtags,
+              })
+            : hashtags.some(
+                (tag) => tag.length > brandKitLimits.hashtagLength
+              )
+            ? t(
+                'brand_hashtags_too_long',
+                'Each hashtag can have up to {{max}} characters',
+                { max: brandKitLimits.hashtagLength }
+              )
+            : '',
+      };
+
+      form.clearErrors();
+      const fields = Object.keys(errors) as Array<keyof typeof errors>;
+      const invalid = fields.filter((field) => !!errors[field]);
+      if (invalid.length) {
+        invalid.forEach((field) =>
+          form.setError(field, { message: errors[field] })
+        );
         toaster.show(
-          t(
-            'brand_kit_save_failed',
-            'Could not save the brand kit, please check the fields and try again'
-          ),
+          t('brand_kit_fix_fields', 'Please fix the fields marked in red'),
           'warning'
         );
         return;
       }
 
-      toaster.show(t('brand_kit_saved', 'Brand kit saved'), 'success');
-      reload();
+      setSaving(true);
+      try {
+        const response = await fetch('/brand-kit', {
+          method: 'PUT',
+          body: JSON.stringify({
+            brandName: value.brandName || null,
+            logoMediaId: value.logo?.id || null,
+            primaryColor: value.primaryColor || null,
+            secondaryColor: value.secondaryColor || null,
+            accentColor: value.accentColor || null,
+            headingFont: value.headingFont || null,
+            bodyFont: value.bodyFont || null,
+            website: !website
+              ? null
+              : /^https?:\/\//i.test(website)
+              ? website
+              : `https://${website}`,
+            voice: value.voice || null,
+            dos,
+            donts,
+            hashtags,
+          }),
+        });
+
+        if (!response.ok) {
+          toaster.show(
+            t(
+              'brand_kit_save_failed',
+              'Could not save the brand kit, please check the fields and try again'
+            ),
+            'warning'
+          );
+          return;
+        }
+
+        toaster.show(t('brand_kit_saved', 'Brand kit saved'), 'success');
+        reload();
+      } catch (err) {
+        toaster.show(
+          t(
+            'brand_kit_save_error',
+            'Could not save the brand kit, please try again'
+          ),
+          'warning'
+        );
+      } finally {
+        setSaving(false);
+      }
     },
-    [reload]
+    [reload, form]
   );
 
   const learnVoice = useCallback(async () => {
     setLearning(true);
-    const response = await fetch('/brand-kit/learn-voice', {
-      method: 'POST',
-    });
-    setLearning(false);
+    let result: LearnVoiceResult | null = null;
+    try {
+      const response = await fetch('/brand-kit/learn-voice', {
+        method: 'POST',
+      });
+      result = response.ok ? await response.json() : null;
+    } catch (err) {
+      result = null;
+    } finally {
+      setLearning(false);
+    }
 
-    if (!response.ok) {
+    if (!result) {
       toaster.show(
         t(
           'brand_voice_learn_failed',
@@ -191,7 +331,6 @@ const BrandKitFormComponent: FC<{
       return;
     }
 
-    const result: LearnVoiceResult = await response.json();
     if (result.status === 'not_configured') {
       toaster.show(
         t(
@@ -313,26 +452,17 @@ const BrandKitFormComponent: FC<{
               </div>
             </div>
             <div className="grid grid-cols-3 mobile:grid-cols-1 gap-[16px]">
-              <ColorPicker
+              <BrandColor
                 name="primaryColor"
                 label={t('primary_color', 'Primary color')}
-                translationKey="primary_color"
-                enabled={true}
-                canBeCancelled={true}
               />
-              <ColorPicker
+              <BrandColor
                 name="secondaryColor"
                 label={t('secondary_color', 'Secondary color')}
-                translationKey="secondary_color"
-                enabled={true}
-                canBeCancelled={true}
               />
-              <ColorPicker
+              <BrandColor
                 name="accentColor"
                 label={t('accent_color', 'Accent color')}
-                translationKey="accent_color"
-                enabled={true}
-                canBeCancelled={true}
               />
             </div>
             <div className="grid grid-cols-2 mobile:grid-cols-1 gap-[16px]">
@@ -372,8 +502,22 @@ const BrandKitFormComponent: FC<{
 
           <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] mobile:p-[12px] flex flex-col gap-[16px]">
             <div className="text-[18px]">{t('preview', 'Preview')}</div>
-            <div className="rounded-[8px] border border-newTableBorder bg-newBgColorInner p-[16px] flex flex-col gap-[12px] min-w-0">
-              <div className="flex items-center gap-[12px] min-w-0">
+            <div className="rounded-[8px] border border-newTableBorder bg-newBgColorInner flex flex-col min-w-0 overflow-hidden">
+              {/* a band in the primary color, its text is black or white so it can always be read */}
+              <div
+                className={clsx(
+                  'flex items-center gap-[12px] min-w-0 px-[16px] pt-[16px]',
+                  !!values.primaryColor && 'pb-[16px]'
+                )}
+                style={
+                  values.primaryColor
+                    ? {
+                        backgroundColor: values.primaryColor,
+                        color: textColorOn(values.primaryColor),
+                      }
+                    : {}
+                }
+              >
                 {!!values.logo?.path && (
                   <img
                     src={values.logo.path}
@@ -383,51 +527,59 @@ const BrandKitFormComponent: FC<{
                 )}
                 <div
                   className="text-[22px] font-[600] break-words min-w-0"
-                  style={{
-                    ...fontStyle(values.headingFont),
-                    ...(values.primaryColor
-                      ? { color: values.primaryColor }
-                      : {}),
-                  }}
+                  style={fontStyle(values.headingFont)}
                 >
                   {values.brandName || t('brand_name', 'Brand name')}
                 </div>
               </div>
-              <div className="text-[14px]" style={fontStyle(values.bodyFont)}>
-                {t(
-                  'brand_kit_preview_text',
-                  'This is how a short text looks with your brand fonts and colors.'
-                )}
-              </div>
-              <div className="flex items-end gap-[16px] flex-wrap">
-                {[
-                  values.primaryColor,
-                  values.secondaryColor,
-                  values.accentColor,
-                ]
-                  .filter((color) => !!color)
-                  .map((color, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-col items-center gap-[4px]"
-                    >
-                      <div
-                        className="w-[32px] h-[32px] rounded-[8px] border border-newTableBorder"
-                        style={{ backgroundColor: color }}
-                      />
-                      <div className="text-[12px] text-textItemBlur">
-                        {color}
-                      </div>
-                    </div>
-                  ))}
-                {!!values.accentColor && (
-                  <div
-                    className="px-[12px] py-[4px] rounded-full text-[12px] text-white"
-                    style={{ backgroundColor: values.accentColor }}
-                  >
-                    {t('brand_kit_preview_button', 'Learn more')}
+              <div className="p-[16px] flex flex-col gap-[12px] min-w-0">
+                <div className="text-[14px]" style={fontStyle(values.bodyFont)}>
+                  {t(
+                    'brand_kit_preview_body',
+                    'This is a short sample text for your brand.'
+                  )}
+                </div>
+                {(!!values.headingFont || !!values.bodyFont) && (
+                  <div className="text-[12px] text-textItemBlur">
+                    {t(
+                      'brand_kit_font_hint',
+                      'The preview shows a font only when it is installed on this device.'
+                    )}
                   </div>
                 )}
+                <div className="flex items-end gap-[16px] flex-wrap">
+                  {[
+                    values.primaryColor,
+                    values.secondaryColor,
+                    values.accentColor,
+                  ]
+                    .filter((color) => !!color)
+                    .map((color, index) => (
+                      <div
+                        key={index}
+                        className="flex flex-col items-center gap-[4px]"
+                      >
+                        <div
+                          className="w-[32px] h-[32px] rounded-[8px] border border-newTableBorder"
+                          style={{ backgroundColor: color }}
+                        />
+                        <div className="text-[12px] text-textItemBlur">
+                          {color}
+                        </div>
+                      </div>
+                    ))}
+                  {!!values.accentColor && (
+                    <div
+                      className="px-[12px] py-[4px] rounded-full text-[12px]"
+                      style={{
+                        backgroundColor: values.accentColor,
+                        color: textColorOn(values.accentColor),
+                      }}
+                    >
+                      {t('brand_kit_preview_button', 'Learn more')}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -467,21 +619,36 @@ const BrandKitFormComponent: FC<{
             />
             <div className="grid grid-cols-2 mobile:grid-cols-1 gap-[16px]">
               <Textarea
-                label={t('brand_dos', "Do's (one per line)")}
-                translationKey="brand_dos"
+                label={t(
+                  'brand_dos_limit',
+                  "Do's (one per line, up to {{max}})",
+                  { max: brandKitLimits.rules }
+                )}
+                translationKey="brand_dos_limit"
+                translationParams={{ max: brandKitLimits.rules }}
                 name="dos"
                 placeholder={t('brand_dos_placeholder', 'Ask a question')}
               />
               <Textarea
-                label={t('brand_donts', "Don'ts (one per line)")}
-                translationKey="brand_donts"
+                label={t(
+                  'brand_donts_limit',
+                  "Don'ts (one per line, up to {{max}})",
+                  { max: brandKitLimits.rules }
+                )}
+                translationKey="brand_donts_limit"
+                translationParams={{ max: brandKitLimits.rules }}
                 name="donts"
                 placeholder={t('brand_donts_placeholder', 'Use slang')}
               />
             </div>
             <Input
-              label={t('default_hashtags', 'Default hashtags')}
-              translationKey="default_hashtags"
+              label={t(
+                'default_hashtags_limit',
+                'Default hashtags (up to {{max}})',
+                { max: brandKitLimits.hashtags }
+              )}
+              translationKey="default_hashtags_limit"
+              translationParams={{ max: brandKitLimits.hashtags }}
               name="hashtags"
               placeholder="#coffee #morning"
             />

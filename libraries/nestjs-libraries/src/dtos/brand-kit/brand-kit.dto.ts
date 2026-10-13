@@ -10,7 +10,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-// Common web fonts, the preview uses the font installed on the device
+// Common web fonts, the preview only shows a font that is installed on the device
 export const brandKitFonts = [
   'Inter',
   'Roboto',
@@ -29,6 +29,14 @@ export const brandKitFonts = [
 ] as const;
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+// Shared with the settings form, so it can say what is wrong before saving
+export const brandKitLimits = {
+  rules: 20,
+  ruleLength: 200,
+  hashtags: 30,
+  hashtagLength: 100,
+} as const;
 
 export class BrandKitDto {
   @IsOptional()
@@ -68,23 +76,23 @@ export class BrandKitDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(20)
+  @ArrayMaxSize(brandKitLimits.rules)
   @IsString({ each: true })
-  @MaxLength(200, { each: true })
+  @MaxLength(brandKitLimits.ruleLength, { each: true })
   dos?: string[];
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(20)
+  @ArrayMaxSize(brandKitLimits.rules)
   @IsString({ each: true })
-  @MaxLength(200, { each: true })
+  @MaxLength(brandKitLimits.ruleLength, { each: true })
   donts?: string[];
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(30)
+  @ArrayMaxSize(brandKitLimits.hashtags)
   @IsString({ each: true })
-  @MaxLength(100, { each: true })
+  @MaxLength(brandKitLimits.hashtagLength, { each: true })
   hashtags?: string[];
 
   @ValidateIf((o) => !!o.website)
