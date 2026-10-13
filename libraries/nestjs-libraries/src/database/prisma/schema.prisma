@@ -1856,6 +1856,7 @@ enum PostApprovalStatus {
 
 // A link a team member sends to a client to approve a post without logging in.
 // Informational only: publishing does not wait for it.
+// Follow-up: "block publishing until approved" (see PostApprovalsService).
 model PostApproval {
   id                String             @id @default(uuid())
   organizationId    String

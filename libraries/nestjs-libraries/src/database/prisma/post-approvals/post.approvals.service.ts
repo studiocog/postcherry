@@ -30,8 +30,16 @@ type SubjectPost = Awaited<
 type ApprovalCandidate = Awaited<
   ReturnType<PostApprovalsRepository['getLatestCandidates']>
 >[number];
+type EditablePost = Awaited<
+  ReturnType<PostApprovalsRepository['getEditablePosts']>
+>[number];
 
-export type PostApprovalBadge = Omit<ApprovalCandidate, 'postId' | 'batchId'>;
+export type PostApprovalBadge = Omit<
+  ApprovalCandidate,
+  'postId' | 'batchId'
+> & {
+  editedAfterDecision: boolean;
+};
 
 export type PostApprovalState =
   | 'open'
@@ -40,6 +48,8 @@ export type PostApprovalState =
   | 'revoked'
   | 'unavailable';
 
+// the page shows its own translated text for each state, the message is for
+// other callers of the API
 const CLOSED_MESSAGES: Record<Exclude<PostApprovalState, 'open'>, string> = {
   locked: 'This post is already published',
   expired: 'This approval link has expired',
@@ -47,6 +57,11 @@ const CLOSED_MESSAGES: Record<Exclude<PostApprovalState, 'open'>, string> = {
   unavailable: 'This post is no longer available',
 };
 
+// Client approval is informational in this phase: publishing, the Temporal
+// workflows and the post states do not look at it.
+// Follow-up: "block publishing until approved", an opt-in per workspace that
+// keeps a post with a pending or changes-requested link from being published
+// (it needs a new workflow version that checks the latest request first).
 @Injectable()
 export class PostApprovalsService {
   constructor(
@@ -57,6 +72,36 @@ export class PostApprovalsService {
 
   private approvalUrl(token: string) {
     return `${process.env.FRONTEND_URL}/approve/${token}`;
+  }
+
+  // the last save of the post, or of any channel saved with it
+  private lastEditOf(
+    edits: EditablePost[],
+    postId: string,
+    batchId: string | null
+  ) {
+    return Math.max(
+      0,
+      ...edits
+        .filter(
+          (edit) =>
+            edit.id === postId || (!!batchId && edit.batchId === batchId)
+        )
+        .map((edit) => +edit.updatedAt)
+    );
+  }
+
+  // A decision is about the version the client saw: when the team saves the
+  // post after it, the badge says so until the client decides again.
+  private isEditedAfterDecision(
+    approval: { status: ApprovalCandidate['status']; decidedAt: Date | null },
+    lastEdit: number
+  ) {
+    return (
+      approval.status !== 'PENDING' &&
+      !!approval.decidedAt &&
+      lastEdit > +approval.decidedAt
+    );
   }
 
   async createRequest(
@@ -101,17 +146,26 @@ export class PostApprovalsService {
       throw new NotFoundException('Post not found');
     }
 
-    const now = new Date();
-    return (
-      await this._postApprovalsRepository.listForSubject(
+    const [approvals, edits] = await Promise.all([
+      this._postApprovalsRepository.listForSubject(
         orgId,
         post.id,
         post.batchId
-      )
-    ).map(({ token, requestedBy, ...approval }) => ({
+      ),
+      this._postApprovalsRepository.getEditablePosts(
+        orgId,
+        [post.id],
+        post.batchId ? [post.batchId] : []
+      ),
+    ]);
+
+    const now = new Date();
+    const lastEdit = this.lastEditOf(edits, post.id, post.batchId);
+    return approvals.map(({ token, requestedBy, ...approval }) => ({
       ...approval,
       url: this.approvalUrl(token),
       active: !approval.revokedAt && approval.expiresAt > now,
+      editedAfterDecision: this.isEditedAfterDecision(approval, lastEdit),
       requestedBy:
         [requestedBy?.name, requestedBy?.lastName]
           .filter(Boolean)
@@ -154,6 +208,15 @@ export class PostApprovalsService {
         batchIds
       );
 
+    // the saves only matter for a decision
+    const edits = candidates.some((c) => c.status !== 'PENDING')
+      ? await this._postApprovalsRepository.getEditablePosts(
+          orgId,
+          ids,
+          batchIds
+        )
+      : [];
+
     return posts.reduce((all, post) => {
       const latest = candidates.find(
         (c) =>
@@ -161,7 +224,13 @@ export class PostApprovalsService {
       );
       if (latest) {
         const { postId, batchId, ...badge } = latest;
-        all[post.id] = badge;
+        all[post.id] = {
+          ...badge,
+          editedAfterDecision: this.isEditedAfterDecision(
+            badge,
+            this.lastEditOf(edits, post.id, post.batchId)
+          ),
+        };
       }
       return all;
     }, {} as Record<string, PostApprovalBadge>);
@@ -260,6 +329,16 @@ export class PostApprovalsService {
       return { state };
     }
 
+    // the same saves the badge of the team counts (getEditablePosts), from
+    // the channels already loaded here
+    const lastEdit = Math.max(
+      0,
+      ...channels
+        .map((list) => list[0])
+        .filter((post) => post.state === 'QUEUE' || post.state === 'DRAFT')
+        .map((post) => +post.updatedAt)
+    );
+
     return {
       state,
       status: approval.status,
@@ -267,6 +346,7 @@ export class PostApprovalsService {
       decidedByName: approval.decidedByName,
       clientComment: approval.clientComment,
       decidedAt: approval.decidedAt,
+      editedAfterDecision: this.isEditedAfterDecision(approval, lastEdit),
       expiresAt: approval.expiresAt,
       channels: channels.map((list) => ({
         integration: {
@@ -287,11 +367,16 @@ export class PostApprovalsService {
 
   // The client can change the decision until the post is published or the
   // link expires or is revoked. Approval is informational, publishing does
-  // not wait for it.
+  // not wait for it (see the follow-up above the class).
   async decide(token: string, body: PostApprovalDecisionDto) {
     const { approval, state, channels } = await this.resolve(token);
     if (state !== 'open') {
-      throw new BadRequestException(CLOSED_MESSAGES[state]);
+      // the state lets the page explain it in the language of the client
+      throw new BadRequestException({
+        statusCode: 400,
+        message: CLOSED_MESSAGES[state],
+        state,
+      });
     }
 
     const comment = body.comment?.trim() || null;

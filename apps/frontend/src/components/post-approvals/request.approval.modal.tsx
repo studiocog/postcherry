@@ -64,12 +64,19 @@ const ApprovalRequestRow: FC<{
       return;
     }
 
-    if (await revoke(postId, approval.id)) {
+    if (!(await revoke(postId, approval.id))) {
+      // the link still works, the team has to know
       toaster.show(
-        t('approval_link_revoked', 'Approval link revoked'),
-        'success'
+        t('approval_revoke_failed', 'Could not revoke the link'),
+        'warning'
       );
+      return;
     }
+
+    toaster.show(
+      t('approval_link_revoked', 'Approval link revoked'),
+      'success'
+    );
   }, [postId, approval.id, revoke, toaster, t]);
 
   return (
@@ -155,7 +162,7 @@ export const RequestApprovalModal: FC<{ postId: string }> = ({ postId }) => {
   const t = useT();
   const toaster = useToaster();
   const copyLink = useCopyLink();
-  const { data, isLoading } = usePostApprovals(postId);
+  const { data, error, isLoading } = usePostApprovals(postId);
   const createApproval = useCreatePostApproval();
   const [loading, setLoading] = useState(false);
   const [createdUrl, setCreatedUrl] = useState('');
@@ -262,6 +269,13 @@ export const RequestApprovalModal: FC<{ postId: string }> = ({ postId }) => {
         {isLoading ? (
           <div className="flex justify-center py-[12px]">
             <div className="animate-spin h-[20px] w-[20px] border-4 border-textColor border-t-transparent rounded-full" />
+          </div>
+        ) : !data && error ? (
+          <div className="text-[14px] text-textItemBlur">
+            {t(
+              'approval_requests_load_failed',
+              'Could not load the approval links, please try again later'
+            )}
           </div>
         ) : !data?.length ? (
           <div className="text-[14px] text-textItemBlur">

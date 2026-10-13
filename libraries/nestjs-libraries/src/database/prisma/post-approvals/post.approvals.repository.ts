@@ -1,6 +1,6 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
-import { PostApprovalStatus } from '@prisma/client';
+import { PostApprovalStatus, State } from '@prisma/client';
 
 @Injectable()
 export class PostApprovalsRepository {
@@ -166,6 +166,7 @@ export class PostApprovalsRepository {
         image: true,
         publishDate: true,
         state: true,
+        updatedAt: true,
         integration: {
           select: {
             name: true,
@@ -174,6 +175,30 @@ export class PostApprovalsRepository {
             profile: true,
           },
         },
+      },
+    });
+  }
+
+  // the channels of the posts the team can still edit, with the time of their
+  // last save (published or failed posts change state without an edit)
+  getEditablePosts(orgId: string, postIds: string[], batchIds: string[]) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        deletedAt: null,
+        parentPostId: null,
+        state: {
+          in: [State.QUEUE, State.DRAFT],
+        },
+        OR: [
+          { id: { in: postIds } },
+          ...(batchIds.length ? [{ batchId: { in: batchIds } }] : []),
+        ],
+      },
+      select: {
+        id: true,
+        batchId: true,
+        updatedAt: true,
       },
     });
   }

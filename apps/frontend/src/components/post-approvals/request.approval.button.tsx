@@ -5,7 +5,10 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { BottomSheetRow } from '@gitroom/frontend/components/ui/bottom.sheet.component';
 import { usePostApprovals } from '@gitroom/frontend/components/post-approvals/post.approval.hooks';
-import { ApprovalStatusBadge } from '@gitroom/frontend/components/post-approvals/post.approval.badge';
+import {
+  ApprovalStatusBadge,
+  useApprovalStatusLabel,
+} from '@gitroom/frontend/components/post-approvals/post.approval.badge';
 import { RequestApprovalModal } from '@gitroom/frontend/components/post-approvals/request.approval.modal';
 
 const ApprovalIcon: FC<{ size?: number }> = ({ size = 20 }) => (
@@ -40,6 +43,7 @@ const useOpenRequestApproval = (postId: string) => {
 // the editor footer action, with the status of the latest link
 export const RequestApprovalButton: FC<{ postId: string }> = ({ postId }) => {
   const t = useT();
+  const label = useApprovalStatusLabel();
   const open = useOpenRequestApproval(postId);
   const { data } = usePostApprovals(postId);
   const latest = data?.find(
@@ -47,12 +51,20 @@ export const RequestApprovalButton: FC<{ postId: string }> = ({ postId }) => {
       !approval.revokedAt && (approval.active || approval.status !== 'PENDING')
   );
 
-  // the footer is narrow on smaller screens, the icon and the status stay
+  // the footer is narrow on smaller screens, the icon and the status stay;
+  // the name keeps the status for screen readers when the text is hidden
   return (
     <button
       type="button"
       onClick={open}
-      aria-label={t('request_approval', 'Request approval')}
+      aria-label={
+        latest
+          ? t('request_approval_with_status', 'Request approval, {{status}}', {
+              status: label(latest),
+              interpolation: { escapeValue: false },
+            })
+          : t('request_approval', 'Request approval')
+      }
       className="cursor-pointer flex gap-[8px] items-center text-[15px] font-[600]"
     >
       <div

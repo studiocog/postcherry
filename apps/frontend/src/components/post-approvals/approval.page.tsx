@@ -15,6 +15,7 @@ import { PreviewLogo } from '@gitroom/frontend/components/preview/preview.logo';
 import { PreviewPostCard } from '@gitroom/frontend/components/preview/preview.post.card';
 import { RenderPreviewDateClient } from '@gitroom/frontend/components/preview/render.preview.date.client';
 import {
+  ClosedApprovalState,
   PublicApproval,
   useDecidePostApproval,
   usePublicApproval,
@@ -27,6 +28,26 @@ type Decision = 'APPROVED' | 'CHANGES_REQUESTED';
 
 const formatDate = (date: string) =>
   dayjs.utc(date).local().format('MMMM D, YYYY h:mm A');
+
+// why the client can no longer decide, for the page and for a decision sent
+// after the link was closed
+const useClosedApprovalMessage = () => {
+  const t = useT();
+  return useCallback(
+    (state: ClosedApprovalState) =>
+      state === 'locked'
+        ? t(
+            'approval_locked_published',
+            'This post is already published, the decision can no longer be changed.'
+          )
+        : state === 'expired'
+        ? t('approval_link_expired', 'This approval link has expired')
+        : state === 'revoked'
+        ? t('approval_link_revoked_message', 'This approval link was revoked')
+        : t('approval_post_unavailable', 'This post is no longer available'),
+    [t]
+  );
+};
 
 const CenteredMessage: FC<{ children: ReactNode }> = ({ children }) => (
   <div className="text-newTextColor fixed start-0 top-0 w-full h-full flex justify-center items-center text-[20px] text-center px-[16px]">
@@ -71,6 +92,7 @@ const ApprovalDecisionPanel: FC<{
 }> = ({ token, approval, onDecided, reload }) => {
   const t = useT();
   const toaster = useToaster();
+  const closedMessage = useClosedApprovalMessage();
   const decide = useDecidePostApproval(token);
   const [loading, setLoading] = useState<Decision | null>(null);
   const locked = approval.state === 'locked';
@@ -85,7 +107,7 @@ const ApprovalDecisionPanel: FC<{
     (decision: Decision) =>
       async (values: { name: string; comment: string }) => {
         setLoading(decision);
-        const { approval: updated, message } = await decide({
+        const { approval: updated, closedState } = await decide({
           decision,
           ...(values.name.trim() ? { name: values.name.trim() } : {}),
           ...(values.comment.trim() ? { comment: values.comment.trim() } : {}),
@@ -94,11 +116,12 @@ const ApprovalDecisionPanel: FC<{
 
         if (!updated) {
           toaster.show(
-            message ||
-              t(
-                'approval_decision_failed',
-                'Could not send your decision, please try again later'
-              ),
+            closedState
+              ? closedMessage(closedState)
+              : t(
+                  'approval_decision_failed',
+                  'Could not send your decision, please try again later'
+                ),
             'warning'
           );
           reload();
@@ -115,7 +138,7 @@ const ApprovalDecisionPanel: FC<{
           'success'
         );
       },
-    [decide, onDecided, reload, toaster, t]
+    [decide, onDecided, reload, toaster, t, closedMessage]
   );
 
   return (
@@ -171,15 +194,20 @@ const ApprovalDecisionPanel: FC<{
               {approval.clientComment}
             </div>
           )}
+          {!!approval.editedAfterDecision && !locked && (
+            <div className="text-[14px] rounded-[8px] bg-btnSimple p-[12px]">
+              {t(
+                'approval_edited_after_your_decision',
+                'The post was changed after this decision, please review it again.'
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {locked && (
         <div className="text-[14px] rounded-[8px] bg-btnSimple p-[12px]">
-          {t(
-            'approval_locked_published',
-            'This post is already published, the decision can no longer be changed.'
-          )}
+          {closedMessage('locked')}
         </div>
       )}
 
@@ -243,6 +271,7 @@ const ApprovalDecisionPanel: FC<{
 // in the browser so the rate limit counts each visitor on their own address.
 export const ApprovalPage: FC<{ token: string }> = ({ token }) => {
   const t = useT();
+  const closedMessage = useClosedApprovalMessage();
   const { data, error, isLoading, mutate } = usePublicApproval(token);
 
   const onDecided = useCallback(
@@ -274,28 +303,17 @@ export const ApprovalPage: FC<{ token: string }> = ({ token }) => {
     );
   }
 
-  if (data.state === 'expired') {
-    return (
-      <CenteredMessage>
-        {t('approval_link_expired', 'This approval link has expired')}
-      </CenteredMessage>
-    );
-  }
-
-  if (data.state === 'revoked') {
-    return (
-      <CenteredMessage>
-        {t('approval_link_revoked_message', 'This approval link was revoked')}
-      </CenteredMessage>
-    );
-  }
-
-  if (data.state !== 'open' && data.state !== 'locked') {
+  if (data.state === 'not_found') {
     return (
       <CenteredMessage>
         {t('approval_link_not_found', 'This approval link was not found')}
       </CenteredMessage>
     );
+  }
+
+  // expired, revoked, or every channel of the post was deleted
+  if (data.state !== 'open' && data.state !== 'locked') {
+    return <CenteredMessage>{closedMessage(data.state)}</CenteredMessage>;
   }
 
   const channels = data.channels || [];

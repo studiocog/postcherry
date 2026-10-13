@@ -14,6 +14,8 @@ export interface PostApprovalBadgeData {
   decidedByName: string | null;
   clientComment: string | null;
   decidedAt: string | null;
+  // the team saved the post after the decision, the client did not see it
+  editedAfterDecision?: boolean;
 }
 
 export interface PostApprovalRequest extends PostApprovalBadgeData {
@@ -35,19 +37,21 @@ export interface PublicApprovalChannel {
   }[];
 }
 
+// a link the client can no longer decide on
+export type ClosedApprovalState =
+  | 'locked'
+  | 'expired'
+  | 'revoked'
+  | 'unavailable';
+
 export interface PublicApproval {
-  state:
-    | 'open'
-    | 'locked'
-    | 'expired'
-    | 'revoked'
-    | 'unavailable'
-    | 'not_found';
+  state: 'open' | ClosedApprovalState | 'not_found';
   status?: PostApprovalStatus;
   clientName?: string | null;
   decidedByName?: string | null;
   clientComment?: string | null;
   decidedAt?: string | null;
+  editedAfterDecision?: boolean;
   expiresAt?: string;
   channels?: PublicApprovalChannel[];
 }
@@ -63,7 +67,7 @@ export const usePostApprovals = (postId?: string) => {
   const load = useCallback(async (path: string) => {
     const response = await fetch(path);
     if (!response.ok) {
-      return [] as PostApprovalRequest[];
+      throw new Error('Could not load the approval links');
     }
     return (await response.json()) as PostApprovalRequest[];
   }, []);
@@ -190,19 +194,19 @@ export const useDecidePostApproval = (token: string) => {
         }
       );
       if (!response.ok) {
-        const { message } = await response.json().catch(() => ({} as any));
+        const { state } = await response.json().catch(() => ({} as any));
         return {
           approval: null,
-          // a closed link (expired, revoked, published) explains itself
-          message:
-            response.status === 400 && typeof message === 'string'
-              ? message
+          // the link was closed (expired, revoked, published) in the meantime
+          closedState:
+            response.status === 400 && typeof state === 'string'
+              ? (state as ClosedApprovalState)
               : undefined,
         };
       }
       return {
         approval: (await response.json()) as PublicApproval,
-        message: undefined,
+        closedState: undefined,
       };
     },
     [fetch, token]
