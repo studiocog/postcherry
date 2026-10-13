@@ -8,6 +8,8 @@ import { BillingSubscribeDto } from '@gitroom/nestjs-libraries/dtos/billing/bill
 import { groupBy } from 'lodash';
 import {
   isPaidTier,
+  PaidTier,
+  PLAN_NAMES,
   pricing,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
@@ -370,27 +372,56 @@ export class StripeService extends PaymentProviderAbstract {
     return { ...productsList };
   }
 
+  // The Stripe product of a plan, created the first time the plan is used.
+  // It's found by metadata.tier, so it can be renamed in Stripe; the products
+  // made before that are named after the tier and get tagged when found.
+  // Every page of products is read, the first page alone (10) would miss
+  // plans and create a duplicate product on every checkout
+  private async findOrCreateProduct(billing: PaidTier) {
+    const products = await stripe.products
+      .list({ active: true, limit: 100 })
+      .autoPagingToArray({ limit: 10000 });
+
+    const byTier = products.find(
+      (product) => product.metadata?.tier === billing
+    );
+    if (byTier) {
+      return byTier;
+    }
+
+    const byName = products.find(
+      (product) => product.name.toUpperCase() === billing.toUpperCase()
+    );
+    if (byName) {
+      await stripe.products
+        .update(byName.id, { metadata: { tier: billing } })
+        .catch((err) => {
+          console.error('stripe_product_tag_failed', {
+            stripe_product_id: byName.id,
+            billing,
+            err,
+          });
+        });
+      return byName;
+    }
+
+    return stripe.products.create({
+      active: true,
+      name: `PostCherry ${PLAN_NAMES[billing]}`,
+      metadata: { tier: billing },
+    });
+  }
+
   async prorate(organizationId: string, body: BillingSubscribeDto) {
     const org = await this._organizationService.getOrgById(organizationId);
     const customer = await this.createOrGetCustomer(org!);
     const priceData = pricing[body.billing];
-    const allProducts = await stripe.products.list({
-      active: true,
-      expand: ['data.prices'],
-    });
-
-    const findProduct =
-      allProducts.data.find(
-        (product) => product.name.toUpperCase() === body.billing.toUpperCase()
-      ) ||
-      (await stripe.products.create({
-        active: true,
-        name: body.billing,
-      }));
+    const findProduct = await this.findOrCreateProduct(body.billing);
 
     const pricesList = await stripe.prices.list({
       active: true,
-      product: findProduct!.id,
+      product: findProduct.id,
+      limit: 100,
     });
 
     const findPrice =
@@ -407,7 +438,7 @@ export class StripeService extends PaymentProviderAbstract {
       ) ||
       (await stripe.prices.create({
         active: true,
-        product: findProduct!.id,
+        product: findProduct.id,
         currency: 'usd',
         nickname: body.billing + ' ' + body.period,
         unit_amount:
@@ -942,23 +973,12 @@ export class StripeService extends PaymentProviderAbstract {
     if ((await this.getLiveSubscriptions(customer)).length) {
       return { blocked: true };
     }
-    const allProducts = await stripe.products.list({
-      active: true,
-      expand: ['data.prices'],
-    });
-
-    const findProduct =
-      allProducts.data.find(
-        (product) => product.name.toUpperCase() === body.billing.toUpperCase()
-      ) ||
-      (await stripe.products.create({
-        active: true,
-        name: body.billing,
-      }));
+    const findProduct = await this.findOrCreateProduct(body.billing);
 
     const pricesList = await stripe.prices.list({
       active: true,
-      product: findProduct!.id,
+      product: findProduct.id,
+      limit: 100,
     });
 
     const findPrice =
@@ -974,7 +994,7 @@ export class StripeService extends PaymentProviderAbstract {
       ) ||
       (await stripe.prices.create({
         active: true,
-        product: findProduct!.id,
+        product: findProduct.id,
         currency: 'usd',
         nickname: body.billing + ' ' + body.period,
         unit_amount:
@@ -1008,23 +1028,12 @@ export class StripeService extends PaymentProviderAbstract {
     const priceData = pricing[body.billing];
     const org = await this._organizationService.getOrgById(organizationId);
     const customer = await this.createOrGetCustomer(org!);
-    const allProducts = await stripe.products.list({
-      active: true,
-      expand: ['data.prices'],
-    });
-
-    const findProduct =
-      allProducts.data.find(
-        (product) => product.name.toUpperCase() === body.billing.toUpperCase()
-      ) ||
-      (await stripe.products.create({
-        active: true,
-        name: body.billing,
-      }));
+    const findProduct = await this.findOrCreateProduct(body.billing);
 
     const pricesList = await stripe.prices.list({
       active: true,
-      product: findProduct!.id,
+      product: findProduct.id,
+      limit: 100,
     });
 
     const findPrice =
@@ -1040,7 +1049,7 @@ export class StripeService extends PaymentProviderAbstract {
       ) ||
       (await stripe.prices.create({
         active: true,
-        product: findProduct!.id,
+        product: findProduct.id,
         currency: 'usd',
         nickname: body.billing + ' ' + body.period,
         unit_amount:

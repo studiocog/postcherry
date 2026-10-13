@@ -89,14 +89,23 @@ const audienceForTier = (tier: string) =>
     (PLAN_GROUPS[audience] as string[]).includes(tier)
   );
 
+export const PLAN_VIEWS: PlanView[] = ['INDIVIDUAL', 'BUSINESS', 'AGENCY', 'ALL'];
+export const isPlanView = (value?: string | null): value is PlanView =>
+  !!value && (PLAN_VIEWS as string[]).includes(value);
+
 // The plans to show on the billing page: the ones made for the workspace
 // account type by default, with a switch to the other audiences or all of
 // them. A subscriber always sees their own plan, and a legacy subscriber can
-// see the other legacy plans (they can still move between them).
-export const useVisiblePlans = (currentTier?: string) => {
+// see the other legacy plans (they can still move between them). A link can
+// open a given view (an upsell for a feature of another audience).
+export const useVisiblePlans = (
+  currentTier?: string,
+  initialView?: PlanView
+) => {
   const { accountType } = useAccountType();
   const [view, setView] = useState<PlanView>(
     () =>
+      initialView ||
       (isNewTier(currentTier) && audienceForTier(currentTier)) ||
       audienceForAccountType(accountType)
   );

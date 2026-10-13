@@ -320,6 +320,24 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   const schedule = useCallback(
     (type: 'draft' | 'now' | 'schedule' | 'update') => async () => {
+      // a recurring post saved on a plan without recurring posts loses its
+      // repeat (the server only takes a repeat from a plan that has it)
+      if (
+        !dummy &&
+        repeater &&
+        !canRepeat &&
+        !(await deleteDialog(
+          t(
+            'recurring_posts_not_in_plan',
+            'This post repeats, but recurring posts are not included in your plan. Saving it will stop the repeat.'
+          ),
+          t('save_without_repeat', 'Save without repeat'),
+          t('recurring_posts', 'Recurring posts')
+        ))
+      ) {
+        return;
+      }
+
       let republish = false;
       // the channels saved as another type, the rest are saved as `type`
       const saveAs: Record<string, 'draft' | 'schedule' | 'update'> = {};

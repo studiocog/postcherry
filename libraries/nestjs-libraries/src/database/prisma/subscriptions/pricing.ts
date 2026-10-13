@@ -87,6 +87,22 @@ export const isNewTier = (tier?: string | null): tier is NewTier =>
 export const isLegacyTier = (tier?: string | null): tier is LegacyTier =>
   !!tier && (LEGACY_TIERS as readonly string[]).includes(tier);
 
+// The plan names customers see on the Stripe checkout, invoices and billing
+// portal (the Stripe product name), the app translates its own
+export const PLAN_NAMES: Record<PaidTier, string> = {
+  STANDARD: 'Standard',
+  TEAM: 'Team',
+  PRO: 'Pro',
+  ULTIMATE: 'Ultimate',
+  PERSONAL: 'Personal',
+  CREATOR: 'Creator',
+  BUSINESS: 'Business',
+  BUSINESS_PLUS: 'Business Plus',
+  FREELANCER: 'Freelancer',
+  AGENCY: 'Agency',
+  AGENCY_PRO: 'Agency Pro',
+};
+
 // Plan flags that can gate a feature (SubscriptionService.hasPlanFeature)
 export type PlanFeatureFlag =
   | 'recurring_posts'
@@ -94,6 +110,24 @@ export type PlanFeatureFlag =
   | 'developer_api'
   | 'autoPost'
   | 'team_members';
+
+// Whether RSS auto-posts can run on a plan. It's a plan feature on the
+// PostCherry plans, the legacy plans allowed it while a webhook slot was free
+// (Sections.AUTOPOST decides who can add one)
+export const allowsAutoPost = (plan?: PricingInnerInterface) =>
+  !!plan && (plan.autoPost || plan.webhooks > 0);
+
+// What happens to the features a workspace already uses when it moves to a
+// plan without them (SubscriptionService.modifySubscription*):
+// - RSS auto-posts are paused (active: false). They stay saved and can be
+//   turned back on with a plan that includes them.
+// - Preview links and the developer API are checked on every request, so they
+//   stop right away.
+// - Recurring posts and webhooks that already exist are kept as they are (they
+//   have no paused state, stopping them would lose the user's setup). New
+//   ones need a plan that includes them, and saving a recurring post again
+//   without that plan removes its repeat (the editor asks first).
+// - Team members are disabled, extra channels are disabled.
 
 export const pricing: PricingInterface = {
   FREE: {

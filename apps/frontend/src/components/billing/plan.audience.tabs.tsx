@@ -21,14 +21,18 @@ export const PlanAudienceTabs: FC<{
 
   return (
     <div
+      role="group"
+      aria-label={t('billing_plans_for', 'Show plans for')}
       className={clsx(
         'flex p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500] select-none',
         className
       )}
     >
       {options.map((option) => (
-        <div
+        <button
+          type="button"
           key={option.value}
+          aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={clsx(
             'h-[34px] px-[16px] mobile:px-[8px] rounded-[6px] flex items-center justify-center whitespace-nowrap mobile:flex-1',
@@ -38,7 +42,7 @@ export const PlanAudienceTabs: FC<{
           )}
         >
           {option.label}
-        </div>
+        </button>
       ))}
     </div>
   );

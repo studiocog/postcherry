@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
   Param,
   Post,
   Put,
@@ -42,7 +43,13 @@ export class WebhookController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpdateDto
   ) {
-    return this._webhooksService.createWebhook(org.id, body);
+    // it only edits an existing webhook, a new one goes through POST (and its plan check)
+    const data = await this._webhooksService.updateWebhook(org.id, body);
+    if (!data) {
+      throw new HttpException('Webhook not found', 404);
+    }
+
+    return data;
   }
 
   @Delete('/:id')

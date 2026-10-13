@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  allowsAutoPost,
   BillingTier,
   isLegacyTier,
   isNewTier,
@@ -40,13 +41,13 @@ export class SubscriptionService {
     return this._subscriptionRepository.getCode(code);
   }
 
-  // Whether the organization's plan includes a feature. It never locks a
-  // workspace out by mistake: billing disabled (self-hosted), no subscription
-  // (a lapsed workspace is already stopped by the billing wall), an unknown
-  // tier or a failed lookup all count as allowed
-  async hasPlanFeature(organizationId: string, feature: PlanFeatureFlag) {
+  // The plan that gates the organization's features, null when nothing is
+  // gated. It never locks a workspace out by mistake: billing disabled
+  // (self-hosted), no subscription (a lapsed workspace is already stopped by
+  // the billing wall), an unknown tier or a failed lookup all give null
+  private async gatingPlan(organizationId: string) {
     if (!process.env.STRIPE_PUBLISHABLE_KEY) {
-      return true;
+      return null;
     }
 
     try {
@@ -55,7 +56,7 @@ export class SubscriptionService {
           organizationId
         );
       if (!subscription) {
-        return true;
+        return null;
       }
 
       const plan = pricing[subscription.subscriptionTier];
@@ -64,13 +65,39 @@ export class SubscriptionService {
           organizationId,
           tier: subscription.subscriptionTier,
         });
-        return true;
+        return null;
       }
 
-      return !!plan[feature];
+      return plan;
     } catch (err) {
       console.error('Error checking the plan feature:', err);
-      return true;
+      return null;
+    }
+  }
+
+  // Whether the organization's plan includes a feature
+  async hasPlanFeature(organizationId: string, feature: PlanFeatureFlag) {
+    const plan = await this.gatingPlan(organizationId);
+    return !plan || !!plan[feature];
+  }
+
+  // Whether the organization's RSS auto-posts can be turned on (adding a new
+  // one is checked by Sections.AUTOPOST)
+  async canRunAutoPost(organizationId: string) {
+    const plan = await this.gatingPlan(organizationId);
+    return !plan || allowsAutoPost(plan);
+  }
+
+  // A plan without RSS auto-posting pauses the active feeds. It runs from the
+  // payment webhooks, so it only logs a failure
+  private async pauseAutoposts(organizationId: string) {
+    try {
+      await this._integrationService.pauseAutoposts(organizationId);
+    } catch (err) {
+      console.error('subscription_pause_autoposts_failed', {
+        organizationId,
+        err,
+      });
     }
   }
 
@@ -225,6 +252,12 @@ export class SubscriptionService {
       );
     }
 
+    // FREE stops the feeds below; a paid plan without RSS auto-posting pauses
+    // them (see the downgrade policy in pricing.ts)
+    if (billing !== 'FREE' && !allowsAutoPost(to)) {
+      await this.pauseAutoposts(organizationId);
+    }
+
     if (billing === 'FREE') {
       await this._integrationService.changeActiveCron(organizationId);
     }
@@ -312,6 +345,12 @@ export class SubscriptionService {
         getOrgByCustomerId?.id!,
         false
       );
+    }
+
+    // FREE stops the feeds below; a paid plan without RSS auto-posting pauses
+    // them (see the downgrade policy in pricing.ts)
+    if (billing !== 'FREE' && !allowsAutoPost(to)) {
+      await this.pauseAutoposts(getOrgByCustomerId?.id!);
     }
 
     if (billing === 'FREE') {

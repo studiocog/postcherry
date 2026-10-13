@@ -1,6 +1,9 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
-import { WebhooksDto } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
+import {
+  UpdateDto,
+  WebhooksDto,
+} from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -48,6 +51,41 @@ export class WebhooksRepository {
         deletedAt: new Date(),
       },
     });
+  }
+
+  // updates an existing webhook of the org only, null when there is none
+  async updateWebhook(orgId: string, body: UpdateDto) {
+    const { count } = await this._webhooks.model.webhooks.updateMany({
+      where: {
+        id: body.id,
+        organizationId: orgId,
+        deletedAt: null,
+      },
+      data: {
+        url: body.url,
+        name: body.name,
+      },
+    });
+    if (!count) {
+      return null;
+    }
+
+    await this._webhooks.model.webhooks.update({
+      where: {
+        id: body.id,
+        organizationId: orgId,
+      },
+      data: {
+        integrations: {
+          deleteMany: {},
+          create: body.integrations.map((integration) => ({
+            integrationId: integration.id,
+          })),
+        },
+      },
+    });
+
+    return { id: body.id };
   }
 
   async createWebhook(orgId: string, body: WebhooksDto) {

@@ -744,7 +744,7 @@ const DeveloperApiUpgrade = () => {
         </div>
       </div>
       <Link
-        href="/billing"
+        href="/billing?plans=AGENCY"
         className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center shrink-0"
       >
         {t('see_plans', 'See plans')}

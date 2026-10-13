@@ -11,6 +11,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import dayjs from 'dayjs';
 import clsx from 'clsx';
 import {
+  allowsAutoPost,
   BillingTier,
   PaidTier,
   pricing,
@@ -34,6 +35,7 @@ import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
 import {
+  isPlanView,
   usePlanName,
   usePlanTagline,
   useVisiblePlans,
@@ -382,12 +384,17 @@ export const MainBillingComponent: FC<{
   const [subscription, setSubscription] = useState<SubscriptionWithPlatform | undefined>(
     sub
   );
+  // ?plans=AGENCY opens the plans of an audience (a feature upsell links there)
+  const plansParam = queryParams.get('plans');
   const {
     view,
     setView,
     plans: visiblePlans,
     popular,
-  } = useVisiblePlans(subscription?.subscriptionTier);
+  } = useVisiblePlans(
+    subscription?.subscriptionTier,
+    isPlanView(plansParam) ? plansParam : undefined
+  );
   const [loading, setLoading] = useState<boolean>(false);
   // which button started the request, so only that one shows a spinner
   const [clicked, setClicked] = useState('');
@@ -458,21 +465,77 @@ export const MainBillingComponent: FC<{
           return;
         }
 
-        const messages = [];
-        if (
-          !pricing[billing].team_members &&
-          pricing[subscription?.subscriptionTier!]?.team_members
-        ) {
+        const from = subscription?.subscriptionTier
+          ? pricing[subscription.subscriptionTier]
+          : undefined;
+        const to = pricing[billing];
+        const messages: string[] = [];
+        if (!to.team_members && from?.team_members) {
           messages.push(
-            `Your team members will be removed from your organization`
+            t(
+              'billing_lose_team_members',
+              'Your team members will be removed from your organization.'
+            )
           );
+        }
+        // moving to a paid plan with fewer features says what stops working
+        // (the downgrade policy is in pricing.ts)
+        if (from && billing !== 'FREE') {
+          if (from.preview_links && !to.preview_links) {
+            messages.push(
+              t(
+                'billing_lose_preview_links',
+                'Shared preview links will stop working.'
+              )
+            );
+          }
+          if (from.developer_api && !to.developer_api) {
+            messages.push(
+              t(
+                'billing_lose_developer_api',
+                'The public API, CLI and agent skills will stop working with your API key.'
+              )
+            );
+          }
+          if (allowsAutoPost(from) && !allowsAutoPost(to)) {
+            messages.push(
+              t(
+                'billing_lose_autopost',
+                'Your RSS auto-posts will be paused.'
+              )
+            );
+          }
+          if (from.recurring_posts && !to.recurring_posts) {
+            messages.push(
+              t(
+                'billing_lose_recurring_posts',
+                'You will not be able to create recurring posts. The ones you have keep repeating until you edit them.'
+              )
+            );
+          }
+          if (from.webhooks > 0 && !to.webhooks) {
+            messages.push(
+              t(
+                'billing_lose_webhooks',
+                'You will not be able to add webhooks. The ones you have keep working.'
+              )
+            );
+          }
+          if (from.image_generator && !to.image_generator) {
+            messages.push(
+              t(
+                'billing_lose_ai_media',
+                'AI image and video generation will not be included anymore.'
+              )
+            );
+          }
         }
         if (billing === 'FREE') {
           if (
             subscription?.cancelAt ||
             (await deleteDialog(
               `Are you sure you want to cancel your subscription?
-              ${messages.join(', ')}`,
+              ${messages.join(' ')}`,
               'Yes, cancel',
               'Cancel Subscription'
             ))
@@ -540,7 +603,11 @@ export const MainBillingComponent: FC<{
         }
         if (
           messages.length &&
-          !(await deleteDialog(messages.join(', '), 'Yes, continue'))
+          !(await deleteDialog(
+            messages.join(' '),
+            t('billing_yes_continue', 'Yes, continue'),
+            t('billing_change_plan_title', 'Change your plan?')
+          ))
         ) {
           return;
         }

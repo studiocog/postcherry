@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { WebhooksRepository } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.repository';
-import { WebhooksDto } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
+import {
+  UpdateDto,
+  WebhooksDto,
+} from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
 
 @Injectable()
 export class WebhooksService {
@@ -16,6 +19,10 @@ export class WebhooksService {
 
   createWebhook(orgId: string, body: WebhooksDto) {
     return this._webhooksRepository.createWebhook(orgId, body);
+  }
+
+  updateWebhook(orgId: string, body: UpdateDto) {
+    return this._webhooksRepository.updateWebhook(orgId, body);
   }
 
   deleteWebhook(orgId: string, id: string) {

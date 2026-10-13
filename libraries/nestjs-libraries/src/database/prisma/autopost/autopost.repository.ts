@@ -69,6 +69,31 @@ export class AutopostRepository {
     });
   }
 
+  // updates an existing auto-post of the org only, null when there is none
+  async updateAutopost(orgId: string, id: string, body: AutopostDto) {
+    const { count } = await this._autoPost.model.autoPost.updateMany({
+      where: {
+        id,
+        organizationId: orgId,
+        deletedAt: null,
+      },
+      data: {
+        url: body.url,
+        title: body.title,
+        integrations: JSON.stringify(body.integrations),
+        active: body.active,
+        content: body.content,
+        generateContent: body.generateContent,
+        addPicture: body.addPicture,
+        syncLast: body.syncLast,
+        onSlot: body.onSlot,
+        lastUrl: body.lastUrl,
+      },
+    });
+
+    return count ? { id, active: body.active } : null;
+  }
+
   async createAutopost(orgId: string, body: AutopostDto, id?: string) {
     const { id: newId, active } = await this._autoPost.model.autoPost.upsert({
       where: {
