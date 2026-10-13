@@ -34,6 +34,7 @@ import {
   ResolveCommentDto,
 } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
 import { RealIP } from 'nestjs-real-ip';
+import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
 
 @ApiTags('Posts')
 @Controller('/posts')
@@ -41,7 +42,8 @@ export class PostsController {
   constructor(
     private _postsService: PostsService,
     private _agentGraphService: AgentGraphService,
-    private _shortLinkService: ShortLinkService
+    private _shortLinkService: ShortLinkService,
+    private _brandKitService: BrandKitService
   ) {}
 
   @Get('/:id/statistics')
@@ -265,8 +267,13 @@ export class PostsController {
     @Res({ passthrough: false }) res: Response
   ) {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const brandVoice = await this._brandKitService.getAiContext(org.id);
     try {
-      for await (const event of this._agentGraphService.start(org.id, body)) {
+      for await (const event of this._agentGraphService.start(
+        org.id,
+        body,
+        brandVoice
+      )) {
         res.write(JSON.stringify(event) + '\n');
       }
     } catch (err) {

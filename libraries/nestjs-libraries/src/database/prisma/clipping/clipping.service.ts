@@ -16,6 +16,7 @@ import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/in
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
+import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
 import { DeepgramService } from '@gitroom/nestjs-libraries/deepgram/deepgram.service';
 import { organizationId } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
 import { truncateForTemporal } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -77,7 +78,8 @@ export class ClippingService {
     private _mediaService: MediaService,
     private _openAi: OpenaiService,
     private _deepgram: DeepgramService,
-    private _temporalService: TemporalService
+    private _temporalService: TemporalService,
+    private _brandKitService: BrandKitService
   ) {}
 
   // Every intermediate file is a flat key, because removeFile only keeps the
@@ -579,7 +581,8 @@ export class ClippingService {
       clipping.title || '',
       language,
       segments,
-      clipping.maxClips
+      clipping.maxClips,
+      await this._brandKitService.getAiContext(clipping.organizationId)
     );
 
     const clips = picked

@@ -16,6 +16,14 @@ const VoicePrompt = z.object({
   voice: z.string(),
 });
 
+const BrandVoicePrompt = z.object({
+  voice: z
+    .string()
+    .describe('How to write like this brand, as instructions to a writer'),
+  dos: z.array(z.string()).describe('Things the brand always does'),
+  donts: z.array(z.string()).describe('Things the brand never does'),
+});
+
 const ClipsPrompt = z.object({
   clips: z.array(
     z.object({
@@ -37,7 +45,8 @@ export class OpenaiService {
     title: string,
     language: string,
     segments: { start: number; end: number; text: string }[],
-    maxClips: number
+    maxClips: number,
+    brandVoice = ''
   ) {
     const { clips } = (
       await openai.chat.completions.parse(
@@ -50,7 +59,12 @@ export class OpenaiService {
 Every line of the transcript is "number [start seconds - end seconds] text".
 Pick up to ${maxClips} clips, best first. A clip is a range of consecutive lines that starts with a hook, makes one complete point and is understandable without the rest of the video.
 The length of a clip is the end of its last line minus the start of its first line: it must be between 20 and 90 seconds, never longer, so check the numbers before answering.
-Clips must not overlap. Write the title and the post in this language, whatever the language of these instructions: ${language}.`,
+Clips must not overlap. Write the title and the post in this language, whatever the language of these instructions: ${language}.${
+                brandVoice
+                  ? '\nWrite the post text of every clip in this brand voice:\n' +
+                    brandVoice
+                  : ''
+              }`,
             },
             {
               role: 'user',
@@ -73,6 +87,33 @@ Clips must not overlap. Write the title and the post in this language, whatever 
     ).choices[0].message.parsed || { clips: [] };
 
     return clips;
+  }
+
+  async proposeBrandVoice(posts: string[]) {
+    return (
+      (
+        await openai.chat.completions.parse({
+          model: 'gpt-4.1',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an assistant that reads social media posts written by one brand and describes its writing voice, so another writer can write new posts that sound the same.
+Describe the tone, the personality, the audience, the typical length and the habits around emojis, hashtags and formatting.
+voice: maximum 600 characters, written as instructions to the writer ("Write ...").
+dos and donts: 3 to 7 short items each.
+Answer in the language most of the posts are written in.`,
+            },
+            {
+              role: 'user',
+              content: posts
+                .map((post, index) => `Post ${index + 1}:\n${post}`)
+                .join('\n---\n'),
+            },
+          ],
+          response_format: zodResponseFormat(BrandVoicePrompt, 'brandVoice'),
+        })
+      ).choices[0].message.parsed || { voice: '', dos: [], donts: [] }
+    );
   }
 
   async generateImage(prompt: string, isVertical = false) {

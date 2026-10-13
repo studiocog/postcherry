@@ -65,6 +65,8 @@ export class LoadToolsService {
         'Agent that helps schedule and list social media posts for users',
       instructions: ({ requestContext }) => {
         const ui: string = requestContext.get('ui' as never);
+        // set only by the app's agent page, never by the MCP server
+        const brandVoice: string = requestContext.get('brandVoice' as never);
         return `
       Global information:
         - Date (UTC): ${dayjs().format('YYYY-MM-DD HH:mm:ss')}
@@ -108,7 +110,13 @@ export class LoadToolsService {
           'If the user confirm, ask if they would like to get a modal with populated content without scheduling the post yet or if they want to schedule it right away.',
         ],
         !!ui
-      )}
+      )}${
+        brandVoice
+          ? `
+      - When you write or improve post text, follow this brand voice:
+${brandVoice}`
+          : ''
+      }
 `;
       },
       model: openai('gpt-5.2'),

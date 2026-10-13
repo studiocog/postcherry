@@ -38,6 +38,7 @@ model Organization {
   submittedPost       Post[]               @relation("submittedForOrg")
   sets                Sets[]
   signatures          Signatures[]
+  brandKit            BrandKit?
   subscription        Subscription?
   tags                Tags[]
   thirdParty          ThirdParty[]
@@ -423,6 +424,28 @@ model Signatures {
   @@index([createdAt])
   @@index([organizationId])
   @@index([deletedAt])
+}
+
+// One per workspace: the look (logo, colors, fonts) and the writing voice the AI follows
+model BrandKit {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  brandName      String?
+  logoMediaId    String?
+  logoPath       String?
+  primaryColor   String?
+  secondaryColor String?
+  accentColor    String?
+  headingFont    String?
+  bodyFont       String?
+  voice          String?
+  dos            String[]     @default([])
+  donts          String[]     @default([])
+  hashtags       String[]     @default([])
+  website        String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
 }
 
 model Comments {
