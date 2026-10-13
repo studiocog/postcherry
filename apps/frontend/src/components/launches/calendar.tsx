@@ -1362,15 +1362,17 @@ const CalendarItem: FC<{
         ) : (
           <></>
         )}{' '}
-        <div
-          className={clsx(
-            'hidden group-hover:block hover:underline cursor-pointer',
-            post?.tags?.[0]?.tag?.color && 'text-shadow-tags'
-          )}
-          onClick={preview}
-        >
-          <Preview />
-        </div>
+        {user?.tier?.preview_links !== false && (
+          <div
+            className={clsx(
+              'hidden group-hover:block hover:underline cursor-pointer',
+              post?.tags?.[0]?.tag?.color && 'text-shadow-tags'
+            )}
+            onClick={preview}
+          >
+            <Preview />
+          </div>
+        )}
         <div
           className={clsx(
             'hidden group-hover:block hover:underline cursor-pointer',

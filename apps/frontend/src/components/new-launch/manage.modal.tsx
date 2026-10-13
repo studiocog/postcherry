@@ -66,6 +66,7 @@ import { useShortlinkPreference } from '@gitroom/frontend/components/settings/sh
 import dayjs from 'dayjs';
 import { Button } from '@gitroom/react/form/button';
 import { useClickOutside } from '@mantine/hooks';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
@@ -85,6 +86,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     setShowPostNow(false);
   });
   const { data: shortlinkPreferenceData } = useShortlinkPreference();
+  const user = useUser();
+  // recurring posts are a plan feature (outside the app there is no plan to check)
+  const canRepeat = user?.tier?.recurring_posts !== false;
 
   const { addEditSets, mutate, customClose, dummy } = props;
 
@@ -704,7 +708,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       const data = {
         type,
         ...(republish ? { republish } : {}),
-        ...(repeater ? { inter: repeater } : {}),
+        ...(repeater && canRepeat ? { inter: repeater } : {}),
         tags,
         shortLink,
         date: date.utc().format('YYYY-MM-DDTHH:mm:ss'),
@@ -793,6 +797,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     [
       ref,
       repeater,
+      canRepeat,
       tags,
       date,
       channelDates,
@@ -1102,7 +1107,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               />
             )}
 
-            {!dummy && (
+            {!dummy && canRepeat && (
               <RepeatComponent repeat={repeater} onChange={setRepeater} />
             )}
           </div>
@@ -1260,11 +1265,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               label={t('add_tag', 'Add Tag')}
               onClick={() => setMobileSheet('tags')}
             />
-            <BottomSheetRow
-              icon={<RepeatIcon size={24} />}
-              label={t('repeat_post', 'Repeat Post')}
-              onClick={() => setMobileSheet('repeat')}
-            />
+            {canRepeat && (
+              <BottomSheetRow
+                icon={<RepeatIcon size={24} />}
+                label={t('repeat_post', 'Repeat Post')}
+                onClick={() => setMobileSheet('repeat')}
+              />
+            )}
             {existingData?.integration && (
               <div
                 onClick={deletePost}

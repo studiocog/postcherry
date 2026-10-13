@@ -11,6 +11,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useDecisionModal } from '@gitroom/frontend/components/layout/new-modal';
 import { McpClientIcon } from '@gitroom/frontend/components/public-api/mcp.client.icons';
 import clsx from 'clsx';
+import Link from 'next/link';
 
 // Remote clients can't set headers, they get a URL to paste (hint = where)
 export const remoteMcpClients = {
@@ -309,9 +310,11 @@ export const CopyButton = ({
 const McpSection = ({
   user,
   mcpBase,
+  developerApi,
 }: {
   user: { publicApi: string };
   mcpBase: string;
+  developerApi: boolean;
 }) => {
   const t = useT();
   const { billingEnabled } = useVariables();
@@ -462,7 +465,7 @@ const McpSection = ({
             {[
               ...Object.keys(remoteMcpClients),
               ...mcpClients,
-              ...Object.keys(chatOnlyMcpClients),
+              ...(developerApi ? Object.keys(chatOnlyMcpClients) : []),
             ].map((client) => (
               <button
                 key={client}
@@ -724,6 +727,32 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
   );
 };
 
+const DeveloperApiUpgrade = () => {
+  const t = useT();
+
+  return (
+    <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder px-[20px] mobile:px-[14px] py-[14px] flex items-center justify-between gap-[12px] mobile:flex-col mobile:items-start">
+      <div>
+        <div className="text-[15px] font-[600]">
+          {t('developer_api_title', 'Public API, CLI & AI Skills')}
+        </div>
+        <div className="text-[13px] text-textItemBlur mt-[2px]">
+          {t(
+            'developer_api_upgrade',
+            'The public API, CLI and agent skills are included in the Agency Pro plan.'
+          )}
+        </div>
+      </div>
+      <Link
+        href="/billing"
+        className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center shrink-0"
+      >
+        {t('see_plans', 'See plans')}
+      </Link>
+    </div>
+  );
+};
+
 const PublicApiContent = () => {
   const user = useUser();
   const { backendUrl, frontEndUrl, mcpUrl } = useVariables();
@@ -759,6 +788,16 @@ const PublicApiContent = () => {
   }
 
   const mcpBase = mcpUrl || backendUrl;
+
+  // the REST API, the CLI and the agent skills are a plan feature, MCP is not
+  if (user.tier?.developer_api === false) {
+    return (
+      <div className="flex flex-col gap-[40px]">
+        <DeveloperApiUpgrade />
+        <McpSection user={user} mcpBase={mcpBase} developerApi={false} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-[40px]">
@@ -916,7 +955,7 @@ const PublicApiContent = () => {
 
       <CliSection apiKey={user.publicApi} />
 
-      <McpSection user={user} mcpBase={mcpBase} />
+      <McpSection user={user} mcpBase={mcpBase} developerApi={true} />
     </div>
   );
 };

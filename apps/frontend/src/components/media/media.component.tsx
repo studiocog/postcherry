@@ -987,8 +987,11 @@ export const MultiMediaComponent: FC<{
 
                 {!!user?.tier?.ai && (
                   <>
-                    <AiImage value={text} onChange={changeMedia} />
-                    {!insertInContent && (
+                    {/* plans without AI media credits have no generator */}
+                    {!!user.tier.image_generation_count && (
+                      <AiImage value={text} onChange={changeMedia} />
+                    )}
+                    {!insertInContent && !!user.tier.generate_videos && (
                       <AiVideo value={text} onChange={changeMedia} />
                     )}
                   </>
