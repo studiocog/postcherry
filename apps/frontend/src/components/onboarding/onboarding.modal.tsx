@@ -634,7 +634,10 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
         <div className="flex flex-col gap-[16px] w-full max-w-[1100px] mx-auto">
           <div className="flex flex-wrap justify-center gap-[6px]">
             {[
-              ...onboardingAgents,
+              // chat-only agents work through the CLI, a developer API feature
+              ...onboardingAgents.filter(
+                (item) => developerApi || !isChatOnlyMcpClient(item)
+              ),
               otherTab,
               ...(developerApi ? [apiTab] : []),
             ].map((item) => (
