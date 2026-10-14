@@ -8,7 +8,25 @@ import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class WebhooksRepository {
-  constructor(private _webhooks: PrismaRepository<'webhooks'>) {}
+  constructor(
+    private _webhooks: PrismaRepository<'webhooks'>,
+    private _integration: PrismaRepository<'integration'>
+  ) {}
+
+  // the ids among these that are channels of the org
+  async getOrgIntegrationIds(orgId: string, ids: string[]) {
+    const found = await this._integration.model.integration.findMany({
+      where: {
+        id: { in: ids },
+        organizationId: orgId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return found.map((integration) => integration.id);
+  }
 
   getTotal(orgId: string) {
     return this._webhooks.model.webhooks.count({

@@ -24,7 +24,10 @@ import { useSearchParams } from 'next/navigation';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { PublicComponent } from '@gitroom/frontend/components/public-api/public.component';
 import Link from 'next/link';
-import { Webhooks } from '@gitroom/frontend/components/webhooks/webhooks';
+import {
+  useWebhookList,
+  Webhooks,
+} from '@gitroom/frontend/components/webhooks/webhooks';
 import { Sets } from '@gitroom/frontend/components/sets/sets';
 import { SignaturesComponent } from '@gitroom/frontend/components/settings/signatures.component';
 import { Autopost } from '@gitroom/frontend/components/autopost/autopost';
@@ -35,6 +38,7 @@ import { AppsComponent } from '@gitroom/frontend/components/settings/apps.compon
 import { ThirdPartyComponent } from '@gitroom/frontend/components/third-parties/third-party.component';
 import { Plugs } from '@gitroom/frontend/components/plugs/plugs';
 import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
+import { isNewTier } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -86,6 +90,25 @@ export const SettingsPopup: FC<{
   }, []);
 
   const t = useT();
+
+  // Every PostCherry plan can be bought from any account type (the billing page
+  // has all of them), so a feature the plan sells shows even in the simple
+  // interface. Legacy plans and self-hosted (ULTIMATE) keep the account type rules
+  const planSellsFeatures = isNewTier(user?.tier?.current);
+  const showTeams =
+    !!user?.tier?.team_members &&
+    isGeneral &&
+    user?.role !== 'USER' &&
+    (!isIndividual || planSellsFeatures);
+  const showAutopost =
+    !!user?.tier?.autoPost && (!isIndividual || planSellsFeatures);
+  const webhooksInPlan =
+    !!user?.tier?.webhooks && (!isSimple || planSellsFeatures);
+  // webhooks keep running on a plan without them (see the downgrade policy in
+  // pricing.ts), so the tab stays while there are some, to edit or delete them
+  const { data: webhooks } = useWebhookList(!webhooksInPlan);
+  const showWebhooks = webhooksInPlan || !!webhooks?.length;
+
   const list = useMemo(() => {
     const arr = [];
     arr.push({ tab: 'global_settings', label: t('global_settings', 'Global Settings') });
@@ -94,18 +117,13 @@ export const SettingsPopup: FC<{
     if (user?.tier?.public_api && isGeneral && showLogout) {
       arr.push({ tab: 'agents', label: t('agents', 'Agents') });
     }
-    if (
-      user?.tier?.team_members &&
-      isGeneral &&
-      user?.role !== 'USER' &&
-      !isIndividual
-    ) {
+    if (showTeams) {
       arr.push({ tab: 'teams', label: t('teams', 'Teams') });
     }
-    if (user?.tier?.webhooks && !isSimple) {
+    if (showWebhooks) {
       arr.push({ tab: 'webhooks', label: t('webhooks_1', 'Webhooks') });
     }
-    if (user?.tier?.autoPost && !isIndividual) {
+    if (showAutopost) {
       arr.push({ tab: 'autopost', label: t('auto_post', 'Auto Post') });
     }
     if (user?.tier.current !== 'FREE' && !isSimple) {
@@ -121,14 +139,25 @@ export const SettingsPopup: FC<{
     arr.push({ tab: 'apps', label: t('apps', 'Apps') });
 
     return arr;
-  }, [user, isGeneral, showLogout, isSimple, isIndividual, t]);
+  }, [
+    user,
+    isGeneral,
+    showLogout,
+    isSimple,
+    showTeams,
+    showWebhooks,
+    showAutopost,
+    t,
+  ]);
 
-  const [tab, setTab] = useState(() => {
-    const requested = url.get('tab');
-    return list.some((p) => p.tab === requested)
-      ? requested!
-      : 'global_settings';
-  });
+  // a tab that is not (or no longer, like Webhooks after deleting the last
+  // one) in the list opens the global settings
+  const [selectedTab, setTab] = useState(
+    () => url.get('tab') || 'global_settings'
+  );
+  const tab = list.some((p) => p.tab === selectedTab)
+    ? selectedTab
+    : 'global_settings';
 
   useEffect(() => {
     loadProfile();
@@ -184,22 +213,19 @@ export const SettingsPopup: FC<{
                   <GlobalSettings />
                 </div>
               )}
-              {tab === 'teams' &&
-                !!user?.tier?.team_members &&
-                isGeneral &&
-                user?.role !== 'USER' && (
-                  <div>
-                    <TeamsComponent />
-                  </div>
-                )}
+              {tab === 'teams' && showTeams && (
+                <div>
+                  <TeamsComponent />
+                </div>
+              )}
 
-              {tab === 'webhooks' && !!user?.tier?.webhooks && (
+              {tab === 'webhooks' && showWebhooks && (
                 <div>
                   <Webhooks />
                 </div>
               )}
 
-              {tab === 'autopost' && !!user?.tier?.autoPost && (
+              {tab === 'autopost' && showAutopost && (
                 <div>
                   <Autopost />
                 </div>

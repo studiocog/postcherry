@@ -280,9 +280,18 @@ export class PostsController {
     @Body() body: GeneratorDto,
     @Res({ passthrough: false }) res: Response
   ) {
+    // the pictures are AI images, a plan without AI image credits gets the
+    // posts without them
+    const isPicture =
+      !!body.isPicture &&
+      (await this._subscriptionService.hasAiImages(org.id));
+
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     try {
-      for await (const event of this._agentGraphService.start(org.id, body)) {
+      for await (const event of this._agentGraphService.start(org.id, {
+        ...body,
+        isPicture,
+      })) {
         res.write(JSON.stringify(event) + '\n');
       }
     } catch (err) {

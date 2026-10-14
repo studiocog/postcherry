@@ -41,6 +41,7 @@ import {
   useVisiblePlans,
 } from '@gitroom/frontend/components/billing/use.plans';
 import { PlanAudienceTabs } from '@gitroom/frontend/components/billing/plan.audience.tabs';
+import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 
 type SubscriptionWithPlatform = Subscription & {
   platform?: 'web' | 'mobile';
@@ -377,6 +378,8 @@ export const MainBillingComponent: FC<{
   const track = useTrack();
   const t = useT();
   const queryParams = useSearchParams();
+  // the connected channels, a plan with a lower channel limit disables the extra ones
+  const { data: integrations } = useIntegrationList();
   const [finishTrial, setFinishTrial] = useState(
     !!queryParams.get('finishTrial')
   );
@@ -470,6 +473,30 @@ export const MainBillingComponent: FC<{
           : undefined;
         const to = pricing[billing];
         const messages: string[] = [];
+        // the channels above the new limit are disabled when the plan changes
+        // (SubscriptionService.modifySubscription)
+        const activeChannels = (
+          Array.isArray(integrations) ? integrations : []
+        ).filter(
+          (integration: { disabled?: boolean }) => !integration.disabled
+        ).length;
+        if (
+          billing !== 'FREE' &&
+          typeof to.channel === 'number' &&
+          activeChannels > to.channel
+        ) {
+          messages.push(
+            t(
+              'billing_lose_channels',
+              '{{disabled}} of your {{total}} connected channels will be disabled, the new plan includes {{limit}}.',
+              {
+                disabled: activeChannels - to.channel,
+                total: activeChannels,
+                limit: to.channel,
+              }
+            )
+          );
+        }
         if (!to.team_members && from?.team_members) {
           messages.push(
             t(
@@ -521,7 +548,12 @@ export const MainBillingComponent: FC<{
               )
             );
           }
-          if (from.image_generator && !to.image_generator) {
+          // the AI image and video buttons show with credits (media library)
+          if (
+            (from.image_generator && !to.image_generator) ||
+            (from.image_generation_count > 0 && !to.image_generation_count) ||
+            (from.generate_videos > 0 && !to.generate_videos)
+          ) {
             messages.push(
               t(
                 'billing_lose_ai_media',
@@ -677,7 +709,7 @@ export const MainBillingComponent: FC<{
         }
         setLoading(false);
       },
-    [monthlyOrYearly, subscription, user, utm]
+    [monthlyOrYearly, subscription, user, utm, integrations]
   );
   if (user?.isLifetime) {
     router.replace('/');

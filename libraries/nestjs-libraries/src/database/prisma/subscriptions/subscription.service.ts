@@ -81,6 +81,13 @@ export class SubscriptionService {
     return !plan || !!plan[feature];
   }
 
+  // Whether the organization's plan includes AI images (it has image credits,
+  // the same rule that shows the AI image button in the media library)
+  async hasAiImages(organizationId: string) {
+    const plan = await this.gatingPlan(organizationId);
+    return !plan || plan.image_generation_count > 0;
+  }
+
   // Whether the organization's RSS auto-posts can be turned on (adding a new
   // one is checked by Sections.AUTOPOST)
   async canRunAutoPost(organizationId: string) {

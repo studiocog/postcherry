@@ -126,8 +126,11 @@ export const allowsAutoPost = (plan?: PricingInnerInterface) =>
 // - Recurring posts and webhooks that already exist are kept as they are (they
 //   have no paused state, stopping them would lose the user's setup). New
 //   ones need a plan that includes them, and saving a recurring post again
-//   without that plan removes its repeat (the editor asks first).
-// - Team members are disabled, extra channels are disabled.
+//   without that plan removes its repeat (the editor asks first). Settings
+//   keeps the Webhooks tab while the workspace has webhooks, so they can
+//   still be edited or deleted.
+// - Team members are disabled, extra channels are disabled (the change-plan
+//   dialog says how many).
 
 export const pricing: PricingInterface = {
   FREE: {
