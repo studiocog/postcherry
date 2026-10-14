@@ -5,6 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { Select } from '@gitroom/react/form/select';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import { usePlanName } from '@gitroom/frontend/components/billing/use.plans';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { setCookie } from '@gitroom/frontend/components/layout/layout.context';
@@ -563,6 +564,7 @@ const ManageBilling = () => {
 export const Subscription = () => {
   const fetch = useFetch();
   const t = useT();
+  const planName = usePlanName();
 
   const addSubscription: ChangeEventHandler<HTMLSelectElement> = useCallback(
     async (e) => {
@@ -600,7 +602,7 @@ export const Subscription = () => {
         .filter((f) => !f.includes('FREE'))
         .map((key) => (
           <option key={key} value={key}>
-            {key}
+            {planName(key)}
           </option>
         ))}
     </Select>

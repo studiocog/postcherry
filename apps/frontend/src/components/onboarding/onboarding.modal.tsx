@@ -357,6 +357,8 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
   const mcpBase = mcpUrl || backendUrl;
   const apiKey = user?.publicApi || '';
   const available = !!apiKey && !!user?.tier?.public_api;
+  // the REST API, the CLI and the agent skills are a plan feature, MCP is not
+  const developerApi = user?.tier?.developer_api !== false;
   // the official connectors work for self-hosted installs too
   const officialConnectors = billingEnabled || isSelfHosted;
 
@@ -631,7 +633,14 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
       {available ? (
         <div className="flex flex-col gap-[16px] w-full max-w-[1100px] mx-auto">
           <div className="flex flex-wrap justify-center gap-[6px]">
-            {[...onboardingAgents, otherTab, apiTab].map((item) => (
+            {[
+              // chat-only agents work through the CLI, a developer API feature
+              ...onboardingAgents.filter(
+                (item) => developerApi || !isChatOnlyMcpClient(item)
+              ),
+              otherTab,
+              ...(developerApi ? [apiTab] : []),
+            ].map((item) => (
               <button
                 key={item}
                 type="button"
@@ -676,14 +685,19 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
           ) : isChatOnlyMcpClient(agent) ? (
             <>
               {connectorSection}
-              {chatSection}
+              {developerApi && chatSection}
             </>
           ) : (
             <>
               {connectorSection}
-              <div className="grid grid-cols-2 gap-[16px]">
+              <div
+                className={clsx(
+                  'grid gap-[16px]',
+                  developerApi ? 'grid-cols-2' : 'grid-cols-1'
+                )}
+              >
                 {mcpSection}
-                {cliSection}
+                {developerApi && cliSection}
               </div>
             </>
           )}

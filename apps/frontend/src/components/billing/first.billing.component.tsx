@@ -11,8 +11,12 @@ import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/se
 import NotificationComponent from '@gitroom/frontend/components/notifications/notification.component';
 import dynamic from 'next/dynamic';
 import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.component';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
-import { capitalize } from 'lodash';
+import {
+  isNewTier,
+  PLAN_GROUPS,
+  POPULAR_PLAN,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import clsx from 'clsx';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { CheckIconComponent } from '@gitroom/frontend/components/ui/check.icon.component';
@@ -26,6 +30,18 @@ import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics'
 import useCookie from 'react-use-cookie';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
 import { DeveloperIconComponent } from '@gitroom/frontend/components/developer/developer.icon.component';
+import {
+  PlanView,
+  usePlanName,
+  useVisiblePlans,
+} from '@gitroom/frontend/components/billing/use.plans';
+import { PlanAudienceTabs } from '@gitroom/frontend/components/billing/plan.audience.tabs';
+import {
+  AccountType,
+  AccountTypePicker,
+  useAccountType,
+  useSaveAccountType,
+} from '@gitroom/frontend/components/settings/account-type.component';
 
 const ModeComponent = dynamic(
   () => import('@gitroom/frontend/components/layout/mode.component'),
@@ -50,11 +66,23 @@ export const FirstBillingComponent = () => {
   const dub = useDubClickId();
   const [stripe, setStripe] = useState<null | Promise<Stripe>>(null);
   const [stripeFailed, setStripeFailed] = useState(false);
-  const [tier, setTier] = useState('STANDARD');
+  const { view, setView, plans, popular } = useVisiblePlans();
+  const planName = usePlanName();
+  const [tier, setTier] = useState<string>(() =>
+    view === 'ALL' ? POPULAR_PLAN.AGENCY : POPULAR_PLAN[view]
+  );
   const [period, setPeriod] = useState('MONTHLY');
   const fetch = useFetch();
   const { mutate } = useSWRConfig();
   const t = useT();
+  const { accountType } = useAccountType();
+  const saveAccountType = useSaveAccountType();
+  // a new workspace has no account type yet: it's asked first, so the plans
+  // shown and the checkout loaded are the ones made for it (a team member
+  // can't set it, they get the default view)
+  const [askAccountType, setAskAccountType] = useState(
+    () => !accountType && !!user?.role && user.role !== 'USER'
+  );
   const [datafast_visitor_id] = useCookie('datafast_visitor_id', '');
   const [datafast_session_id] = useCookie('datafast_session_id', '');
 
@@ -81,7 +109,7 @@ export const FirstBillingComponent = () => {
   }, [tier, period]);
 
   const { data, isLoading } = useSWR(
-    `/billing-${tier}-${period}`,
+    askAccountType ? null : `/billing-${tier}-${period}`,
     loadCheckout,
     {
       revalidateOnFocus: false,
@@ -98,9 +126,32 @@ export const FirstBillingComponent = () => {
     }
   }, [data?.blocked, mutate]);
 
-  const price = useMemo(
-    () => Object.entries(pricing).filter(([key, value]) => key !== 'FREE'),
-    []
+  // another audience selects its most popular plan, unless the selected plan is in it
+  const changeView = useCallback(
+    (value: PlanView) => {
+      setView(value);
+      if (
+        value !== 'ALL' &&
+        !(PLAN_GROUPS[value] as string[]).includes(tier)
+      ) {
+        setTier(POPULAR_PLAN[value]);
+      }
+    },
+    [tier]
+  );
+
+  // the plans of the chosen account type show right away, saving it can't block the checkout
+  const chooseAccountType = useCallback(
+    async (type: AccountType) => {
+      changeView(type);
+      setAskAccountType(false);
+      try {
+        await saveAccountType(type);
+      } catch (err) {
+        /** the plans are already shown **/
+      }
+    },
+    [changeView, saveAccountType]
   );
 
   const JoinOver = () => {
@@ -172,76 +223,101 @@ export const FirstBillingComponent = () => {
           </div>
         </div>
       </div>
-      <div className="flex px-[80px] tablet:px-[32px] mobile:!px-[16px] flex-1 flex-row tablet:flex-none tablet:flex-col-reverse">
-        <div className="flex-1 py-[40px] tablet:pt-[80px] flex flex-col pe-[40px] tablet:pe-0">
-          <div className="block tablet:hidden">
+      {askAccountType ? (
+        <div className="flex flex-col items-center gap-[40px] px-[80px] tablet:px-[32px] mobile:!px-[16px] py-[60px] mobile:py-[32px]">
+          <div className="flex flex-col items-center text-center">
             <JoinOver />
           </div>
-          {data?.blocked ? (
-            <div className="mt-[24px] p-[24px] rounded-[20px] border-[1.5px] border-newColColor text-[16px] font-[500]">
-              {t(
-                'billing_other_account_subscribed',
-                'Another account with this email already has an active subscription. Please log off and sign in to that account to manage your subscription.'
-              )}
+          <div className="flex flex-col items-center gap-[24px] w-full">
+            <div className="flex flex-col items-center gap-[8px] text-center">
+              <div className="text-[24px] font-[700]">
+                {t('billing_who_is_it_for', 'Who will use PostCherry?')}
+              </div>
+              <div className="text-[16px] text-textItemBlur">
+                {t(
+                  'billing_who_is_it_for_description',
+                  'We will show you the plans made for you. You can see every plan on the next step.'
+                )}
+              </div>
             </div>
-          ) : stripeFailed ? (
-            <div className="mt-[24px] p-[24px] rounded-[20px] border-[1.5px] border-newColColor text-[16px] font-[500]">
-              {t(
-                'billing_stripe_load_failed',
-                'The payment form could not be loaded. Please disable ad blockers or privacy extensions for this page and reload.'
-              )}
-            </div>
-          ) : !isLoading && data && stripe ? (
-            <EmbeddedBilling
-              stripe={stripe}
-              secret={data.client_secret}
-              showCoupon={period === 'MONTHLY'}
-              autoApplyCoupon={data.auto_apply_coupon}
-            />
-          ) : (
-            <LoadingComponent />
-          )}
+            <AccountTypePicker value={null} onSelect={chooseAccountType} />
+          </div>
         </div>
-        <div className="flex flex-col ps-[40px] tablet:!ps-[0] border-l border-newColColor py-[40px] mobile:!pt-[24px] tablet:border-none tablet:pb-0">
-          <div className="top-[20px] sticky">
-            <div className="hidden tablet:block">
+      ) : (
+        <div className="flex px-[80px] tablet:px-[32px] mobile:!px-[16px] flex-1 flex-row tablet:flex-none tablet:flex-col-reverse">
+          <div className="flex-1 py-[40px] tablet:pt-[80px] flex flex-col pe-[40px] tablet:pe-0">
+            <div className="block tablet:hidden">
               <JoinOver />
             </div>
-            <div className="flex mb-[24px] mobile:flex-col">
-              <div className="flex-1 text-[24px] font-[700]">
-                {t('billing_choose_plan', 'Choose a Plan')}
+            {data?.blocked ? (
+              <div className="mt-[24px] p-[24px] rounded-[20px] border-[1.5px] border-newColColor text-[16px] font-[500]">
+                {t(
+                  'billing_other_account_subscribed',
+                  'Another account with this email already has an active subscription. Please log off and sign in to that account to manage your subscription.'
+                )}
               </div>
-              <div className="h-[44px] px-[6px] mobile:px-0 flex items-center justify-center mobile:justify-start gap-[12px] border border-newColColor rounded-[12px] select-none">
-                <div
-                  className={clsx(
-                    'h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
-                    period === 'MONTHLY'
-                      ? 'bg-boxFocused text-textItemFocused'
-                      : 'cursor-pointer'
-                  )}
-                  onClick={() => setPeriod('MONTHLY')}
-                >
-                  {t('billing_monthly', 'Monthly')}
+            ) : stripeFailed ? (
+              <div className="mt-[24px] p-[24px] rounded-[20px] border-[1.5px] border-newColColor text-[16px] font-[500]">
+                {t(
+                  'billing_stripe_load_failed',
+                  'The payment form could not be loaded. Please disable ad blockers or privacy extensions for this page and reload.'
+                )}
+              </div>
+            ) : !isLoading && data && stripe ? (
+              <EmbeddedBilling
+                stripe={stripe}
+                secret={data.client_secret}
+                showCoupon={period === 'MONTHLY'}
+                autoApplyCoupon={data.auto_apply_coupon}
+              />
+            ) : (
+              <LoadingComponent />
+            )}
+          </div>
+          <div className="flex flex-col ps-[40px] tablet:!ps-[0] border-l border-newColColor py-[40px] mobile:!pt-[24px] tablet:border-none tablet:pb-0">
+            <div className="top-[20px] sticky">
+              <div className="hidden tablet:block">
+                <JoinOver />
+              </div>
+              <div className="flex mb-[16px] mobile:flex-col">
+                <div className="flex-1 text-[24px] font-[700]">
+                  {t('billing_choose_plan', 'Choose a Plan')}
                 </div>
-                <div
-                  className={clsx(
-                    'gap-[10px] h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
-                    period === 'YEARLY'
-                      ? 'bg-boxFocused text-textItemFocused'
-                      : 'cursor-pointer'
-                  )}
-                  onClick={() => setPeriod('YEARLY')}
-                >
-                  <div>{t('billing_yearly', 'Yearly')}</div>
-                  <div className="bg-[#AA0FA4] text-[white] px-[8px] rounded-[4px] mobile:hidden">
-                    {t('billing_20_percent_off', '20% Off')}
+                <div className="h-[44px] px-[6px] mobile:px-0 flex items-center justify-center mobile:justify-start gap-[12px] border border-newColColor rounded-[12px] select-none">
+                  <div
+                    className={clsx(
+                      'h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
+                      period === 'MONTHLY'
+                        ? 'bg-boxFocused text-textItemFocused'
+                        : 'cursor-pointer'
+                    )}
+                    onClick={() => setPeriod('MONTHLY')}
+                  >
+                    {t('billing_monthly', 'Monthly')}
+                  </div>
+                  <div
+                    className={clsx(
+                      'gap-[10px] h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
+                      period === 'YEARLY'
+                        ? 'bg-boxFocused text-textItemFocused'
+                        : 'cursor-pointer'
+                    )}
+                    onClick={() => setPeriod('YEARLY')}
+                  >
+                    <div>{t('billing_yearly', 'Yearly')}</div>
+                    <div className="bg-[#AA0FA4] text-[white] px-[8px] rounded-[4px] mobile:hidden">
+                      {t('billing_two_months_free', '2 months free')}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-[8px] mobile:!grid-cols-2 tablet:grid-cols-4">
-              {price.map(
-                ([key, value]) => (
+              <PlanAudienceTabs
+                value={view}
+                onChange={changeView}
+                className="mb-[16px] w-fit mobile:w-full"
+              />
+              <div className="grid grid-cols-2 gap-[8px] mobile:!grid-cols-2 tablet:grid-cols-4">
+                {plans.map((key) => (
                   <div
                     onClick={() => setTier(key)}
                     key={key}
@@ -252,14 +328,21 @@ export const FirstBillingComponent = () => {
                         : 'border-[1.5px] border-newColColor'
                     )}
                   >
-                    <div className="text-[20px] mobile:text-[18px] font-[500]">
-                      {capitalize(key)}
+                    <div className="flex items-center justify-between gap-[8px]">
+                      <div className="text-[20px] mobile:text-[18px] font-[500] truncate">
+                        {planName(key)}
+                      </div>
+                      {popular.includes(key) && (
+                        <div className="bg-[#AA0FA4] text-white text-[12px] px-[6px] rounded-[4px] whitespace-nowrap mobile:hidden">
+                          {t('billing_most_popular', 'Most popular')}
+                        </div>
+                      )}
                     </div>
                     <div className="text-[24px] mobile:text-[18px] font-[400]">
                       <span className="text-[44px] mobile:text-[30px] font-[600]">
                         $
                         {
-                          value[
+                          pricing[key][
                             period === 'MONTHLY' ? 'month_price' : 'year_price'
                           ]
                         }
@@ -269,23 +352,22 @@ export const FirstBillingComponent = () => {
                         : t('billing_per_year', '/ year')}
                     </div>
                   </div>
-                ),
-                []
-              )}
-            </div>
-            <div className="flex flex-col mt-[54px] gap-[24px] tablet:mt-[40px]">
-              <div className="text-[24px] font-[700]">
-                {t('billing_features', 'Features')}
+                ))}
               </div>
-              <BillingFeatures tier={tier} />
-            </div>
-            <div className="flex flex-col mobile:hidden tablet:hidden">
-              {/*<div>asd</div>*/}
-              <FAQComponent />
+              <div className="flex flex-col mt-[54px] gap-[24px] tablet:mt-[40px]">
+                <div className="text-[24px] font-[700]">
+                  {t('billing_features', 'Features')}
+                </div>
+                <BillingFeatures tier={tier} />
+              </div>
+              <div className="flex flex-col mobile:hidden tablet:hidden">
+                {/*<div>asd</div>*/}
+                <FAQComponent />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -294,6 +376,7 @@ type FeatureItem = {
   key: string;
   defaultValue: string;
   prefix?: string | number;
+  values?: Record<string, string | number>;
 };
 
 export const useBillingFeatures = (tier: string) => {
@@ -302,6 +385,86 @@ export const useBillingFeatures = (tier: string) => {
     const currentPricing = pricing[tier];
     const channelsOr = currentPricing.channel;
     const list: FeatureItem[] = [];
+
+    // the PostCherry plans list what the website sells, every line is
+    // enforced by the plan limits
+    if (isNewTier(tier)) {
+      list.push(
+        currentPricing.brands === 1
+          ? {
+              key: 'billing_brands_one',
+              defaultValue: '1 brand ({{channels}} social accounts)',
+              values: { channels: channelsOr },
+            }
+          : {
+              key: 'billing_brands_many',
+              defaultValue:
+                'Up to {{brands}} brands ({{channels}} social accounts)',
+              values: { brands: currentPricing.brands, channels: channelsOr },
+            }
+      );
+      list.push({
+        key: 'billing_all_channel_types',
+        defaultValue: 'All 30+ channel types',
+      });
+      list.push(
+        currentPricing.team_members
+          ? {
+              key: 'billing_unlimited_team_members',
+              defaultValue: 'Unlimited team members',
+            }
+          : { key: 'billing_single_user', defaultValue: 'Single user' }
+      );
+      if (currentPricing.ai) {
+        list.push({
+          key: 'billing_ai_writing_assistant',
+          defaultValue: 'AI writing assistant',
+        });
+      }
+      if (currentPricing.image_generator) {
+        list.push({
+          key: 'billing_ai_images_per_month',
+          defaultValue: 'AI Images per month',
+          prefix: currentPricing.image_generation_count,
+        });
+        list.push({
+          key: 'billing_ai_videos_per_month',
+          defaultValue: 'AI Videos per month',
+          prefix: currentPricing.generate_videos,
+        });
+        list.push({
+          key: 'billing_clipping_minutes_per_month',
+          defaultValue: 'minutes of AI video clipping per month',
+          prefix: currentPricing.clipping_minutes,
+        });
+      }
+      if (currentPricing.recurring_posts) {
+        list.push({
+          key: 'billing_recurring_posts',
+          defaultValue: 'Recurring posts',
+        });
+      }
+      if (currentPricing.preview_links) {
+        list.push({
+          key: 'billing_preview_links',
+          defaultValue: 'Preview links to share',
+        });
+      }
+      if (currentPricing.autoPost) {
+        list.push({
+          key: 'billing_rss_auto_posting',
+          defaultValue: 'RSS auto-posting',
+        });
+      }
+      if (currentPricing.developer_api) {
+        list.push({
+          key: 'billing_public_api_webhooks_agents',
+          defaultValue: 'Public API, webhooks and AI agent skills',
+        });
+      }
+      list.push({ key: 'billing_analytics', defaultValue: 'Analytics' });
+      return list;
+    }
 
     list.push({
       key: channelsOr === 1 ? 'billing_channel' : 'billing_channels',
@@ -364,7 +527,11 @@ export const useBillingFeatures = (tier: string) => {
   }, [tier]);
 
   const renderFeature = (feature: FeatureItem) => {
-    const translatedText = t(feature.key, feature.defaultValue);
+    const translatedText = t(
+      feature.key,
+      feature.defaultValue,
+      feature.values || {}
+    );
     if (feature.prefix === 'unlimited') {
       return `${t('billing_unlimited', 'Unlimited')} ${translatedText}`;
     }

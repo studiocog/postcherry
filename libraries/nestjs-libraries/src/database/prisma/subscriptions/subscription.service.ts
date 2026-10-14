@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  allowsAutoPost,
+  BillingTier,
+  isLegacyTier,
+  isNewTier,
+  PaidTier,
+  PlanFeatureFlag,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
@@ -31,6 +39,91 @@ export class SubscriptionService {
 
   getCode(code: string) {
     return this._subscriptionRepository.getCode(code);
+  }
+
+  // The plan that gates the organization's features, null when nothing is
+  // gated. It never locks a workspace out by mistake: billing disabled
+  // (self-hosted), no subscription (a lapsed workspace is already stopped by
+  // the billing wall), an unknown tier or a failed lookup all give null
+  private async gatingPlan(organizationId: string) {
+    if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+      return null;
+    }
+
+    try {
+      const subscription =
+        await this._subscriptionRepository.getSubscriptionByOrganizationId(
+          organizationId
+        );
+      if (!subscription) {
+        return null;
+      }
+
+      const plan = pricing[subscription.subscriptionTier];
+      if (!plan) {
+        console.warn('subscription_unknown_tier', {
+          organizationId,
+          tier: subscription.subscriptionTier,
+        });
+        return null;
+      }
+
+      return plan;
+    } catch (err) {
+      console.error('Error checking the plan feature:', err);
+      return null;
+    }
+  }
+
+  // Whether the organization's plan includes a feature
+  async hasPlanFeature(organizationId: string, feature: PlanFeatureFlag) {
+    const plan = await this.gatingPlan(organizationId);
+    return !plan || !!plan[feature];
+  }
+
+  // Whether the organization's plan includes AI images (it has image credits,
+  // the same rule that shows the AI image button in the media library)
+  async hasAiImages(organizationId: string) {
+    const plan = await this.gatingPlan(organizationId);
+    return !plan || plan.image_generation_count > 0;
+  }
+
+  // Whether the organization's RSS auto-posts can be turned on (adding a new
+  // one is checked by Sections.AUTOPOST)
+  async canRunAutoPost(organizationId: string) {
+    const plan = await this.gatingPlan(organizationId);
+    return !plan || allowsAutoPost(plan);
+  }
+
+  // A plan without RSS auto-posting pauses the active feeds. It runs from the
+  // payment webhooks, so it only logs a failure
+  private async pauseAutoposts(organizationId: string) {
+    try {
+      await this._integrationService.pauseAutoposts(organizationId);
+    } catch (err) {
+      console.error('subscription_pause_autoposts_failed', {
+        organizationId,
+        err,
+      });
+    }
+  }
+
+  // The new plans can always be bought, the legacy tiers only by a workspace
+  // that is still on one of them (to switch period or move between them)
+  async canPurchaseTier(organizationId: string, tier: string) {
+    if (isNewTier(tier)) {
+      return true;
+    }
+
+    if (!isLegacyTier(tier)) {
+      return false;
+    }
+
+    const subscription =
+      await this._subscriptionRepository.getSubscriptionByOrganizationId(
+        organizationId
+      );
+    return isLegacyTier(subscription?.subscriptionTier);
   }
 
   // Customer-keyed flows must never touch a subscription owned by another provider
@@ -101,9 +194,14 @@ export class SubscriptionService {
   async modifySubscriptionByOrg(
     organizationId: string,
     totalChannels: number,
-    billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE'
+    billing: BillingTier
   ) {
     if (!organizationId) {
+      return false;
+    }
+
+    if (!pricing[billing]) {
+      console.error('subscription_unknown_tier', { organizationId, billing });
       return false;
     }
 
@@ -161,6 +259,12 @@ export class SubscriptionService {
       );
     }
 
+    // FREE stops the feeds below; a paid plan without RSS auto-posting pauses
+    // them (see the downgrade policy in pricing.ts)
+    if (billing !== 'FREE' && !allowsAutoPost(to)) {
+      await this.pauseAutoposts(organizationId);
+    }
+
     if (billing === 'FREE') {
       await this._integrationService.changeActiveCron(organizationId);
     }
@@ -171,9 +275,14 @@ export class SubscriptionService {
   async modifySubscription(
     customerId: string,
     totalChannels: number,
-    billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE'
+    billing: BillingTier
   ) {
     if (!customerId) {
+      return false;
+    }
+
+    if (!pricing[billing]) {
+      console.error('subscription_unknown_tier', { customerId, billing });
       return false;
     }
 
@@ -245,6 +354,12 @@ export class SubscriptionService {
       );
     }
 
+    // FREE stops the feeds below; a paid plan without RSS auto-posting pauses
+    // them (see the downgrade policy in pricing.ts)
+    if (billing !== 'FREE' && !allowsAutoPost(to)) {
+      await this.pauseAutoposts(getOrgByCustomerId?.id!);
+    }
+
     if (billing === 'FREE') {
       await this._integrationService.changeActiveCron(getOrgByCustomerId?.id!);
     }
@@ -258,7 +373,7 @@ export class SubscriptionService {
     identifier: string,
     customerId: string,
     totalChannels: number,
-    billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+    billing: PaidTier,
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null,
     code?: string,
@@ -302,7 +417,7 @@ export class SubscriptionService {
     provider: string,
     identifier: string,
     totalChannels: number,
-    billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+    billing: PaidTier,
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null
   ) {
@@ -430,7 +545,7 @@ export class SubscriptionService {
   async addSubscription(
     orgId: string,
     userId: string,
-    subscription: any,
+    subscription: PaidTier,
     provider: string
   ) {
     await this._subscriptionRepository.setCustomerId(orgId, userId);

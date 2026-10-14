@@ -4,9 +4,9 @@ import React, { FC, useCallback, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import dayjs from 'dayjs';
 import clsx from 'clsx';
-import { capitalize } from 'lodash';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { usePlanName } from '@gitroom/frontend/components/billing/use.plans';
 import { Select } from '@gitroom/react/form/select';
 
 interface Invoice {
@@ -84,6 +84,7 @@ const ActionLink: FC<{
 
 export const BillingHistory: FC = () => {
   const t = useT();
+  const planName = usePlanName();
   const { data, isLoading, error } = useInvoices();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
@@ -119,7 +120,7 @@ export const BillingHistory: FC = () => {
         .map((invoice) => ({
           ...invoice,
           plan: invoice.tier
-            ? capitalize(invoice.tier)
+            ? planName(invoice.tier)
             : invoice.description || t('billing_subscription', 'Subscription'),
           periodLabel:
             invoice.period === 'YEARLY'
@@ -132,7 +133,7 @@ export const BillingHistory: FC = () => {
           endDate: formatDate(invoice.periodEnd),
           statusInfo: statuses[invoice.status] || statuses.void,
         })),
-    [data, statuses, t]
+    [data, statuses, t, planName]
   );
 
   const filtered = useMemo(() => {

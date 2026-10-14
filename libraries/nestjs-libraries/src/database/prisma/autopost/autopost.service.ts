@@ -92,6 +92,21 @@ export class AutopostService {
     return data;
   }
 
+  async updateAutopost(orgId: string, id: string, body: AutopostDto) {
+    const data = await this._autopostsRepository.updateAutopost(
+      orgId,
+      id,
+      body
+    );
+    if (!data) {
+      return null;
+    }
+
+    await this.processCron(body.active, orgId, id);
+
+    return data;
+  }
+
   async changeActive(orgId: string, id: string, active: boolean) {
     const data = await this._autopostsRepository.changeActive(
       orgId,

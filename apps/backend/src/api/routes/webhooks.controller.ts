@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
   Param,
   Post,
   Put,
@@ -34,6 +35,12 @@ export class WebhookController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: WebhooksDto
   ) {
+    if (
+      !(await this._webhooksService.ownsIntegrations(org.id, body.integrations))
+    ) {
+      throw new HttpException('Channel not found', 400);
+    }
+
     return this._webhooksService.createWebhook(org.id, body);
   }
 
@@ -42,7 +49,19 @@ export class WebhookController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpdateDto
   ) {
-    return this._webhooksService.createWebhook(org.id, body);
+    if (
+      !(await this._webhooksService.ownsIntegrations(org.id, body.integrations))
+    ) {
+      throw new HttpException('Channel not found', 400);
+    }
+
+    // it only edits an existing webhook, a new one goes through POST (and its plan check)
+    const data = await this._webhooksService.updateWebhook(org.id, body);
+    if (!data) {
+      throw new HttpException('Webhook not found', 404);
+    }
+
+    return data;
   }
 
   @Delete('/:id')

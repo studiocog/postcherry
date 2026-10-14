@@ -6,6 +6,7 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import DeleteAccountComponent from '@gitroom/frontend/components/settings/delete-account.component';
+import { CHANNELS_PER_BRAND } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 const useFaqList = () => {
   const { sourceCodeUrl } = useVariables();
   const user = useUser();
@@ -42,6 +43,14 @@ const useFaqList = () => {
         `PostCherry allows you to schedule your posts between different channels.
 A channel is a publishing platform where you can schedule your posts.
 For example, you can schedule your posts on X, Facebook, Instagram, TikTok, YouTube, Reddit, Linkedin, Dribbble, Threads and Pinterest.`
+      ),
+    },
+    {
+      title: t('faq_what_is_a_brand', 'What is a brand?'),
+      description: t(
+        'faq_what_is_a_brand_answer',
+        'A brand is one business, client or personal presence. Each brand on your plan includes up to {{channels}} connected social accounts, so a plan with 5 brands can connect up to {{total}} accounts.',
+        { channels: CHANNELS_PER_BRAND, total: 5 * CHANNELS_PER_BRAND }
       ),
     },
     {

@@ -55,5 +55,20 @@ const getErrorMessage = (error: {
         default:
           return 'You have used all the clipping minutes of your subscription for this month. Please upgrade your subscription to clip more videos.';
       }
+    case Sections.AUTOPOST:
+      switch (error.action) {
+        default:
+          return 'RSS auto-posting is not included in your plan. Please upgrade your subscription to post from RSS feeds automatically.';
+      }
+    case Sections.RECURRING_POSTS:
+      switch (error.action) {
+        default:
+          return 'Recurring posts are not included in your plan. Please upgrade your subscription to repeat your posts.';
+      }
+    case Sections.DEVELOPER_API:
+      switch (error.action) {
+        default:
+          return 'The PostCherry public API, CLI and agent skills are included in the Agency Pro plan. Please upgrade your subscription to use them.';
+      }
   }
 };

@@ -71,6 +71,7 @@ import {
 import dayjs from 'dayjs';
 import { Button } from '@gitroom/react/form/button';
 import { useClickOutside } from '@mantine/hooks';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
@@ -91,6 +92,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   });
   const { data: shortlinkPreferenceData } = useShortlinkPreference();
   const { isIndividual } = useAccountType();
+  const user = useUser();
+  // recurring posts are a plan feature (outside the app there is no plan to check)
+  const canRepeat = user?.tier?.recurring_posts !== false;
 
   const { addEditSets, mutate, customClose, dummy } = props;
 
@@ -335,6 +339,24 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   const schedule = useCallback(
     (type: 'draft' | 'now' | 'schedule' | 'update') => async () => {
+      // a recurring post saved on a plan without recurring posts loses its
+      // repeat (the server only takes a repeat from a plan that has it)
+      if (
+        !dummy &&
+        repeater &&
+        !canRepeat &&
+        !(await deleteDialog(
+          t(
+            'recurring_posts_not_in_plan',
+            'This post repeats, but recurring posts are not included in your plan. Saving it will stop the repeat.'
+          ),
+          t('save_without_repeat', 'Save without repeat'),
+          t('recurring_posts', 'Recurring posts')
+        ))
+      ) {
+        return;
+      }
+
       let republish = false;
       // the channels saved as another type, the rest are saved as `type`
       const saveAs: Record<string, 'draft' | 'schedule' | 'update'> = {};
@@ -723,7 +745,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       const data = {
         type,
         ...(republish ? { republish } : {}),
-        ...(repeater ? { inter: repeater } : {}),
+        ...(repeater && canRepeat ? { inter: repeater } : {}),
         tags,
         shortLink,
         date: date.utc().format('YYYY-MM-DDTHH:mm:ss'),
@@ -812,6 +834,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     [
       ref,
       repeater,
+      canRepeat,
       tags,
       date,
       channelDates,
@@ -1121,7 +1144,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               />
             )}
 
-            {!dummy && (
+            {!dummy && canRepeat && (
               <RepeatComponent repeat={repeater} onChange={setRepeater} />
             )}
           </div>
@@ -1285,11 +1308,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               label={t('add_tag', 'Add Tag')}
               onClick={() => setMobileSheet('tags')}
             />
-            <BottomSheetRow
-              icon={<RepeatIcon size={24} />}
-              label={t('repeat_post', 'Repeat Post')}
-              onClick={() => setMobileSheet('repeat')}
-            />
+            {canRepeat && (
+              <BottomSheetRow
+                icon={<RepeatIcon size={24} />}
+                label={t('repeat_post', 'Repeat Post')}
+                onClick={() => setMobileSheet('repeat')}
+              />
+            )}
             {canRequestApproval && (
               <RequestApprovalSheetRow
                 postId={approvalPostId!}

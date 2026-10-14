@@ -834,6 +834,18 @@ export class PostsRepository {
     });
   }
 
+  getPostOrganizationId(id: string) {
+    return this._post.model.post.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+      },
+      select: {
+        organizationId: true,
+      },
+    });
+  }
+
   getPostById(id: string, org?: string) {
     return this._post.model.post.findUnique({
       where: {

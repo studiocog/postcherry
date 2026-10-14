@@ -12,6 +12,9 @@ export enum Sections {
   IMPORT_FROM_CHANNELS = 'import_from_channels',
   ADMIN = 'admin',
   WEBHOOKS = 'webhooks',
+  AUTOPOST = 'autopost',
+  RECURRING_POSTS = 'recurring_posts',
+  DEVELOPER_API = 'developer_api',
 }
 
 export enum AuthorizationActions {

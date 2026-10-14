@@ -1,15 +1,14 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import {
-  AccountType,
-  Role,
-  ShortLinkPreference,
-  SubscriptionTier,
-} from '@prisma/client';
+import { AccountType, Role, ShortLinkPreference } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
+import {
+  isPaidTier,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 @Injectable()
 export class OrganizationRepository {
@@ -435,10 +434,12 @@ export class OrganizationRepository {
         },
       });
 
+    // single-person plans (e.g. STANDARD, PERSONAL, CREATOR) take no team members
+    const tier = checkForSubscription?.subscription?.subscriptionTier;
     if (
       process.env.STRIPE_PUBLISHABLE_KEY &&
-      checkForSubscription?.subscription?.subscriptionTier ===
-        SubscriptionTier.STANDARD
+      isPaidTier(tier) &&
+      !pricing[tier].team_members
     ) {
       return false;
     }

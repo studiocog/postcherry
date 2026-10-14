@@ -10,8 +10,12 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import dayjs from 'dayjs';
 import clsx from 'clsx';
-import { capitalize } from 'lodash';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  allowsAutoPost,
+  BillingTier,
+  PaidTier,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { FAQComponent } from '@gitroom/frontend/components/billing/faq.component';
 import { useBillingFeatures } from '@gitroom/frontend/components/billing/first.billing.component';
 import { BillingHistory } from '@gitroom/frontend/components/billing/billing.history.component';
@@ -30,6 +34,14 @@ import { FinishTrial } from '@gitroom/frontend/components/billing/finish.trial';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
+import {
+  isPlanView,
+  usePlanName,
+  usePlanTagline,
+  useVisiblePlans,
+} from '@gitroom/frontend/components/billing/use.plans';
+import { PlanAudienceTabs } from '@gitroom/frontend/components/billing/plan.audience.tabs';
+import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 
 type SubscriptionWithPlatform = Subscription & {
   platform?: 'web' | 'mobile';
@@ -37,7 +49,7 @@ type SubscriptionWithPlatform = Subscription & {
 
 export const Prorate: FC<{
   period: 'MONTHLY' | 'YEARLY';
-  pack: 'STANDARD' | 'PRO';
+  pack: PaidTier;
 }> = (props) => {
   const { period, pack } = props;
   const t = useT();
@@ -87,20 +99,40 @@ const planButton = {
   danger: 'bg-red-500 text-white hover:bg-red-600',
 };
 
+// Tailwind only ships class names written in full
+const gridColumns: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+};
+
 const PlanCard: FC<{
   name: string;
   price: number;
   yearly: boolean;
   current: boolean;
+  popular: boolean;
   action: PlanAction;
   loading: boolean;
   disabled: boolean;
   note?: React.ReactNode;
 }> = (props) => {
-  const { name, price, yearly, current, action, loading, disabled, note } =
-    props;
+  const {
+    name,
+    price,
+    yearly,
+    current,
+    popular,
+    action,
+    loading,
+    disabled,
+    note,
+  } = props;
   const t = useT();
   const features = useBillingFeatures(name);
+  const planName = usePlanName();
+  const planTagline = usePlanTagline();
+  const tagline = planTagline(name);
 
   return (
     <div
@@ -128,12 +160,30 @@ const PlanCard: FC<{
           )}
         />
       ))}
-      <div className="flex items-center justify-between gap-[8px] min-h-[26px]">
-        <div className="text-[18px] font-[600]">{capitalize(name)}</div>
-        {current && (
-          <div className="flex items-center gap-[6px] h-[26px] px-[10px] rounded-full bg-white/15 text-[12px] font-[600] uppercase whitespace-nowrap">
-            <span className="w-[6px] h-[6px] rounded-full bg-[#32D583]" />
-            {t('active', 'Active')}
+      <div className="flex flex-col gap-[4px]">
+        <div className="flex items-center justify-between gap-[8px] min-h-[26px]">
+          <div className="text-[18px] font-[600]">{planName(name)}</div>
+          {current ? (
+            <div className="flex items-center gap-[6px] h-[26px] px-[10px] rounded-full bg-white/15 text-[12px] font-[600] uppercase whitespace-nowrap">
+              <span className="w-[6px] h-[6px] rounded-full bg-[#32D583]" />
+              {t('active', 'Active')}
+            </div>
+          ) : (
+            popular && (
+              <div className="bg-[#AA0FA4] text-white text-[12px] px-[6px] rounded-[4px] whitespace-nowrap">
+                {t('billing_most_popular', 'Most popular')}
+              </div>
+            )
+          )}
+        </div>
+        {!!tagline && (
+          <div
+            className={clsx(
+              'text-[13px]',
+              current ? 'text-white/70' : 'text-textItemBlur'
+            )}
+          >
+            {tagline}
           </div>
         )}
       </div>
@@ -328,12 +378,25 @@ export const MainBillingComponent: FC<{
   const track = useTrack();
   const t = useT();
   const queryParams = useSearchParams();
+  // the connected channels, a plan with a lower channel limit disables the extra ones
+  const { data: integrations } = useIntegrationList();
   const [finishTrial, setFinishTrial] = useState(
     !!queryParams.get('finishTrial')
   );
 
   const [subscription, setSubscription] = useState<SubscriptionWithPlatform | undefined>(
     sub
+  );
+  // ?plans=AGENCY opens the plans of an audience (a feature upsell links there)
+  const plansParam = queryParams.get('plans');
+  const {
+    view,
+    setView,
+    plans: visiblePlans,
+    popular,
+  } = useVisiblePlans(
+    subscription?.subscriptionTier,
+    isPlanView(plansParam) ? plansParam : undefined
   );
   const [loading, setLoading] = useState<boolean>(false);
   // which button started the request, so only that one shows a spinner
@@ -376,7 +439,7 @@ export const MainBillingComponent: FC<{
     return subscription?.subscriptionTier;
   }, [subscription, initialChannels, monthlyOrYearly, period]);
   const moveToCheckout = useCallback(
-    (billing: 'STANDARD' | 'PRO' | 'FREE', reactivate = false) =>
+    (billing: BillingTier, reactivate = false) =>
       async () => {
         if (reactivate) {
           setLoading(true);
@@ -405,21 +468,106 @@ export const MainBillingComponent: FC<{
           return;
         }
 
-        const messages = [];
+        const from = subscription?.subscriptionTier
+          ? pricing[subscription.subscriptionTier]
+          : undefined;
+        const to = pricing[billing];
+        const messages: string[] = [];
+        // the channels above the new limit are disabled when the plan changes
+        // (SubscriptionService.modifySubscription)
+        const activeChannels = (
+          Array.isArray(integrations) ? integrations : []
+        ).filter(
+          (integration: { disabled?: boolean }) => !integration.disabled
+        ).length;
         if (
-          !pricing[billing].team_members &&
-          pricing[subscription?.subscriptionTier!]?.team_members
+          billing !== 'FREE' &&
+          typeof to.channel === 'number' &&
+          activeChannels > to.channel
         ) {
           messages.push(
-            `Your team members will be removed from your organization`
+            t(
+              'billing_lose_channels',
+              '{{disabled}} of your {{total}} connected channels will be disabled, the new plan includes {{limit}}.',
+              {
+                disabled: activeChannels - to.channel,
+                total: activeChannels,
+                limit: to.channel,
+              }
+            )
           );
+        }
+        if (!to.team_members && from?.team_members) {
+          messages.push(
+            t(
+              'billing_lose_team_members',
+              'Your team members will be removed from your organization.'
+            )
+          );
+        }
+        // moving to a paid plan with fewer features says what stops working
+        // (the downgrade policy is in pricing.ts)
+        if (from && billing !== 'FREE') {
+          if (from.preview_links && !to.preview_links) {
+            messages.push(
+              t(
+                'billing_lose_preview_links',
+                'Shared preview links will stop working.'
+              )
+            );
+          }
+          if (from.developer_api && !to.developer_api) {
+            messages.push(
+              t(
+                'billing_lose_developer_api',
+                'The public API, CLI and agent skills will stop working with your API key.'
+              )
+            );
+          }
+          if (allowsAutoPost(from) && !allowsAutoPost(to)) {
+            messages.push(
+              t(
+                'billing_lose_autopost',
+                'Your RSS auto-posts will be paused.'
+              )
+            );
+          }
+          if (from.recurring_posts && !to.recurring_posts) {
+            messages.push(
+              t(
+                'billing_lose_recurring_posts',
+                'You will not be able to create recurring posts. The ones you have keep repeating until you edit them.'
+              )
+            );
+          }
+          if (from.webhooks > 0 && !to.webhooks) {
+            messages.push(
+              t(
+                'billing_lose_webhooks',
+                'You will not be able to add webhooks. The ones you have keep working.'
+              )
+            );
+          }
+          // the AI image and video buttons show with credits (media library)
+          if (
+            (from.image_generator && !to.image_generator) ||
+            (from.image_generation_count > 0 && !to.image_generation_count) ||
+            (from.generate_videos > 0 && !to.generate_videos)
+          ) {
+            messages.push(
+              t(
+                'billing_lose_ai_media',
+                'AI image and video generation will not be included anymore.'
+              )
+            );
+          }
         }
         if (billing === 'FREE') {
           if (
             subscription?.cancelAt ||
             (await deleteDialog(
               `Are you sure you want to cancel your subscription?
-              ${messages.join(', ')}`,
+              ${messages.join(' ')}`,
               'Yes, cancel',
               'Cancel Subscription'
             ))
@@ -487,7 +635,11 @@ export const MainBillingComponent: FC<{
         }
         if (
           messages.length &&
-          !(await deleteDialog(messages.join(', '), 'Yes, continue'))
+          !(await deleteDialog(
+            messages.join(' '),
+            t('billing_yes_continue', 'Yes, continue'),
+            t('billing_change_plan_title', 'Change your plan?')
+          ))
         ) {
           return;
         }
@@ -557,7 +709,7 @@ export const MainBillingComponent: FC<{
         }
         setLoading(false);
       },
-    [monthlyOrYearly, subscription, user, utm]
+    [monthlyOrYearly, subscription, user, utm, integrations]
   );
   if (user?.isLifetime) {
     router.replace('/');
@@ -588,9 +740,8 @@ export const MainBillingComponent: FC<{
     );
   }
   const yearly = monthlyOrYearly === 'on';
-  const tiers = Object.keys(pricing);
   const currentTier = subscription?.subscriptionTier || 'FREE';
-  const plans = tiers.filter((name) => !isGeneral || name !== 'FREE');
+  const plans = [...(isGeneral ? [] : ['FREE']), ...visiblePlans];
 
   const planAction = (name: string): PlanAction => {
     if (currentPackage === name && subscription?.cancelAt) {
@@ -622,20 +773,24 @@ export const MainBillingComponent: FC<{
         variant: 'danger',
       };
     }
-    const direction = tiers.indexOf(name) - tiers.indexOf(currentTier);
+    // the plans are grouped by audience, so the price tells the direction
+    const direction =
+      pricing[name].month_price - (pricing[currentTier]?.month_price || 0);
     return {
       label: !subscription
         ? user?.tier?.current === 'FREE' && user.allowTrial
           ? t('start_7_days_free_trial', 'Start 7 days free trial')
           : t('billing_purchase', 'Purchase')
+        : name === currentTier
+        ? yearly
+          ? t('billing_switch_to_yearly', 'Switch to yearly')
+          : t('billing_switch_to_monthly', 'Switch to monthly')
         : direction > 0
         ? t('billing_upgrade', 'Upgrade')
         : direction < 0
         ? t('billing_downgrade', 'Downgrade')
-        : yearly
-        ? t('billing_switch_to_yearly', 'Switch to yearly')
-        : t('billing_switch_to_monthly', 'Switch to monthly'),
-      onClick: moveToCheckout(name as 'STANDARD' | 'PRO'),
+        : t('billing_switch_plan', 'Switch plan'),
+      onClick: moveToCheckout(name as PaidTier),
       variant: !!subscription && direction < 0 ? 'simple' : 'primary',
     };
   };
@@ -673,8 +828,8 @@ export const MainBillingComponent: FC<{
             )}
           >
             {t('billing_yearly', 'Yearly')}
-            <div className="bg-[#AA0FA4] text-white text-[12px] px-[6px] rounded-[4px]">
-              {t('billing_20_percent_off', '20% Off')}
+            <div className="bg-[#AA0FA4] text-white text-[12px] px-[6px] rounded-[4px] whitespace-nowrap">
+              {t('billing_two_months_free', '2 months free')}
             </div>
           </div>
         </div>
@@ -698,10 +853,15 @@ export const MainBillingComponent: FC<{
           </div>
         </div>
       )}
+      <PlanAudienceTabs
+        value={view}
+        onChange={setView}
+        className="self-start mobile:self-stretch"
+      />
       <div
         className={clsx(
           'grid gap-[16px] tablet:grid-cols-2 mobile:!grid-cols-1',
-          plans.length > 4 ? 'grid-cols-5' : 'grid-cols-4'
+          gridColumns[plans.length] || 'grid-cols-4'
         )}
       >
         {plans.map((name) => {
@@ -715,6 +875,7 @@ export const MainBillingComponent: FC<{
               }
               yearly={yearly}
               current={currentPackage === name}
+              popular={popular.includes(name)}
               action={{
                 ...action,
                 onClick: () => {
@@ -730,7 +891,7 @@ export const MainBillingComponent: FC<{
                 name !== 'FREE' && (
                   <Prorate
                     period={yearly ? 'YEARLY' : 'MONTHLY'}
-                    pack={name as 'STANDARD' | 'PRO'}
+                    pack={name as PaidTier}
                   />
                 )
               }
