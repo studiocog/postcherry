@@ -59,6 +59,8 @@ import { StripeController } from '@gitroom/backend/api/routes/stripe.controller'
 import { BrandKitController } from '@gitroom/backend/api/routes/brand-kit.controller';
 import { PostApprovalsController } from '@gitroom/backend/api/routes/post.approvals.controller';
 import { ReportsController } from '@gitroom/backend/api/routes/reports.controller';
+import { AiPlannerController } from '@gitroom/backend/api/routes/ai.planner.controller';
+import { AiPlannerService } from '@gitroom/nestjs-libraries/ai-planner/ai.planner.service';
 
 const authenticatedController = [
   UsersController,
@@ -84,6 +86,7 @@ const authenticatedController = [
   BrandKitController,
   PostApprovalsController,
   ReportsController,
+  AiPlannerController,
 ];
 @Module({
   imports: [UploadModule],
@@ -131,6 +134,7 @@ const authenticatedController = [
     FarcasterProvider,
     WalletProvider,
     OauthProvider,
+    AiPlannerService,
   ],
   get exports() {
     return [...this.imports, ...this.providers];

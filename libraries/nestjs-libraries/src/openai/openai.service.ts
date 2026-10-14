@@ -37,6 +37,32 @@ const ClipsPrompt = z.object({
   ),
 });
 
+// Limits are not part of the schemas, the planner checks every value afterwards
+const PlanOutlinePrompt = z.object({
+  items: z.array(
+    z.object({
+      date: z.string().describe('YYYY-MM-DD'),
+      time: z.string().describe('Local time HH:mm, 24 hours'),
+      channels: z
+        .array(z.number())
+        .describe('Numbers of the channels from the list'),
+      category: z
+        .string()
+        .describe('One of the content types from the list, or "other"'),
+      title: z.string().describe('The idea of the post in one short sentence'),
+    })
+  ),
+});
+
+const PlanPostsPrompt = z.object({
+  posts: z.array(
+    z.object({
+      number: z.number().describe('Number of the idea'),
+      content: z.string().describe('The full social media post'),
+    })
+  ),
+});
+
 @Injectable()
 export class OpenaiService {
   // The model answers with line numbers and not times, so a clip can only
@@ -366,5 +392,133 @@ Answer in the language most of the posts are written in.`,
     }
 
     return [];
+  }
+
+  // The model answers with channel numbers and never with ids, so it can only
+  // pick channels from the list it was given
+  async planContentOutline(
+    input: {
+      startDate: string;
+      endDate: string;
+      total: number;
+      postsPerWeek: number;
+      channels: {
+        number: number;
+        name: string;
+        identifier: string;
+        maxLength: number;
+      }[];
+      // every content type a post can have, and the ones the user picked
+      categories: string[];
+      contentMix: string[];
+      language: string;
+      goals: string;
+      brandContext: string;
+    },
+    signal?: AbortSignal
+  ) {
+    const channels = input.channels
+      .map(
+        (channel) =>
+          `${channel.number}. ${channel.name} (${channel.identifier}, max ${channel.maxLength} characters)`
+      )
+      .join('\n');
+
+    const contentMix = input.contentMix.length
+      ? `Use only these content types: ${input.contentMix.join(', ')}.`
+      : 'Use the content types that fit the goals best.';
+
+    const system = `You plan the social media content calendar of one brand.
+Plan exactly ${input.total} posts between ${input.startDate} and ${input.endDate} (both included), about ${input.postsPerWeek} per week, spread evenly over the period and never more than ${input.postsPerWeek} in any 7 days counted from ${input.startDate}.
+Give every post a good local posting time (HH:mm, 24 hours).
+Every post goes to one or more of these channels, use their numbers. Put a post on several channels only when the idea fits all of them:
+${channels}
+Give every post one content type from this list: ${input.categories.join(', ')}, or "other". ${contentMix}
+Every idea must be different.
+Write the titles in this language, whatever the language of these instructions: ${input.language}.`;
+
+    return (
+      (
+        await openai.chat.completions.parse(
+          {
+            model: 'gpt-4.1',
+            messages: [
+              {
+                role: 'system',
+                content: input.brandContext
+                  ? `${system}\n\n${input.brandContext}`
+                  : system,
+              },
+              {
+                role: 'user',
+                content: `Goals and topics:\n${input.goals}`,
+              },
+            ],
+            response_format: zodResponseFormat(
+              PlanOutlinePrompt,
+              'planOutline'
+            ),
+          },
+          { timeout: 2 * 60 * 1000, maxRetries: 1, signal }
+        )
+      ).choices[0].message.parsed?.items || []
+    );
+  }
+
+  async writePlannedPosts(
+    input: {
+      ideas: {
+        number: number;
+        date: string;
+        title: string;
+        category: string;
+        channels: string;
+        maxLength: number;
+      }[];
+      allTitles: string[];
+      language: string;
+      goals: string;
+      brandContext: string;
+    },
+    signal?: AbortSignal
+  ) {
+    const system = `You write social media posts for a planned content calendar.
+Write one complete post for every idea you are asked for, and answer with the number of the idea.
+Each post must fit in its max characters. Plain text only, no markdown, line breaks are allowed.
+Do not repeat what the other posts of the plan say, all the ideas of the plan are listed.
+Write in this language, whatever the language of these instructions: ${input.language}.`;
+
+    const allIdeas = input.allTitles.map((title) => `- ${title}`).join('\n');
+
+    const ideas = input.ideas
+      .map(
+        (idea) =>
+          `${idea.number}. [${idea.date}] ${idea.title} (type: ${idea.category}, channels: ${idea.channels}, max ${idea.maxLength} characters)`
+      )
+      .join('\n');
+
+    return (
+      (
+        await openai.chat.completions.parse(
+          {
+            model: 'gpt-4.1',
+            messages: [
+              {
+                role: 'system',
+                content: input.brandContext
+                  ? `${system}\n\n${input.brandContext}`
+                  : system,
+              },
+              {
+                role: 'user',
+                content: `Goals and topics:\n${input.goals}\n\nAll ideas of the plan:\n${allIdeas}\n\nWrite these:\n${ideas}`,
+              },
+            ],
+            response_format: zodResponseFormat(PlanPostsPrompt, 'plannedPosts'),
+          },
+          { timeout: 2 * 60 * 1000, maxRetries: 1, signal }
+        )
+      ).choices[0].message.parsed?.posts || []
+    );
   }
 }
