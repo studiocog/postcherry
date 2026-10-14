@@ -84,6 +84,43 @@ const toLines = (value: string) =>
 const fontStyle = (font: string) =>
   font ? { fontFamily: `'${font}', sans-serif` } : {};
 
+// https:// is added when no scheme is typed, '' clears the website
+const toWebsite = (value: string) => {
+  const website = value.trim();
+  if (!website) {
+    return '';
+  }
+
+  return /^https?:\/\//i.test(website) ? website : `https://${website}`;
+};
+
+// Close to the check of the server: http or https, no spaces and a domain like
+// example.com (or an IP address), so a wrong website is marked before saving
+const isWebsite = (website: string) => {
+  if (website.length > 500 || /[\s<>]/.test(website)) {
+    return false;
+  }
+
+  try {
+    const { protocol, hostname } = new URL(website);
+    const labels = hostname.split('.');
+    return (
+      ['http:', 'https:'].includes(protocol) &&
+      (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) ||
+        (labels.length > 1 &&
+          /^([a-z]{2,}|xn--[a-z0-9-]+)$/i.test(labels[labels.length - 1]) &&
+          labels.every(
+            (label) =>
+              label.length <= 63 &&
+              /^[a-z0-9-]+$/i.test(label) &&
+              !/^-|-$/.test(label)
+          )))
+    );
+  } catch (err) {
+    return false;
+  }
+};
+
 // Black or white, whichever is easier to read on the color
 const textColorOn = (color: string) => {
   const hex = /^#([0-9a-f]{6})$/i.exec(color)?.[1];
@@ -109,7 +146,7 @@ const BrandColor: FC<{ name: keyof BrandKitForm; label: string }> = ({
   <div
     role="group"
     aria-label={label}
-    className="flex flex-col gap-[6px] min-w-0"
+    className="flex flex-col gap-[6px] grow min-w-0"
   >
     <div className="text-[14px]">{label}</div>
     <ColorPicker name={name} label="" enabled={true} canBeCancelled={true} />
@@ -202,7 +239,7 @@ const BrandKitFormComponent: FC<{
 
   const save = useCallback(
     async (value: BrandKitForm) => {
-      const website = value.website.trim();
+      const website = toWebsite(value.website);
       const dos = toLines(value.dos);
       const donts = toLines(value.donts);
       const hashtags = value.hashtags.split(/[\s,]+/).filter((tag) => !!tag);
@@ -238,6 +275,13 @@ const BrandKitFormComponent: FC<{
                 { max: brandKitLimits.hashtagLength }
               )
             : '',
+        website:
+          website && !isWebsite(website)
+            ? t(
+                'brand_website_invalid',
+                'Please enter a valid website, like https://example.com'
+              )
+            : '',
       };
 
       form.clearErrors();
@@ -266,11 +310,7 @@ const BrandKitFormComponent: FC<{
             accentColor: value.accentColor || null,
             headingFont: value.headingFont || null,
             bodyFont: value.bodyFont || null,
-            website: !website
-              ? null
-              : /^https?:\/\//i.test(website)
-              ? website
-              : `https://${website}`,
+            website: website || null,
             voice: value.voice || null,
             dos,
             donts,
@@ -451,7 +491,9 @@ const BrandKitFormComponent: FC<{
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-3 mobile:grid-cols-1 gap-[16px]">
+            {/* a picker has a fixed width, so the colors wrap to a new line instead of
+                sharing a row that is too narrow for them */}
+            <div className="flex flex-wrap gap-[16px]">
               <BrandColor
                 name="primaryColor"
                 label={t('primary_color', 'Primary color')}
@@ -641,17 +683,25 @@ const BrandKitFormComponent: FC<{
                 placeholder={t('brand_donts_placeholder', 'Use slang')}
               />
             </div>
-            <Input
-              label={t(
-                'default_hashtags_limit',
-                'Default hashtags (up to {{max}})',
-                { max: brandKitLimits.hashtags }
-              )}
-              translationKey="default_hashtags_limit"
-              translationParams={{ max: brandKitLimits.hashtags }}
-              name="hashtags"
-              placeholder="#coffee #morning"
-            />
+            <div className="flex flex-col gap-[6px]">
+              <div className="text-[14px]">
+                {t('brand_hashtags_limit', 'Brand hashtags (up to {{max}})', {
+                  max: brandKitLimits.hashtags,
+                })}
+              </div>
+              <div className="text-[12px] text-textItemBlur">
+                {t(
+                  'brand_hashtags_hint',
+                  'Kept with your brand kit for reference. They are not added to your posts automatically.'
+                )}
+              </div>
+              <Input
+                label=""
+                aria-label={t('brand_hashtags', 'Brand hashtags')}
+                name="hashtags"
+                placeholder="#coffee #morning"
+              />
+            </div>
           </div>
         </fieldset>
       </FormProvider>

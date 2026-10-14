@@ -14,8 +14,9 @@ import { generationError } from '@gitroom/nestjs-libraries/openai/generation.err
 const LEARN_VOICE_POSTS = 30;
 const LEARN_VOICE_POST_LENGTH = 1500;
 
-// '' and spaces only are stored as null
-const toNullable = (value?: string | null) => value?.trim() || null;
+// '' and spaces only are stored as null, and so is anything that is not a string
+const toNullable = (value?: unknown) =>
+  (typeof value === 'string' ? value.trim() : '') || null;
 
 const toList = (values: string[] = [], maxItems: number, maxLength: number) =>
   uniq(
