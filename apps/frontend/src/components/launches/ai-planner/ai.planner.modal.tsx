@@ -174,13 +174,15 @@ export const AiPlannerModal: FC<{
     })(),
   });
 
-  const [selected, startDate, endDate, postsPerWeek, contentMix] = form.watch([
-    'integrations',
-    'startDate',
-    'endDate',
-    'postsPerWeek',
-    'contentMix',
-  ]);
+  const [selected, startDate, endDate, postsPerWeek, contentMix, goals] =
+    form.watch([
+      'integrations',
+      'startDate',
+      'endDate',
+      'postsPerWeek',
+      'contentMix',
+      'goals',
+    ]);
 
   const [step, setStep] = useState<Step>('form');
   const [progress, setProgress] = useState('');
@@ -236,6 +238,16 @@ export const AiPlannerModal: FC<{
         max: AI_PLANNER_MAX_CHANNELS,
       })
     : '';
+
+  // the only field without a valid default, so it says why Generate is disabled,
+  // in red once the user typed in it
+  const goalsMissing = (goals || '').trim().length < 3;
+  const goalsTouched =
+    !!form.formState.touchedFields.goals || !!form.formState.dirtyFields.goals;
+  const goalsHint = t(
+    'ai_planner_goals_required',
+    'Tell the AI what to talk about (at least 3 characters)'
+  );
 
   const hasBrandVoice = !!(
     brandKit?.voice ||
@@ -462,6 +474,7 @@ export const AiPlannerModal: FC<{
       return;
     }
 
+    // aborted when the planner is closed, the drafts after the current one are not added
     const controller = new AbortController();
     abort.current = controller;
     setStep('saving');
@@ -474,16 +487,34 @@ export const AiPlannerModal: FC<{
 
       let response: Response | null = null;
       try {
+        // never cancelled: the server can add the draft anyway, so the request
+        // finishes and the calendar shows it even if the planner was closed
         response = await fetch('/posts', {
           method: 'POST',
           body: JSON.stringify(toDraft(item)),
-          signal: controller.signal,
         });
       } catch (err) {
         response = null;
       }
 
-      if (controller.signal.aborted) {
+      if (response?.ok) {
+        done++;
+        setItems((list) => list.filter((p) => p.id !== item.id));
+      }
+
+      // the planner was closed while adding, the user still sees what was added
+      if (controller.signal.aborted && done < total) {
+        if (done) {
+          reloadCalendarView();
+          toaster.show(
+            t(
+              'ai_planner_added_partial',
+              'Added {{done}} of {{total}} drafts to your calendar',
+              { done, total }
+            ),
+            'warning'
+          );
+        }
         return;
       }
 
@@ -517,19 +548,20 @@ export const AiPlannerModal: FC<{
         setStep('review');
         return;
       }
-
-      done++;
-      setItems((list) => list.filter((p) => p.id !== item.id));
     }
 
     reloadCalendarView();
     toaster.show(
       t('ai_planner_added', '{{count}} drafts added to your calendar', {
         count: total,
+        defaultValue_one: '{{count}} draft added to your calendar',
       }),
       'success'
     );
-    modal.closeAll();
+    // already closed when it was closed while adding the last one
+    if (!controller.signal.aborted) {
+      modal.closeAll();
+    }
   }, [items, channelLimits, fetch, toaster, reloadCalendarView, modal, t]);
 
   if (step === 'generating') {
@@ -612,7 +644,8 @@ export const AiPlannerModal: FC<{
             <div className="flex-1 text-[14px]">
               {t('ai_planner_channels', 'Channels')}
             </div>
-            <div
+            <button
+              type="button"
               className="text-[14px] underline cursor-pointer"
               onClick={() =>
                 setChannels(
@@ -621,13 +654,14 @@ export const AiPlannerModal: FC<{
               }
             >
               {t('ai_planner_select_all', 'Select all')}
-            </div>
-            <div
+            </button>
+            <button
+              type="button"
               className="text-[14px] underline cursor-pointer"
               onClick={() => setChannels([])}
             >
               {t('ai_planner_clear', 'Clear')}
-            </div>
+            </button>
           </div>
           <div className="flex flex-wrap gap-[12px] mobile:hidden">
             {channels.map((integration) => (
@@ -700,6 +734,7 @@ export const AiPlannerModal: FC<{
             {rangeError ||
               t('ai_planner_estimate', 'About {{count}} posts will be planned', {
                 count: plannedPostsCount(+postsPerWeek || 1, days),
+                defaultValue_one: 'About {{count}} post will be planned',
               })}
           </div>
         </div>
@@ -707,7 +742,18 @@ export const AiPlannerModal: FC<{
         <Textarea
           label={t('ai_planner_goals', 'Goals and topics')}
           name="goals"
+          maxLength={2000}
           className="!min-h-[110px]"
+          // replaces the raw message of the validator
+          error={
+            !goalsMissing ? (
+              <>&nbsp;</>
+            ) : goalsTouched ? (
+              goalsHint
+            ) : (
+              <span className="text-textItemBlur">{goalsHint}</span>
+            )
+          }
           placeholder={t(
             'ai_planner_goals_placeholder',
             'What do you want to talk about this month? Products, events, offers, the audience you want to reach...'
@@ -780,7 +826,10 @@ export const AiPlannerModal: FC<{
           <Button
             onClick={form.handleSubmit(submit)}
             disabled={
-              !form.formState.isValid || !!rangeError || !!channelsError
+              !form.formState.isValid ||
+              !!rangeError ||
+              !!channelsError ||
+              goalsMissing
             }
           >
             {t('ai_planner_generate', 'Generate plan')}

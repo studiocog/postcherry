@@ -254,7 +254,7 @@ export class AiPlannerService {
       }
 
       const batches = chunk(ideas, POSTS_PER_BATCH);
-      yield { name: 'writing', done: 0, total: batches.length };
+      yield { name: 'writing', done: 0, total: ideas.length };
 
       // all the batches run together, the progress follows them in order
       const allTitles = ideas.map((idea) => idea.title);
@@ -288,6 +288,7 @@ export class AiPlannerService {
 
       const items: AiPlanItem[] = [];
       let lastError: unknown = null;
+      let written = 0;
       for (const [index, request] of requests.entries()) {
         const { posts, error } = await request;
         if (error) {
@@ -301,7 +302,9 @@ export class AiPlannerService {
           items.push(...this.clampContent(plan, batches[index], posts));
         }
 
-        yield { name: 'writing', done: index + 1, total: batches.length };
+        // the progress counts posts, a batch holds several of them
+        written += batches[index].length;
+        yield { name: 'writing', done: written, total: ideas.length };
       }
 
       if (signal?.aborted) {

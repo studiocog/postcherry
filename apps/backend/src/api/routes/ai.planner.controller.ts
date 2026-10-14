@@ -11,7 +11,10 @@ import { Response } from 'express';
 import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { AiPlannerService } from '@gitroom/nestjs-libraries/ai-planner/ai.planner.service';
-import { GeneratePlanDto } from '@gitroom/nestjs-libraries/dtos/ai-planner/ai.planner.dto';
+import {
+  AiPlannerEvent,
+  GeneratePlanDto,
+} from '@gitroom/nestjs-libraries/dtos/ai-planner/ai.planner.dto';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import {
   AuthorizationActions,
@@ -43,11 +46,22 @@ export class AiPlannerController {
     res.on('close', () => abort.abort());
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    // Every event has to leave right away: the global gzip (or a proxy that
+    // compresses or buffers) would hold the progress and the pings until the
+    // plan is done, and the proxy would cut a long plan as a silent request
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    const send = (event: AiPlannerEvent) => {
+      res.write(JSON.stringify(event) + '\n');
+      // a compression layer that still wraps the response sends what it holds
+      (res as Response & { flush?: () => void }).flush?.();
+    };
 
     // a plan takes longer than the proxy waits for a silent response
     const ping = setInterval(() => {
       if (!abort.signal.aborted) {
-        res.write(JSON.stringify({ name: 'ping' }) + '\n');
+        send({ name: 'ping' });
       }
     }, 15000);
 
@@ -60,7 +74,7 @@ export class AiPlannerController {
         if (abort.signal.aborted) {
           break;
         }
-        res.write(JSON.stringify(event) + '\n');
+        send(event);
       }
     } catch (err) {
       // nothing was sent yet (another plan is running): a real status code
@@ -75,9 +89,7 @@ export class AiPlannerController {
           ? err.message
           : 'Something went wrong while planning your posts, please try again.';
       if (!abort.signal.aborted) {
-        res.write(
-          JSON.stringify({ name: 'error', error: true, message }) + '\n'
-        );
+        send({ name: 'error', error: true, message });
       }
     } finally {
       clearInterval(ping);

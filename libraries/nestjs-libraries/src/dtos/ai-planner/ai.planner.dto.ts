@@ -110,6 +110,7 @@ export interface AiPlanItem {
 export type AiPlannerEvent =
   | { name: 'ping' }
   | { name: 'outline' }
+  // posts written so far / posts of the plan
   | { name: 'writing'; done: number; total: number }
   | { name: 'result'; status: 'not_configured' }
   | {

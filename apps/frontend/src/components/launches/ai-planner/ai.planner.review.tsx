@@ -44,8 +44,11 @@ export const ChannelAvatar: FC<{
   size: number;
   onClick: () => void;
 }> = ({ integration, selected, size, onClick }) => (
-  <div
+  <button
+    type="button"
     onClick={onClick}
+    aria-pressed={selected}
+    aria-label={integration.name}
     data-tooltip-id="tooltip"
     data-tooltip-content={integration.name}
     className={clsx(
@@ -62,7 +65,7 @@ export const ChannelAvatar: FC<{
       height={size}
     />
     <PlatformBadge integration={integration} />
-  </div>
+  </button>
 );
 
 // grows with the text, so a long post is read without a scrollbar
@@ -164,16 +167,16 @@ const PlanItemCard: FC<{
             />
           ))}
         </div>
-        <div
+        <button
+          type="button"
           onClick={onRemove}
-          role="button"
           aria-label={t('ai_planner_remove_post', 'Remove this post')}
           data-tooltip-id="tooltip"
           data-tooltip-content={t('ai_planner_remove_post', 'Remove this post')}
           className="w-[32px] h-[32px] rounded-[6px] flex items-center justify-center cursor-pointer text-textItemBlur hover:bg-boxHover hover:text-red-400"
         >
           <TrashIcon size={16} />
-        </div>
+        </button>
       </div>
       <input
         value={item.title}
@@ -235,6 +238,7 @@ export const AiPlannerReview: FC<{
         <div className="flex-1 text-[16px] font-[600]">
           {t('ai_planner_count', '{{count}} posts planned', {
             count: items.length,
+            defaultValue_one: '{{count}} post planned',
           })}
         </div>
         {brandVoice && (
@@ -251,9 +255,11 @@ export const AiPlannerReview: FC<{
           )}
         </div>
       ) : (
-        <div
+        // a fieldset so the keyboard cannot change the posts while they are added either
+        <fieldset
+          disabled={disabled}
           className={clsx(
-            'flex flex-col gap-[12px] max-h-[60vh] overflow-y-auto pe-[4px] scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor',
+            'flex flex-col gap-[12px] max-h-[60vh] min-w-0 overflow-y-auto pe-[4px] scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor',
             disabled && 'pointer-events-none opacity-75'
           )}
         >
@@ -271,7 +277,7 @@ export const AiPlannerReview: FC<{
               onRemove={() => onRemove(item.id)}
             />
           ))}
-        </div>
+        </fieldset>
       )}
     </div>
   );

@@ -149,10 +149,11 @@ export const AiPlannerButton: FC<{ mobile?: boolean; collapsed?: boolean }> = ({
   const tooltip = notConfigured ? notConfiguredText : compact ? label : '';
 
   return (
-    <div
+    <button
+      type="button"
       onClick={open}
-      role="button"
       aria-label={label}
+      aria-disabled={notConfigured}
       {...(tooltip
         ? { 'data-tooltip-id': 'tooltip', 'data-tooltip-content': tooltip }
         : {})}
@@ -168,6 +169,6 @@ export const AiPlannerButton: FC<{ mobile?: boolean; collapsed?: boolean }> = ({
         <PlannerIcon />
       </div>
       {!compact && <div className="flex-1 text-start text-[14px]">{label}</div>}
-    </div>
+    </button>
   );
 };
