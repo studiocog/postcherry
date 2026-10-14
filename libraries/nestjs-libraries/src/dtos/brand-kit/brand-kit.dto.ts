@@ -30,6 +30,11 @@ export const brandKitFonts = [
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
+// null, undefined and '' clear a field, any other value is checked, so a value
+// like false or 0 is refused instead of being skipped
+const isSet = (value: unknown) =>
+  value !== undefined && value !== null && value !== '';
+
 // Shared with the settings form, so it can say what is wrong before saving
 export const brandKitLimits = {
   rules: 20,
@@ -49,23 +54,28 @@ export class BrandKitDto {
   @MaxLength(100)
   logoMediaId?: string | null;
 
-  @ValidateIf((o) => !!o.primaryColor)
+  @ValidateIf((o) => isSet(o.primaryColor))
+  @IsString()
   @Matches(HEX_COLOR)
   primaryColor?: string | null;
 
-  @ValidateIf((o) => !!o.secondaryColor)
+  @ValidateIf((o) => isSet(o.secondaryColor))
+  @IsString()
   @Matches(HEX_COLOR)
   secondaryColor?: string | null;
 
-  @ValidateIf((o) => !!o.accentColor)
+  @ValidateIf((o) => isSet(o.accentColor))
+  @IsString()
   @Matches(HEX_COLOR)
   accentColor?: string | null;
 
-  @ValidateIf((o) => !!o.headingFont)
+  @ValidateIf((o) => isSet(o.headingFont))
+  @IsString()
   @IsIn([...brandKitFonts])
   headingFont?: string | null;
 
-  @ValidateIf((o) => !!o.bodyFont)
+  @ValidateIf((o) => isSet(o.bodyFont))
+  @IsString()
   @IsIn([...brandKitFonts])
   bodyFont?: string | null;
 
@@ -95,7 +105,8 @@ export class BrandKitDto {
   @MaxLength(brandKitLimits.hashtagLength, { each: true })
   hashtags?: string[];
 
-  @ValidateIf((o) => !!o.website)
+  @ValidateIf((o) => isSet(o.website))
+  @IsString()
   @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   @MaxLength(500)
   website?: string | null;
