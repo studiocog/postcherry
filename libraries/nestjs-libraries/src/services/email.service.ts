@@ -155,13 +155,13 @@ export class EmailService {
 
   // Sends right away (not through the email workflow, a file does not belong in workflow
   // arguments) with the body exactly as given, without the app template around it.
+  // The sender is always the platform (EMAIL_FROM_NAME), users never choose the "from" name.
   // Never throws, true when the provider accepted the email
   async sendEmailWithAttachments(
     to: string,
     subject: string,
     html: string,
-    attachments: EmailAttachment[],
-    fromName?: string
+    attachments: EmailAttachment[]
   ): Promise<boolean> {
     if (!this.hasProvider() || !to || to.indexOf('@') === -1 || !subject) {
       return false;
@@ -173,15 +173,11 @@ export class EmailService {
     }
 
     // the name goes into the "from" header as it is, so it can not carry quotes, brackets or new lines
-    const senderName = (name?: string) =>
-      (name || '')
+    const emailFromName =
+      (process.env.EMAIL_FROM_NAME || '')
         .replace(/["<>,;\r\n]/g, '')
         .trim()
-        .slice(0, 60);
-    const emailFromName =
-      senderName(fromName) ||
-      senderName(process.env.EMAIL_FROM_NAME) ||
-      process.env.EMAIL_FROM_ADDRESS;
+        .slice(0, 60) || process.env.EMAIL_FROM_ADDRESS;
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {

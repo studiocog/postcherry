@@ -15,11 +15,9 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Button } from '@gitroom/react/form/button';
 import { Input } from '@gitroom/react/form/input';
-import { Checkbox } from '@gitroom/react/form/checkbox';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { getTimezone } from '@gitroom/frontend/components/layout/set.timezone';
-import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import { useBrandKit } from '@gitroom/frontend/components/settings/brand-kit.component';
 import {
   EmailReportResult,
@@ -69,6 +67,36 @@ const useOrganizations = () => {
     refreshWhenOffline: false,
     refreshWhenHidden: false,
     revalidateOnReconnect: false,
+  });
+};
+
+// Its own key (like the Analytics page) so a failed load is an error, not an empty list
+const useReportChannels = () => {
+  const fetch = useFetch();
+
+  const load = useCallback(async () => {
+    const response = await fetch('/integrations/list');
+    if (!response.ok) {
+      throw new Error('Could not load the channels');
+    }
+
+    const { integrations } = await response.json();
+    if (!Array.isArray(integrations)) {
+      throw new Error('Could not load the channels');
+    }
+
+    return integrations as ReportChannelOption[];
+  }, [fetch]);
+
+  return useSWR<ReportChannelOption[]>('reports-channels', load, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    revalidateIfStale: false,
+    revalidateOnMount: true,
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
+    // the page shows the error with a retry button instead of retrying in the background
+    shouldRetryOnError: false,
   });
 };
 
@@ -143,7 +171,13 @@ export const ReportsComponent: FC = () => {
   const t = useT();
   const toaster = useToaster();
   const user = useUser();
-  const { data: integrations, isLoading } = useIntegrationList();
+  const {
+    data: integrations,
+    error: channelsError,
+    isLoading,
+    isValidating: reloadingChannels,
+    mutate: reloadChannels,
+  } = useReportChannels();
   const { data: brandKit } = useBrandKit();
   const { data: organizations } = useOrganizations();
   const { downloadPdf, emailReport } = useReportActions();
@@ -369,7 +403,7 @@ export const ReportsComponent: FC = () => {
   ];
   const today = dayjs().tz(getTimezone()).format('YYYY-MM-DD');
 
-  if (isLoading) {
+  if (isLoading && !channelsError) {
     return (
       <div className="bg-newBgColorInner p-[20px] flex flex-1 items-center justify-center">
         <LoadingComponent />
@@ -448,7 +482,24 @@ export const ReportsComponent: FC = () => {
           </Card>
 
           <Card title={t('channels', 'Channels')}>
-            {!channels.length ? (
+            {channelsError ? (
+              <div className="flex flex-col items-start gap-[8px]">
+                <div className="text-[13px] text-red-400">
+                  {t(
+                    'reports_channels_failed',
+                    'We could not load your channels. Please try again.'
+                  )}
+                </div>
+                <Button
+                  secondary={true}
+                  onClick={() => reloadChannels()}
+                  loading={reloadingChannels}
+                  className="rounded-[8px]"
+                >
+                  {t('try_again', 'Try again')}
+                </Button>
+              </div>
+            ) : !channels.length ? (
               <div className="text-[13px] opacity-70">
                 {t(
                   'reports_no_channels',
@@ -482,39 +533,49 @@ export const ReportsComponent: FC = () => {
                 <div className="flex flex-col gap-[16px]">
                   {groups.map((group) => {
                     const ids = group.channels.map((channel) => channel.id);
-                    const allSelected = ids.every((id) =>
+                    const selectedCount = ids.filter((id) =>
                       selectedIds.includes(id)
-                    );
+                    ).length;
+                    const allSelected = selectedCount === ids.length;
                     return (
                       <div key={group.id} className="flex flex-col gap-[8px]">
                         {!!group.name && (
-                          <div className="flex items-center gap-[10px]">
-                            <Checkbox
-                              disableForm={true}
+                          <label className="flex items-center gap-[10px] cursor-pointer self-start">
+                            <input
+                              type="checkbox"
+                              className="w-[18px] h-[18px] accent-forth cursor-pointer shrink-0"
                               checked={allSelected}
-                              onChange={(e) => toggle(ids, e.target.value)}
+                              ref={(input) => {
+                                // only some channels of the customer are selected
+                                if (input) {
+                                  input.indeterminate =
+                                    !!selectedCount && !allSelected;
+                                }
+                              }}
+                              onChange={(e) => toggle(ids, e.target.checked)}
                             />
-                            <div className="text-[14px] font-[600]">
+                            <span className="text-[14px] font-[600]">
                               {group.name}
-                            </div>
-                          </div>
+                            </span>
+                          </label>
                         )}
                         <div
                           className={clsx(
                             'grid grid-cols-2 mobile:grid-cols-1 gap-[8px]',
-                            !!group.name && 'ps-[34px]'
+                            !!group.name && 'ps-[28px]'
                           )}
                         >
                           {group.channels.map((channel) => (
-                            <div
+                            <label
                               key={channel.id}
-                              className="flex items-center gap-[10px] min-w-0"
+                              className="flex items-center gap-[10px] min-w-0 cursor-pointer"
                             >
-                              <Checkbox
-                                disableForm={true}
+                              <input
+                                type="checkbox"
+                                className="w-[18px] h-[18px] accent-forth cursor-pointer shrink-0"
                                 checked={selectedIds.includes(channel.id)}
                                 onChange={(e) =>
-                                  toggle([channel.id], e.target.value)
+                                  toggle([channel.id], e.target.checked)
                                 }
                               />
                               <div
@@ -530,7 +591,7 @@ export const ReportsComponent: FC = () => {
                                   fallbackSrc={`/icons/platforms/${channel.identifier}.png`}
                                   src={channel.picture}
                                   className="rounded-[8px]"
-                                  alt={channel.identifier}
+                                  alt=""
                                   width={28}
                                   height={28}
                                 />
@@ -542,15 +603,15 @@ export const ReportsComponent: FC = () => {
                                   height={14}
                                 />
                               </div>
-                              <div
+                              <span
                                 className={clsx(
                                   'flex-1 text-[14px] whitespace-nowrap text-ellipsis overflow-hidden',
                                   channel.disabled && 'opacity-50'
                                 )}
                               >
                                 {channel.name}
-                              </div>
-                            </div>
+                              </span>
+                            </label>
                           ))}
                         </div>
                       </div>

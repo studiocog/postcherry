@@ -1,7 +1,8 @@
 import { Body, Controller, Post, StreamableFile } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Organization } from '@prisma/client';
+import { Organization, User } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
+import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { ReportsService } from '@gitroom/nestjs-libraries/database/prisma/reports/reports.service';
 import {
   EmailReportDto,
@@ -32,12 +33,13 @@ export class ReportsController {
     });
   }
 
-  // Rate limited per workspace in the service
+  // Rate limited per workspace and per user in the service
   @Post('/email')
   emailReport(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
     @Body() body: EmailReportDto
   ) {
-    return this._reportsService.emailReport(org, body);
+    return this._reportsService.emailReport(org, user.id, body);
   }
 }

@@ -48,6 +48,7 @@ const RECENT_POSTS = 15;
 const POST_TEXT_LENGTH = 220;
 const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 const EMAILS_PER_HOUR = 10;
+const EMAILS_PER_USER_PER_HOUR = 20;
 const EMAIL_CHANNELS = 20;
 
 // Neutral colors for a workspace without a brand kit
@@ -299,21 +300,29 @@ export class ReportsService {
 
   // Only called when a user clicks "Email this report", never automatically.
   // Follow-up (not built): monthly sending needs an opt-in schedule and a NEW Temporal
-  // workflow + activity that call this method, the existing workflows stay untouched
+  // workflow + activity that call this method, the existing workflows stay untouched.
+  // The email always comes from the platform sender (EMAIL_FROM_NAME), the brand name
+  // is only in the subject and the body, so nobody can pick the "from" name of an email
   async emailReport(
     org: Organization,
+    userId: string,
     body: EmailReportDto
   ): Promise<EmailReportResult> {
     if (!this._emailService.hasProvider() || !process.env.EMAIL_FROM_ADDRESS) {
       return { sent: false, reason: 'not_configured' };
     }
 
-    const rateKey = `reports:email:${org.id}`;
-    const sentThisHour = await ioRedis.incr(rateKey);
-    if (sentThisHour === 1) {
-      await ioRedis.expire(rateKey, 3600);
-    }
-    if (sentThisHour > EMAILS_PER_HOUR) {
+    // per workspace, and per user so more workspaces do not mean more emails
+    if (
+      !(await this.underHourlyLimit(
+        `reports:email:${org.id}`,
+        EMAILS_PER_HOUR
+      )) ||
+      !(await this.underHourlyLimit(
+        `reports:email:user:${userId}`,
+        EMAILS_PER_USER_PER_HOUR
+      ))
+    ) {
       throw new HttpException(
         'too_many_report_emails',
         HttpStatus.TOO_MANY_REQUESTS
@@ -326,11 +335,19 @@ export class ReportsService {
       body.to,
       `${data.brand.name.replace(/\s+/g, ' ')} - social media report, ${range}`,
       this.emailHtml(data, range),
-      [{ filename, content: buffer, contentType: 'application/pdf' }],
-      data.brand.name
+      [{ filename, content: buffer, contentType: 'application/pdf' }]
     );
 
     return sent ? { sent: true } : { sent: false, reason: 'failed' };
+  }
+
+  // Counts one more email for this hour, false once the limit is passed
+  private async underHourlyLimit(key: string, limit: number) {
+    const count = await ioRedis.incr(key);
+    if (count === 1) {
+      await ioRedis.expire(key, 3600);
+    }
+    return count <= limit;
   }
 
   private async createReport(org: Organization, body: ReportRequestDto) {

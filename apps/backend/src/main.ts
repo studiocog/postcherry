@@ -40,6 +40,8 @@ async function start() {
         'onboarding',
         'activate',
         'x-copilotkit-runtime-client-gql-version',
+        // the file name of downloads (like the reports PDF) when the backend is on another origin
+        'Content-Disposition',
         ...(process.env.NOT_SECURED ? ['auth', 'showorg', 'impersonate'] : []),
       ],
       origin: [
