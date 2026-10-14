@@ -23,6 +23,7 @@ import { Calendar } from './calendar';
 import { useDrag, useDrop } from 'react-dnd';
 import { DNDProvider } from '@gitroom/frontend/components/launches/helpers/dnd.provider';
 import { GeneratorComponent } from './generator/generator';
+import { AiPlannerButton } from '@gitroom/frontend/components/launches/ai-planner/ai.planner.component';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { NewPost } from '@gitroom/frontend/components/launches/new.post';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -705,6 +706,13 @@ export const LaunchesComponent = () => {
                   user?.tier?.ai &&
                   billingEnabled && <GeneratorComponent />}
               </div>
+              {sortedIntegrations?.length > 0 && (
+                <div className="mobile:hidden">
+                  <AiPlannerButton
+                    collapsed={collapseMenu === '1' && !channelsOpen}
+                  />
+                </div>
+              )}
             </div>
             <div className="gap-[32px] flex flex-col select-none flex-1">
               {sortedIntegrations.length === 0 &&
@@ -782,6 +790,7 @@ export const LaunchesComponent = () => {
               <>
                 <NewPost />
                 {user?.tier?.ai && billingEnabled && <GeneratorComponent />}
+                <AiPlannerButton mobile={true} />
               </>
             ) : (
               <div className="flex-1">
