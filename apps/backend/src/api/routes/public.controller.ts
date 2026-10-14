@@ -8,8 +8,11 @@ import {
   Req,
   Res,
   StreamableFile,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { RealIP } from 'nestjs-real-ip';
@@ -28,6 +31,8 @@ import { OnlyURL } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { CreatePublicCommentDto } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
+import { PostApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/post-approvals/post.approvals.service';
+import { PostApprovalDecisionDto } from '@gitroom/nestjs-libraries/dtos/post-approvals/post.approval.dto';
 
 const pump = promisify(pipeline);
 
@@ -38,7 +43,8 @@ export class PublicController {
     private _trackService: TrackService,
     private _agentGraphInsertService: AgentGraphInsertService,
     private _postsService: PostsService,
-    private _subscriptionService: SubscriptionService
+    private _subscriptionService: SubscriptionService,
+    private _postApprovalsService: PostApprovalsService
   ) {}
   @Post('/agent')
   async createAgent(@Body() body: { text: string; apiKey: string }) {
@@ -86,6 +92,25 @@ export class PublicController {
     @RealIP() ip: string
   ) {
     return this._postsService.createPublicComment(postId, body, null, ip);
+  }
+
+  // the client opens the approval link without logging in, the token is the
+  // credential, so cap the calls per client
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 120, ttl: 3600000 } })
+  @Get(`/approvals/:token`)
+  async getApproval(@Param('token') token: string) {
+    return this._postApprovalsService.getPublic(token);
+  }
+
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 20, ttl: 3600000 } })
+  @Post(`/approvals/:token/decision`)
+  async decideApproval(
+    @Param('token') token: string,
+    @Body() body: PostApprovalDecisionDto
+  ) {
+    return this._postApprovalsService.decide(token, body);
   }
 
   @Post('/t')

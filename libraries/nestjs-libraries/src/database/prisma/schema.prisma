@@ -47,6 +47,7 @@ model Organization {
   webhooks            Webhooks[]
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
+  postApprovals       PostApproval[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -119,6 +120,7 @@ model User {
   sendFailureEmails     Boolean              @default(true)
   sendStreakEmails      Boolean              @default(true)
   oauthAuthorizations   OAuthAuthorization[]
+  postApprovals         PostApproval[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -1867,4 +1869,49 @@ model Announcement {
   description String
   color       AnnouncementColor @default(INFO)
   createdAt   DateTime          @default(now())
+}
+
+enum PostApprovalStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+// A link a team member sends to a client to approve a post without logging in.
+// Informational only: publishing does not wait for it.
+// Follow-up: "block publishing until approved" (see PostApprovalsService).
+model PostApproval {
+  id                String             @id @default(uuid())
+  organizationId    String
+  // the root post the link was created from, it keeps its id when the post is edited
+  postId            String
+  // the group at request time, the dashboard gives the post a new group on every save
+  group             String
+  // the channels saved together with the post, null for older posts
+  batchId           String?
+  token             String             @unique
+  status            PostApprovalStatus @default(PENDING)
+  // who the link is for, entered by the team
+  clientName        String?
+  // the name the client typed when deciding
+  decidedByName     String?
+  clientComment     String?
+  requestedByUserId String
+  expiresAt         DateTime
+  decidedAt         DateTime?
+  revokedAt         DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  requestedBy       User               @relation(fields: [requestedByUserId], references: [id])
+
+  @@index([organizationId])
+  @@index([postId])
+  @@index([batchId])
+  @@index([group])
+  @@index([requestedByUserId])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@index([deletedAt])
 }
