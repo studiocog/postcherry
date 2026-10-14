@@ -1,5 +1,8 @@
 import { Resend } from 'resend';
-import { EmailInterface } from '@gitroom/nestjs-libraries/emails/email.interface';
+import {
+  EmailAttachment,
+  EmailInterface,
+} from '@gitroom/nestjs-libraries/emails/email.interface';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_132');
 
@@ -12,7 +15,8 @@ export class ResendProvider implements EmailInterface {
     html: string,
     emailFromName: string,
     emailFromAddress: string,
-    replyTo?: string
+    replyTo?: string,
+    attachments?: EmailAttachment[]
   ) {
     const sends = await resend.emails.send({
       from: `${emailFromName} <${emailFromAddress}>`,
@@ -20,6 +24,18 @@ export class ResendProvider implements EmailInterface {
       subject,
       html,
       ...(replyTo && { reply_to: replyTo }),
+      // the API takes the content as base64
+      ...(attachments?.length
+        ? {
+            attachments: attachments.map((attachment) => ({
+              filename: attachment.filename,
+              content: attachment.content.toString('base64'),
+              ...(attachment.contentType
+                ? { content_type: attachment.contentType }
+                : {}),
+            })),
+          }
+        : {}),
     });
 
     // The SDK returns API errors (like 429 rate limits) instead of throwing,

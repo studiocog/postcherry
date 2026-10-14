@@ -54,6 +54,9 @@ import { BrandKitRepository } from '@gitroom/nestjs-libraries/database/prisma/br
 import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
 import { PostApprovalsRepository } from '@gitroom/nestjs-libraries/database/prisma/post-approvals/post.approvals.repository';
 import { PostApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/post-approvals/post.approvals.service';
+import { ReportsRepository } from '@gitroom/nestjs-libraries/database/prisma/reports/reports.repository';
+import { ReportsService } from '@gitroom/nestjs-libraries/database/prisma/reports/reports.service';
+import { ReportPdfService } from '@gitroom/nestjs-libraries/database/prisma/reports/report.pdf.service';
 
 @Global()
 @Module({
@@ -117,6 +120,9 @@ import { PostApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/
     BrandKitService,
     PostApprovalsRepository,
     PostApprovalsService,
+    ReportsRepository,
+    ReportsService,
+    ReportPdfService,
   ],
   get exports() {
     return this.providers;

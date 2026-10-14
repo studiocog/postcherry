@@ -96,6 +96,29 @@ export const useMenuItem = () => {
       path: '/analytics',
     },
     {
+      name: t('reports', 'Reports'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="21"
+          viewBox="0 0 20 21"
+          fill="none"
+        >
+          <path
+            d="M11.6667 2.39V5.83C11.6667 6.30 11.6667 6.53 11.7575 6.71C11.8374 6.86 11.9649 6.99 12.1217 7.07C12.3 7.16 12.5334 7.16 13 7.16H16.4416M13.3334 11.33H6.66675M13.3334 14.67H6.66675M8.33341 8H6.66675M11.6667 2.17H7.33341C5.93328 2.17 5.23322 2.17 4.69844 2.44C4.22803 2.68 3.84558 3.06 3.6059 3.53C3.33341 4.07 3.33341 4.77 3.33341 6.17V14.83C3.33341 16.23 3.33341 16.93 3.6059 17.47C3.84558 17.94 4.22803 18.32 4.69844 18.56C5.23322 18.83 5.93328 18.83 7.33341 18.83H12.6667C14.0669 18.83 14.7669 18.83 15.3017 18.56C15.7721 18.32 16.1546 17.94 16.3943 17.47C16.6667 16.93 16.6667 16.23 16.6667 14.83V7.17L11.6667 2.17Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      path: '/reports',
+      // UI simplification only, the page still opens from its URL
+      hide: isIndividual,
+    },
+    {
       name: t('media', 'Media'),
       icon: (
         <svg
