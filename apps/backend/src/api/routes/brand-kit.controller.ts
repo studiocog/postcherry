@@ -1,6 +1,13 @@
-import { Body, Controller, Get, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Organization } from '@prisma/client';
+import { Organization, Role } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
 import { BrandKitDto } from '@gitroom/nestjs-libraries/dtos/brand-kit/brand-kit.dto';
@@ -23,9 +30,18 @@ export class BrandKitController {
   @Put('/')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   saveBrandKit(
-    @GetOrgFromRequest() org: Organization,
+    @GetOrgFromRequest() org: Organization & { users?: Array<{ role: Role }> },
     @Body() body: BrandKitDto
   ) {
+    // CheckPolicies lets every role through when billing is off, and the brand
+    // voice steers the AI of the whole workspace, so the role is checked here too
+    if (!['ADMIN', 'SUPERADMIN'].includes(org.users?.[0]?.role || '')) {
+      throw new HttpException(
+        'Only workspace admins can change the brand kit',
+        403
+      );
+    }
+
     return this._brandKitService.saveBrandKit(org.id, body);
   }
 
