@@ -32,6 +32,12 @@ class MockRedis {
     return 1;
   }
 
+  async incr(key: string) {
+    const value = Number(this.data.get(key) || 0) + 1;
+    this.data.set(key, String(value));
+    return value;
+  }
+
   // Add other Redis methods as needed for your tests
 }
 

@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { EmailInterface } from '@gitroom/nestjs-libraries/emails/email.interface';
+import {
+  EmailAttachment,
+  EmailInterface,
+} from '@gitroom/nestjs-libraries/emails/email.interface';
 import { ResendProvider } from '@gitroom/nestjs-libraries/emails/resend.provider';
 import { EmptyProvider } from '@gitroom/nestjs-libraries/emails/empty.provider';
 import { NodeMailerProvider } from '@gitroom/nestjs-libraries/emails/node.mailer.provider';
@@ -148,5 +151,59 @@ export class EmailService {
       }
     }
     console.log(`Email to ${to} failed after 3 attempts:`, lastErr);
+  }
+
+  // Sends right away (not through the email workflow, a file does not belong in workflow
+  // arguments) with the body exactly as given, without the app template around it.
+  // Never throws, true when the provider accepted the email
+  async sendEmailWithAttachments(
+    to: string,
+    subject: string,
+    html: string,
+    attachments: EmailAttachment[],
+    fromName?: string
+  ): Promise<boolean> {
+    if (!this.hasProvider() || !to || to.indexOf('@') === -1 || !subject) {
+      return false;
+    }
+
+    if (!process.env.EMAIL_FROM_ADDRESS) {
+      console.log('Email sender address not found in environment variables');
+      return false;
+    }
+
+    // the name goes into the "from" header as it is, so it can not carry quotes, brackets or new lines
+    const senderName = (name?: string) =>
+      (name || '')
+        .replace(/["<>,;\r\n]/g, '')
+        .trim()
+        .slice(0, 60);
+    const emailFromName =
+      senderName(fromName) ||
+      senderName(process.env.EMAIL_FROM_NAME) ||
+      process.env.EMAIL_FROM_ADDRESS;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await this.emailService.sendEmail(
+          to,
+          subject,
+          html,
+          emailFromName,
+          process.env.EMAIL_FROM_ADDRESS,
+          undefined,
+          attachments
+        );
+        return true;
+      } catch (err) {
+        console.log(`Email attempt ${attempt + 1}/3 failed:`, err);
+        if (attempt < 2) {
+          await timer(700);
+        }
+      }
+    }
+
+    console.log(`Email with attachments to ${to} failed after 3 attempts`);
+    return false;
   }
 }

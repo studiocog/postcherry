@@ -1,3 +1,9 @@
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 export interface EmailInterface {
   name: string;
   validateEnvKeys: string[];
@@ -7,6 +13,7 @@ export interface EmailInterface {
     html: string,
     emailFromName: string,
     emailFromAddress: string,
-    replyTo?: string
+    replyTo?: string,
+    attachments?: EmailAttachment[]
   ): Promise<any>;
 }
