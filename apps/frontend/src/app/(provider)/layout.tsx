@@ -57,6 +57,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           disableXAnalytics={!!process.env.DISABLE_X_ANALYTICS}
           sentryDsn={process.env.NEXT_PUBLIC_SENTRY_DSN!}
           extensionId={process.env.EXTENSION_ID || ''}
+          docsUrl={process.env.DOCS_URL}
+          extensionStoreUrl={process.env.EXTENSION_STORE_URL || ''}
+          mcpConnectorClaudeUrl={process.env.MCP_CONNECTOR_CLAUDE_URL || ''}
+          mcpConnectorChatgptUrl={process.env.MCP_CONNECTOR_CHATGPT_URL || ''}
+          mcpConnectorCursorUrl={process.env.MCP_CONNECTOR_CURSOR_URL || ''}
+          mcpConnectorGrokUrl={process.env.MCP_CONNECTOR_GROK_URL || ''}
+          cliPackage={process.env.CLI_PACKAGE || ''}
+          cliCommand={process.env.CLI_COMMAND || ''}
+          cliSkill={process.env.CLI_SKILL || ''}
+          n8nNodeUrl={process.env.N8N_NODE_URL || ''}
           mediaProcessing={
             process.env.STORAGE_PROVIDER === 'cloudflare' &&
             !!process.env.RUNPOD_API_KEY &&

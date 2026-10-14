@@ -11,6 +11,7 @@ import { ApiKeyDto } from '@gitroom/nestjs-libraries/dtos/integrations/api.key.d
 import { useRouter } from 'next/navigation';
 import { TopTitle } from '@gitroom/frontend/components/launches/helpers/top.title.component';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { useExternalLinks } from '@gitroom/react/helpers/external.links';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { object, string } from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -277,34 +278,39 @@ export const CustomVariables: FC<{
 const ExtensionNotFound: FC = () => {
   const modals = useModals();
   const t = useT();
+  const { extensionStoreUrl } = useExternalLinks();
   return (
     <div className="flex flex-col gap-[16px] pt-[8px]">
       <p className="text-[14px] text-textColor/80">
-        {t(
-          'extension_not_available',
-          'The browser extension is not installed. You need to install it before connecting this channel.'
-        )}
+        {extensionStoreUrl
+          ? t(
+              'extension_not_available',
+              'The browser extension is not installed. You need to install it before connecting this channel.'
+            )
+          : t(
+              'extension_not_available_no_store',
+              "The browser extension is not installed, so this channel can't be connected yet."
+            )}
       </p>
       <div className="flex gap-[10px]">
-        <Button
-          type="button"
-          className="flex-1"
-          onClick={() => {
-            window.open(
-              'https://chromewebstore.google.com/detail/postiz/cidhffagahknaeodkplfbcpfeielnkjl?hl=en',
-              '_blank'
-            );
-            modals.closeCurrent();
-          }}
-        >
-          {t('install_extension', 'Install Extension')}
-        </Button>
+        {!!extensionStoreUrl && (
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={() => {
+              window.open(extensionStoreUrl, '_blank');
+              modals.closeCurrent();
+            }}
+          >
+            {t('install_extension', 'Install Extension')}
+          </Button>
+        )}
         <Button
           type="button"
           className="flex-1 !bg-transparent border border-tableBorder text-textColor"
           onClick={() => modals.closeCurrent()}
         >
-          {t('cancel', 'Cancel')}
+          {extensionStoreUrl ? t('cancel', 'Cancel') : t('close', 'Close')}
         </Button>
       </div>
     </div>

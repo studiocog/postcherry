@@ -36,6 +36,17 @@ interface VariableContextInterface {
   googleAdsTrialTracking?: string;
   recaptchaSiteKey?: string;
   sourceCodeUrl?: string;
+  // external links, read them through useExternalLinks()
+  docsUrl?: string;
+  extensionStoreUrl?: string;
+  mcpConnectorClaudeUrl?: string;
+  mcpConnectorChatgptUrl?: string;
+  mcpConnectorCursorUrl?: string;
+  mcpConnectorGrokUrl?: string;
+  cliPackage?: string;
+  cliCommand?: string;
+  cliSkill?: string;
+  n8nNodeUrl?: string;
 }
 const VariableContext = createContext({
   stripeClient: '',
@@ -71,6 +82,16 @@ const VariableContext = createContext({
   extensionId: '',
   recaptchaSiteKey: '',
   sourceCodeUrl: '',
+  // docsUrl stays undefined so the default docs URL applies
+  extensionStoreUrl: '',
+  mcpConnectorClaudeUrl: '',
+  mcpConnectorChatgptUrl: '',
+  mcpConnectorCursorUrl: '',
+  mcpConnectorGrokUrl: '',
+  cliPackage: '',
+  cliCommand: '',
+  cliSkill: '',
+  n8nNodeUrl: '',
 } as VariableContextInterface);
 export const VariableContextComponent: FC<
   VariableContextInterface & {
