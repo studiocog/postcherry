@@ -159,6 +159,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   // the channels the post already has, each with its own post
   const existingPosts = [existingData, ...(existingData.siblings || [])];
+  // a client can no longer decide on a post that went out on any channel
+  const approvalPublished = existingPosts.some(
+    (p) => p.posts?.[0]?.state === 'PUBLISHED'
+  );
   // the channel in view, or the one that was opened
   const channel =
     existingPosts.find((p) => p.integration === current) || existingData;
@@ -1123,7 +1127,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           </div>
           <div className="pe-[20px] flex items-center justify-end gap-[8px]">
             {canRequestApproval && (
-              <RequestApprovalButton postId={approvalPostId!} />
+              <RequestApprovalButton
+                postId={approvalPostId!}
+                published={approvalPublished}
+              />
             )}
             {existingData?.integration && (
               <button
@@ -1286,6 +1293,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             {canRequestApproval && (
               <RequestApprovalSheetRow
                 postId={approvalPostId!}
+                published={approvalPublished}
                 onOpen={() => setMobileSheet(null)}
               />
             )}

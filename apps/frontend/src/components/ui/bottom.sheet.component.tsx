@@ -81,7 +81,9 @@ export const BottomSheetRow: FC<{
   icon: ReactNode;
   label: string;
   onClick: () => void;
-}> = ({ icon, label, onClick }) => {
+  // a status shown before the chevron
+  badge?: ReactNode;
+}> = ({ icon, label, onClick, badge }) => {
   return (
     <div
       onClick={onClick}
@@ -89,6 +91,7 @@ export const BottomSheetRow: FC<{
     >
       <div className="text-[#A3A3A3]">{icon}</div>
       <div className="flex-1 text-[15px] font-[600]">{label}</div>
+      {badge}
       <ChevronRightIcon size={20} className="text-[#A3A3A3] rtl:rotate-180" />
     </div>
   );

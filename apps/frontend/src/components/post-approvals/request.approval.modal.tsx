@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useId, useState } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
@@ -158,7 +158,12 @@ const ApprovalRequestRow: FC<{
   );
 };
 
-export const RequestApprovalModal: FC<{ postId: string }> = ({ postId }) => {
+// `published`: the post already went out on one of its channels, the client
+// could not decide on a new link
+export const RequestApprovalModal: FC<{
+  postId: string;
+  published: boolean;
+}> = ({ postId, published }) => {
   const t = useT();
   const toaster = useToaster();
   const copyLink = useCopyLink();
@@ -166,6 +171,8 @@ export const RequestApprovalModal: FC<{ postId: string }> = ({ postId }) => {
   const createApproval = useCreatePostApproval();
   const [loading, setLoading] = useState(false);
   const [createdUrl, setCreatedUrl] = useState('');
+  // names the field of the new link for screen readers
+  const linkLabelId = useId();
   const form = useForm({
     defaultValues: {
       clientName: '',
@@ -176,17 +183,25 @@ export const RequestApprovalModal: FC<{ postId: string }> = ({ postId }) => {
   const submit = useCallback(
     async (values: { clientName: string; expiresInDays: string }) => {
       setLoading(true);
-      const created = await createApproval(postId, {
-        ...(values.clientName.trim()
-          ? { clientName: values.clientName.trim() }
-          : {}),
-        expiresInDays: +values.expiresInDays,
-      });
+      const { created, published: publishedSince } = await createApproval(
+        postId,
+        {
+          ...(values.clientName.trim()
+            ? { clientName: values.clientName.trim() }
+            : {}),
+          expiresInDays: +values.expiresInDays,
+        }
+      );
       setLoading(false);
 
       if (!created) {
         toaster.show(
-          t('approval_create_failed', 'Could not create the approval link'),
+          publishedSince
+            ? t(
+                'approval_post_published',
+                'This post is already published, your client can no longer approve it or request changes.'
+              )
+            : t('approval_create_failed', 'Could not create the approval link'),
           'warning'
         );
         return;
@@ -206,49 +221,59 @@ export const RequestApprovalModal: FC<{ postId: string }> = ({ postId }) => {
           'Your client sees the last saved version of this post without logging in, and can approve it or request changes.'
         )}
       </div>
-      <FormProvider {...form}>
-        <form
-          onSubmit={form.handleSubmit(submit)}
-          className="flex flex-col gap-[4px]"
-        >
-          <div className="flex gap-[12px] mobile:flex-col mobile:gap-0">
-            <div className="flex-1">
-              <Input
-                label={t('approval_client_name', 'Client name (optional)')}
-                placeholder={t(
-                  'approval_client_name_placeholder',
-                  'Who is the link for?'
-                )}
-                name="clientName"
-                maxLength={80}
-              />
+      {published ? (
+        <div className="text-[14px] rounded-[8px] bg-btnSimple p-[12px]">
+          {t(
+            'approval_post_published',
+            'This post is already published, your client can no longer approve it or request changes.'
+          )}
+        </div>
+      ) : (
+        <FormProvider {...form}>
+          <form
+            onSubmit={form.handleSubmit(submit)}
+            className="flex flex-col gap-[4px]"
+          >
+            <div className="flex gap-[12px] mobile:flex-col mobile:gap-0">
+              <div className="flex-1">
+                <Input
+                  label={t('approval_client_name', 'Client name (optional)')}
+                  placeholder={t(
+                    'approval_client_name_placeholder',
+                    'Who is the link for?'
+                  )}
+                  name="clientName"
+                  maxLength={80}
+                />
+              </div>
+              <div className="w-[160px] mobile:w-full">
+                <Select
+                  label={t('approval_link_valid_for', 'Link valid for')}
+                  name="expiresInDays"
+                >
+                  {EXPIRY_DAYS.map((days) => (
+                    <option key={days} value={String(days)}>
+                      {t('approval_days', '{{days}} days', { days })}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </div>
-            <div className="w-[160px] mobile:w-full">
-              <Select
-                label={t('approval_link_valid_for', 'Link valid for')}
-                name="expiresInDays"
-              >
-                {EXPIRY_DAYS.map((days) => (
-                  <option key={days} value={String(days)}>
-                    {t('approval_days', '{{days}} days', { days })}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-          <Button type="submit" loading={loading} className="rounded-[8px]">
-            {t('create_approval_link', 'Create approval link')}
-          </Button>
-        </form>
-      </FormProvider>
+            <Button type="submit" loading={loading} className="rounded-[8px]">
+              {t('create_approval_link', 'Create approval link')}
+            </Button>
+          </form>
+        </FormProvider>
+      )}
       {!!createdUrl && (
         <div className="flex flex-col gap-[8px]">
-          <div className="text-[14px] font-[600]">
+          <div id={linkLabelId} className="text-[14px] font-[600]">
             {t('approval_send_link', 'Send this link to your client')}
           </div>
           <div className="flex items-center gap-[8px]">
             <input
               readOnly={true}
+              aria-labelledby={linkLabelId}
               value={createdUrl}
               onFocus={(e) => e.target.select()}
               className="flex-1 min-w-0 h-[42px] px-[16px] bg-newBgColorInner border border-newTableBorder rounded-[8px] text-[14px] text-textColor outline-none"

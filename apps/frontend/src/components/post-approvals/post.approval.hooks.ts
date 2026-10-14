@@ -145,14 +145,19 @@ export const useCreatePostApproval = () => {
         body: JSON.stringify(body),
       });
       if (!response.ok) {
-        return null;
+        const { state } = await response.json().catch(() => ({} as any));
+        return {
+          created: null,
+          // the post went out in the meantime, a client could not decide
+          published: response.status === 400 && state === 'locked',
+        };
       }
       const created = (await response.json()) as { id: string; url: string };
       await Promise.all([
         mutate(`/post-approvals/post/${postId}`),
         mutate(isStatusesKey),
       ]);
-      return created;
+      return { created, published: false };
     },
     [fetch, mutate]
   );

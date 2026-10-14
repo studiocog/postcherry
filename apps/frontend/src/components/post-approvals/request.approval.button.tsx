@@ -28,28 +28,39 @@ const ApprovalIcon: FC<{ size?: number }> = ({ size = 20 }) => (
   </svg>
 );
 
-const useOpenRequestApproval = (postId: string) => {
+// `published`: the post already went out on one of its channels, a client
+// can no longer decide on it
+const useOpenRequestApproval = (postId: string, published: boolean) => {
   const t = useT();
   const modals = useModals();
   return useCallback(() => {
     modals.openModal({
       title: t('client_approval', 'Client approval'),
       withCloseButton: true,
-      children: <RequestApprovalModal postId={postId} />,
+      children: <RequestApprovalModal postId={postId} published={published} />,
     });
-  }, [postId, modals, t]);
+  }, [postId, published, modals, t]);
 };
 
-// the editor footer action, with the status of the latest link
-export const RequestApprovalButton: FC<{ postId: string }> = ({ postId }) => {
-  const t = useT();
-  const label = useApprovalStatusLabel();
-  const open = useOpenRequestApproval(postId);
+// the latest link that still means something: not revoked, and decided or
+// still open
+const useLatestPostApproval = (postId: string) => {
   const { data } = usePostApprovals(postId);
-  const latest = data?.find(
+  return data?.find(
     (approval) =>
       !approval.revokedAt && (approval.active || approval.status !== 'PENDING')
   );
+};
+
+// the editor footer action, with the status of the latest link
+export const RequestApprovalButton: FC<{
+  postId: string;
+  published: boolean;
+}> = ({ postId, published }) => {
+  const t = useT();
+  const label = useApprovalStatusLabel();
+  const open = useOpenRequestApproval(postId, published);
+  const latest = useLatestPostApproval(postId);
 
   // the footer is narrow on smaller screens, the icon and the status stay;
   // the name keeps the status for screen readers when the text is hidden
@@ -81,18 +92,22 @@ export const RequestApprovalButton: FC<{ postId: string }> = ({ postId }) => {
   );
 };
 
-// the same action in the settings sheet of the mobile editor
+// the same action in the settings sheet of the mobile editor, with the same
+// status
 export const RequestApprovalSheetRow: FC<{
   postId: string;
+  published: boolean;
   onOpen?: () => void;
-}> = ({ postId, onOpen }) => {
+}> = ({ postId, published, onOpen }) => {
   const t = useT();
-  const open = useOpenRequestApproval(postId);
+  const open = useOpenRequestApproval(postId, published);
+  const latest = useLatestPostApproval(postId);
 
   return (
     <BottomSheetRow
       icon={<ApprovalIcon size={24} />}
       label={t('request_approval', 'Request approval')}
+      badge={<ApprovalStatusBadge variant="pill" approval={latest} />}
       onClick={() => {
         onOpen?.();
         open();

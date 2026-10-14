@@ -6,7 +6,8 @@ import {
 import { randomBytes } from 'crypto';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { escape, groupBy, truncate, uniq } from 'lodash';
+import { escape, groupBy, truncate, uniq, uniqBy } from 'lodash';
+import { State } from '@prisma/client';
 import { PostApprovalsRepository } from '@gitroom/nestjs-libraries/database/prisma/post-approvals/post.approvals.repository';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
@@ -30,9 +31,17 @@ type SubjectPost = Awaited<
 type ApprovalCandidate = Awaited<
   ReturnType<PostApprovalsRepository['getLatestCandidates']>
 >[number];
-type EditablePost = Awaited<
-  ReturnType<PostApprovalsRepository['getEditablePosts']>
->[number];
+// what decides which posts a request covers
+type ScopePost = {
+  id: string;
+  group: string;
+  batchId: string | null;
+  integrationId: string;
+  intervalInDays: number | null;
+};
+// a post whose saves can make a decision outdated
+type ScopedPost = ScopePost & { state: State; updatedAt: Date };
+type Covers = (anchorId: string, post: ScopePost) => boolean;
 
 export type PostApprovalBadge = Omit<
   ApprovalCandidate,
@@ -74,20 +83,65 @@ export class PostApprovalsService {
     return `${process.env.FRONTEND_URL}/approve/${token}`;
   }
 
-  // the last save of the post, or of any channel saved with it
-  private lastEditOf(
-    edits: EditablePost[],
-    postId: string,
-    batchId: string | null
-  ) {
+  // The posts a request covers. A batch holds every post saved in one go,
+  // and an API call can also put several posts of one channel in it (one per
+  // day). Like the editor (PostsService.getPostsByGroup), a request covers
+  // the post it was made from and, for every other channel, the first post of
+  // the batch that repeats the same way. `roots` are root posts in the order
+  // they were created.
+  private coveredGroups(anchor: ScopePost, roots: ScopePost[]) {
+    const groups = new Set([anchor.group]);
+    if (!anchor.batchId) {
+      return groups;
+    }
+
+    const channels = new Set([anchor.integrationId]);
+    for (const post of roots) {
+      if (
+        post.batchId === anchor.batchId &&
+        !channels.has(post.integrationId) &&
+        post.intervalInDays === anchor.intervalInDays
+      ) {
+        channels.add(post.integrationId);
+        groups.add(post.group);
+      }
+    }
+    return groups;
+  }
+
+  // whether a request made from the post `anchorId` covers a post
+  private coverage(anchors: ScopePost[], roots: ScopePost[]): Covers {
+    const anchorsById = new Map(anchors.map((anchor) => [anchor.id, anchor]));
+    const covered = new Map<string, Set<string>>();
+    return (anchorId, post) => {
+      if (post.id === anchorId) {
+        return true;
+      }
+
+      const anchor = anchorsById.get(anchorId);
+      if (!anchor?.batchId || anchor.batchId !== post.batchId) {
+        return false;
+      }
+
+      const groups =
+        covered.get(anchorId) || this.coveredGroups(anchor, roots);
+      covered.set(anchorId, groups);
+      return groups.has(post.group);
+    };
+  }
+
+  // the last save of the channels a request covers that the team can still
+  // edit (published or failed posts change state without an edit)
+  private lastEditOf(anchorId: string, posts: ScopedPost[], covers: Covers) {
     return Math.max(
       0,
-      ...edits
+      ...posts
         .filter(
-          (edit) =>
-            edit.id === postId || (!!batchId && edit.batchId === batchId)
+          (post) =>
+            (post.state === State.QUEUE || post.state === State.DRAFT) &&
+            covers(anchorId, post)
         )
-        .map((edit) => +edit.updatedAt)
+        .map((post) => +post.updatedAt)
     );
   }
 
@@ -118,6 +172,26 @@ export class PostApprovalsService {
       throw new NotFoundException('Post not found');
     }
 
+    // the client could not decide on a post that already went out on one of
+    // its channels (see resolve)
+    const roots = post.batchId
+      ? await this._postApprovalsRepository.getBatchRootPosts(orgId, [
+          post.batchId,
+        ])
+      : [];
+    const covers = this.coverage([post], roots);
+    if (
+      [post, ...roots].some(
+        (p) => p.state === State.PUBLISHED && covers(post.id, p)
+      )
+    ) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: CLOSED_MESSAGES.locked,
+        state: 'locked',
+      });
+    }
+
     const { token, ...approval } =
       await this._postApprovalsRepository.createApproval({
         organizationId: orgId,
@@ -146,32 +220,42 @@ export class PostApprovalsService {
       throw new NotFoundException('Post not found');
     }
 
-    const [approvals, edits] = await Promise.all([
-      this._postApprovalsRepository.listForSubject(
-        orgId,
-        post.id,
-        post.batchId
-      ),
-      this._postApprovalsRepository.getEditablePosts(
-        orgId,
-        [post.id],
-        post.batchId ? [post.batchId] : []
-      ),
-    ]);
+    const roots = post.batchId
+      ? await this._postApprovalsRepository.getBatchRootPosts(orgId, [
+          post.batchId,
+        ])
+      : [];
+    const candidates = await this._postApprovalsRepository.listForSubject(
+      orgId,
+      uniq([post.id, ...roots.map((root) => root.id)]),
+      post.batchId
+    );
+    const anchors = await this._postApprovalsRepository.getAnchorPosts(
+      orgId,
+      uniq(candidates.map((candidate) => candidate.postId))
+    );
 
+    // only the requests whose preview holds this post
+    const covers = this.coverage(anchors, roots);
+    const posts = uniqBy([post, ...roots], (p) => p.id);
     const now = new Date();
-    const lastEdit = this.lastEditOf(edits, post.id, post.batchId);
-    return approvals.map(({ token, requestedBy, ...approval }) => ({
-      ...approval,
-      url: this.approvalUrl(token),
-      active: !approval.revokedAt && approval.expiresAt > now,
-      editedAfterDecision: this.isEditedAfterDecision(approval, lastEdit),
-      requestedBy:
-        [requestedBy?.name, requestedBy?.lastName]
-          .filter(Boolean)
-          .join(' ')
-          .trim() || null,
-    }));
+    return candidates
+      .filter((candidate) => covers(candidate.postId, post))
+      .slice(0, 20)
+      .map(({ token, requestedBy, postId: anchorId, ...approval }) => ({
+        ...approval,
+        url: this.approvalUrl(token),
+        active: !approval.revokedAt && approval.expiresAt > now,
+        editedAfterDecision: this.isEditedAfterDecision(
+          approval,
+          this.lastEditOf(anchorId, posts, covers)
+        ),
+        requestedBy:
+          [requestedBy?.name, requestedBy?.lastName]
+            .filter(Boolean)
+            .join(' ')
+            .trim() || null,
+      }));
   }
 
   async revoke(orgId: string, id: string) {
@@ -184,7 +268,7 @@ export class PostApprovalsService {
   }
 
   // The latest request that still counts for each root post. A request made
-  // from one channel of the post counts for all the channels saved with it.
+  // from one channel of the post counts for the channels its preview shows.
   async getStatuses(
     orgId: string,
     postIds: string[]
@@ -201,35 +285,45 @@ export class PostApprovalsService {
     const batchIds = uniq(
       posts.map((p) => p.batchId).filter((id): id is string => !!id)
     );
+    const roots = batchIds.length
+      ? await this._postApprovalsRepository.getBatchRootPosts(orgId, batchIds)
+      : [];
     const candidates =
       await this._postApprovalsRepository.getLatestCandidates(
         orgId,
-        ids,
+        uniq([...posts, ...roots].map((p) => p.id)),
         batchIds
       );
+    if (!candidates.length) {
+      return {};
+    }
 
-    // the saves only matter for a decision
-    const edits = candidates.some((c) => c.status !== 'PENDING')
-      ? await this._postApprovalsRepository.getEditablePosts(
-          orgId,
-          ids,
-          batchIds
-        )
-      : [];
+    const anchors = await this._postApprovalsRepository.getAnchorPosts(
+      orgId,
+      uniq(candidates.map((candidate) => candidate.postId))
+    );
+    const covers = this.coverage(anchors, roots);
+    const scoped = uniqBy([...posts, ...roots], (p) => p.id);
+    // the saves only matter for a decision, once per request
+    const lastEdits = new Map<string, number>();
+    const lastEditFor = (anchorId: string) => {
+      const lastEdit =
+        lastEdits.get(anchorId) ?? this.lastEditOf(anchorId, scoped, covers);
+      lastEdits.set(anchorId, lastEdit);
+      return lastEdit;
+    };
 
     return posts.reduce((all, post) => {
-      const latest = candidates.find(
-        (c) =>
-          c.postId === post.id || (!!c.batchId && c.batchId === post.batchId)
+      const latest = candidates.find((candidate) =>
+        covers(candidate.postId, post)
       );
       if (latest) {
-        const { postId, batchId, ...badge } = latest;
+        const { postId: anchorId, batchId, ...badge } = latest;
         all[post.id] = {
           ...badge,
-          editedAfterDecision: this.isEditedAfterDecision(
-            badge,
-            this.lastEditOf(edits, post.id, post.batchId)
-          ),
+          editedAfterDecision:
+            badge.status !== 'PENDING' &&
+            this.isEditedAfterDecision(badge, lastEditFor(anchorId)),
         };
       }
       return all;
@@ -258,25 +352,35 @@ export class PostApprovalsService {
       return { approval, state: 'expired', channels: [] };
     }
 
-    // the live batch and group of the post: the batch can be set after the
-    // request and the group changes on every save in the editor
-    const root = await this._postApprovalsRepository.getRootPost(
+    // the post the link was created from as it is now (the batch can be set
+    // after the request and the group changes on every save in the editor),
+    // also when it was deleted since: its other channels still show
+    const [anchor] = await this._postApprovalsRepository.getAnchorPosts(
       approval.organizationId,
-      approval.postId
+      [approval.postId]
     );
-    const batchId = root?.batchId || approval.batchId;
-    const posts =
-      root || batchId
-        ? await this._postApprovalsRepository.getSubjectPosts(
-            approval.organizationId,
-            batchId,
-            root?.group || approval.group
-          )
-        : [];
+    const posts = anchor
+      ? await this._postApprovalsRepository.getSubjectPosts(
+          approval.organizationId,
+          anchor.batchId,
+          anchor.group
+        )
+      : [];
+    const covered = anchor
+      ? this.coveredGroups(
+          anchor,
+          posts.filter((post) => !post.parentPostId)
+        )
+      : new Set<string>();
 
     // one entry per channel with its thread in order, the channel the link
     // was created from first
-    const channels = Object.values(groupBy(posts, (post) => post.group))
+    const channels = Object.values(
+      groupBy(
+        posts.filter((post) => covered.has(post.group)),
+        (post) => post.group
+      )
+    )
       .map(
         (list) =>
           this._postsService.arrangePostsByGroup(
@@ -296,7 +400,7 @@ export class PostApprovalsService {
 
     return {
       approval,
-      state: channels.some((list) => list[0].state === 'PUBLISHED')
+      state: channels.some((list) => list[0].state === State.PUBLISHED)
         ? 'locked'
         : 'open',
       channels,
@@ -329,13 +433,15 @@ export class PostApprovalsService {
       return { state };
     }
 
-    // the same saves the badge of the team counts (getEditablePosts), from
-    // the channels already loaded here
+    // the same saves the badge of the team counts (lastEditOf), from the
+    // channels already loaded here
     const lastEdit = Math.max(
       0,
       ...channels
         .map((list) => list[0])
-        .filter((post) => post.state === 'QUEUE' || post.state === 'DRAFT')
+        .filter(
+          (post) => post.state === State.QUEUE || post.state === State.DRAFT
+        )
         .map((post) => +post.updatedAt)
     );
 
@@ -423,8 +529,8 @@ export class PostApprovalsService {
         ? 'Post approved by your client'
         : 'Your client requested changes',
       decision === 'APPROVED'
-        ? `${who} approved the post scheduled for ${date} UTC on ${channelNames}.${quote} ${link}`
-        : `${who} requested changes to the post scheduled for ${date} UTC on ${channelNames}.${quote} ${link}`,
+        ? `${who} approved the post planned for ${date} UTC on ${channelNames}.${quote} ${link}`
+        : `${who} requested changes to the post planned for ${date} UTC on ${channelNames}.${quote} ${link}`,
       true,
       true,
       'info'

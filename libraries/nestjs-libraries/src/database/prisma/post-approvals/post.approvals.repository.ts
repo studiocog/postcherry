@@ -1,6 +1,6 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
-import { PostApprovalStatus, State } from '@prisma/client';
+import { PostApprovalStatus } from '@prisma/client';
 
 @Injectable()
 export class PostApprovalsRepository {
@@ -22,6 +22,60 @@ export class PostApprovalsRepository {
         id: true,
         group: true,
         batchId: true,
+        integrationId: true,
+        intervalInDays: true,
+        state: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  // the posts requests were made from, also when they were deleted since: the
+  // other channels of the post still show what the request covers
+  getAnchorPosts(orgId: string, postIds: string[]) {
+    return this._post.model.post.findMany({
+      where: {
+        id: {
+          in: postIds,
+        },
+        organizationId: orgId,
+      },
+      select: {
+        id: true,
+        group: true,
+        batchId: true,
+        integrationId: true,
+        intervalInDays: true,
+      },
+    });
+  }
+
+  // the channels saved with the posts, in the order they were created, like
+  // the editor loads them (PostsRepository.getPostsByBatch)
+  getBatchRootPosts(orgId: string, batchIds: string[]) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        batchId: {
+          in: batchIds,
+        },
+        parentPostId: null,
+        deletedAt: null,
+        integration: {
+          deletedAt: null,
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      select: {
+        id: true,
+        group: true,
+        batchId: true,
+        integrationId: true,
+        intervalInDays: true,
+        state: true,
+        updatedAt: true,
       },
     });
   }
@@ -49,20 +103,22 @@ export class PostApprovalsRepository {
     });
   }
 
-  // the requests made from any channel of the post
-  listForSubject(orgId: string, postId: string, batchId: string | null) {
+  // the requests made from the post or from a channel saved with it, the
+  // service keeps the ones that cover the post
+  listForSubject(orgId: string, postIds: string[], batchId: string | null) {
     return this._postApproval.model.postApproval.findMany({
       where: {
         organizationId: orgId,
         deletedAt: null,
-        OR: [{ postId }, ...(batchId ? [{ batchId }] : [])],
+        OR: [{ postId: { in: postIds } }, ...(batchId ? [{ batchId }] : [])],
       },
       orderBy: {
         createdAt: 'desc',
       },
-      take: 20,
+      take: 100,
       select: {
         id: true,
+        postId: true,
         token: true,
         status: true,
         clientName: true,
@@ -91,8 +147,6 @@ export class PostApprovalsRepository {
         id: true,
         organizationId: true,
         postId: true,
-        group: true,
-        batchId: true,
         status: true,
         clientName: true,
         decidedByName: true,
@@ -143,8 +197,9 @@ export class PostApprovalsRepository {
     });
   }
 
-  // every channel of the post (the batch), or the group of older posts, with
-  // only the channel fields a preview shows
+  // every post saved with the post (the batch), or the group of older posts,
+  // with only the channel fields a preview shows; the service keeps the
+  // channels the request covers
   getSubjectPosts(orgId: string, batchId: string | null, group: string) {
     return this._post.model.post.findMany({
       where: {
@@ -161,6 +216,9 @@ export class PostApprovalsRepository {
       select: {
         id: true,
         group: true,
+        batchId: true,
+        integrationId: true,
+        intervalInDays: true,
         parentPostId: true,
         content: true,
         image: true,
@@ -179,30 +237,6 @@ export class PostApprovalsRepository {
     });
   }
 
-  // the channels of the posts the team can still edit, with the time of their
-  // last save (published or failed posts change state without an edit)
-  getEditablePosts(orgId: string, postIds: string[], batchIds: string[]) {
-    return this._post.model.post.findMany({
-      where: {
-        organizationId: orgId,
-        deletedAt: null,
-        parentPostId: null,
-        state: {
-          in: [State.QUEUE, State.DRAFT],
-        },
-        OR: [
-          { id: { in: postIds } },
-          ...(batchIds.length ? [{ batchId: { in: batchIds } }] : []),
-        ],
-      },
-      select: {
-        id: true,
-        batchId: true,
-        updatedAt: true,
-      },
-    });
-  }
-
   getPostsForStatuses(orgId: string, postIds: string[]) {
     return this._post.model.post.findMany({
       where: {
@@ -213,7 +247,12 @@ export class PostApprovalsRepository {
       },
       select: {
         id: true,
+        group: true,
         batchId: true,
+        integrationId: true,
+        intervalInDays: true,
+        state: true,
+        updatedAt: true,
       },
     });
   }
