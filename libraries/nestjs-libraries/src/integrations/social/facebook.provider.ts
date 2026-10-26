@@ -25,6 +25,42 @@ import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorato
 
 export const META_GRAPH_API_VERSION = 'v25.0';
 
+// Removes the app's permissions (DELETE /{user}/permissions) for the Facebook
+// user behind a token of the Facebook Login app (FACEBOOK_APP_ID), shared by
+// the facebook and instagram providers. The token can be a user token, a page
+// token, or the instagram provider's `pageToken___userToken` pair. A page
+// token resolves /me to the page, so the user is looked up with debug_token
+// and the permissions are deleted with the app token instead.
+// Meta grants permissions per user and app, not per page: this disconnects
+// the app from every page / Instagram account of that Facebook user.
+// Best effort: it never throws.
+export const revokeMetaPermissions = async (token: string): Promise<void> => {
+  try {
+    const [accessToken, userToken] = token.split('___');
+    const inputToken = userToken || accessToken;
+    const appToken = `${process.env.FACEBOOK_APP_ID}|${process.env.FACEBOOK_APP_SECRET}`;
+
+    const { data } = await (
+      await fetch(
+        `https://graph.facebook.com/${META_GRAPH_API_VERSION}/debug_token?input_token=${inputToken}&access_token=${appToken}`
+      )
+    ).json();
+
+    const response = await fetch(
+      data?.user_id
+        ? `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${data.user_id}/permissions?access_token=${appToken}`
+        : `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/permissions?access_token=${inputToken}`,
+      { method: 'DELETE' }
+    );
+
+    if (!response.ok) {
+      console.warn('Meta revoke permissions failed:', await response.text());
+    }
+  } catch (err) {
+    console.warn('Meta revoke permissions failed:', (err as any)?.message);
+  }
+};
+
 @Rules(
   "Facebook posts can be text only, or include photos or a video. If it's a story, it must have at least one attachment (photo or video), and each media is published as a separate story. Video posts (not stories) can carry an optional title."
 )
@@ -32,11 +68,12 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
   identifier = 'facebook';
   name = 'Facebook Page';
   isBetweenSteps = true;
+  // Minimal set for Meta App Review: no pages_manage_engagement (so no
+  // comment(), the post workflow then publishes only the first value) and no
+  // business_management (pages are listed from /me/accounts only).
   scopes = [
     'pages_show_list',
-    'business_management',
     'pages_manage_posts',
-    'pages_manage_engagement',
     'pages_read_engagement',
     'read_insights',
   ];
@@ -308,7 +345,13 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
           `${process.env.FRONTEND_URL}/integrations/social/facebook`
         )}` +
         `&state=${state}` +
-        `&scope=${this.scopes.join(',')}`,
+        // Facebook Login for Business: the permissions come from the
+        // configuration (must use a User access token), not from scope=
+        (process.env.FACEBOOK_LOGIN_CONFIG_ID
+          ? `&config_id=${encodeURIComponent(
+              process.env.FACEBOOK_LOGIN_CONFIG_ID
+            )}`
+          : `&scope=${this.scopes.join(',')}`),
       codeVerifier: makeSecureId(10),
       state,
     };
@@ -409,44 +452,13 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
       }
     };
 
-    // Fetch pages the user explicitly shared during the OAuth dialog
+    // Pages the user shared during the OAuth dialog. Pages owned by a
+    // Business Manager show up here too when the user selects them in the
+    // dialog - business_management is not requested, so /me/businesses
+    // (owned_pages / client_pages) is not used.
     await fetchPaginated(
       `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=id,username,name,access_token,picture.type(large)&limit=100&access_token=${accessToken}`
     );
-
-    // Also fetch pages via Business Manager API to discover pages
-    // not selected during the OAuth page selection step
-    try {
-      let bizUrl:
-        | string
-        | undefined = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/businesses?access_token=${accessToken}`;
-
-      while (bizUrl) {
-        const bizResponse = await (await fetch(bizUrl)).json();
-        if (bizResponse.data) {
-          for (const business of bizResponse.data) {
-            try {
-              await fetchPaginated(
-                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${business.id}/owned_pages?fields=id,username,name,access_token,picture.type(large)&limit=100&access_token=${accessToken}`
-              );
-            } catch {
-              // Continue with other businesses
-            }
-
-            try {
-              await fetchPaginated(
-                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${business.id}/client_pages?fields=id,username,name,access_token,picture.type(large)&limit=100&access_token=${accessToken}`
-              );
-            } catch {
-              // Continue with other businesses
-            }
-          }
-        }
-        bizUrl = bizResponse.paging?.next;
-      }
-    } catch {
-      // Business Manager API not available for all users
-    }
 
     return allPages;
   }
@@ -464,8 +476,8 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
           const page = response.data.find(
             (p: any) => String(p.id) === String(pageId)
           );
-          // A page listed through a business the user has no role on comes
-          // back without a page token, keep looking for a listing that has one
+          // A page the user has no task on comes back without a page token,
+          // keep looking for a listing that has one
           if (page && !page.access_token) {
             foundWithoutToken = true;
           } else if (page) {
@@ -483,46 +495,12 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
       return null;
     };
 
-    // 1. Check /me/accounts
+    // Only /me/accounts: business_management is not requested, so the
+    // Business Manager owned_pages / client_pages lookups are not available
     const fromAccounts = await searchPaginated(
       `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=${fields}&limit=100&access_token=${accessToken}`
     );
     if (fromAccounts) return fromAccounts;
-
-    // 2. Check Business Manager owned_pages and client_pages
-    try {
-      let bizUrl:
-        | string
-        | undefined = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/businesses?access_token=${accessToken}`;
-
-      while (bizUrl) {
-        const bizResponse = await (await fetch(bizUrl)).json();
-        if (bizResponse.data) {
-          for (const business of bizResponse.data) {
-            try {
-              const fromOwned = await searchPaginated(
-                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${business.id}/owned_pages?fields=${fields}&limit=100&access_token=${accessToken}`
-              );
-              if (fromOwned) return fromOwned;
-            } catch {
-              // Continue with other businesses
-            }
-
-            try {
-              const fromClient = await searchPaginated(
-                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${business.id}/client_pages?fields=${fields}&limit=100&access_token=${accessToken}`
-              );
-              if (fromClient) return fromClient;
-            } catch {
-              // Continue with other businesses
-            }
-          }
-        }
-        bizUrl = bizResponse.paging?.next;
-      }
-    } catch {
-      // Business Manager API not available for all users
-    }
 
     if (foundWithoutToken) {
       throw new Error(
@@ -984,44 +962,8 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     ];
   }
 
-  async comment(
-    id: string,
-    postId: string,
-    lastCommentId: string | undefined,
-    accessToken: string,
-    postDetails: PostDetails<FacebookDto>[],
-    integration: Integration
-  ): Promise<PostResponse[]> {
-    const [commentPost] = postDetails;
-    const replyToId = lastCommentId || postId;
-
-    const data = await (
-      await this.fetch(
-        `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${replyToId}/comments?access_token=${accessToken}&fields=id,permalink_url`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...(commentPost.media?.length
-              ? { attachment_url: commentPost.media[0].path }
-              : {}),
-            message: commentPost.message,
-          }),
-        },
-        'add comment'
-      )
-    ).json();
-
-    return [
-      {
-        id: commentPost.id,
-        postId: data.id,
-        releaseURL: data.permalink_url,
-        status: 'success',
-      },
-    ];
+  async revokeToken(accessToken: string): Promise<void> {
+    await revokeMetaPermissions(accessToken);
   }
 
   async analytics(

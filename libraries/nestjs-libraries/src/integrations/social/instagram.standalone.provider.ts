@@ -29,10 +29,11 @@ export class InstagramStandaloneProvider
   name = 'Instagram\n(Standalone)';
   isBetweenSteps = false;
   refreshCron = true;
+  // Minimal set for Meta App Review: no instagram_business_manage_comments,
+  // so no comment() - the post workflow then publishes only the first value
   scopes = [
     'instagram_business_basic',
     'instagram_business_content_publish',
-    'instagram_business_manage_comments',
     'instagram_business_manage_insights',
   ];
     override maxConcurrentJob = 200; // Instagram standalone has stricter limits
@@ -231,23 +232,29 @@ export class InstagramStandaloneProvider
     return instagramProvider.finalizePost(accessToken, pendingData, integration);
   }
 
-  async comment(
-    id: string,
-    postId: string,
-    lastCommentId: string | undefined,
-    accessToken: string,
-    postDetails: PostDetails<InstagramDto>[],
-    integration: Integration
-  ): Promise<PostResponse[]> {
-    return instagramProvider.comment(
-      id,
-      postId,
-      lastCommentId,
-      accessToken,
-      postDetails,
-      integration,
-      'graph.instagram.com'
-    );
+  // Instagram Login does not clearly document a revoke endpoint, so this tries
+  // the Graph DELETE /me/permissions edge on graph.instagram.com as best
+  // effort. Removing the app in Instagram settings always works and reaches
+  // the Meta deauthorize callback. Never throws.
+  async revokeToken(accessToken: string): Promise<void> {
+    try {
+      const response = await fetch(
+        `https://graph.instagram.com/${META_GRAPH_API_VERSION}/me/permissions?access_token=${accessToken}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        console.warn(
+          'Instagram revoke permissions failed:',
+          await response.text()
+        );
+      }
+    } catch (err) {
+      console.warn(
+        'Instagram revoke permissions failed:',
+        (err as any)?.message
+      );
+    }
   }
 
   async analytics(id: string, accessToken: string, date: number) {

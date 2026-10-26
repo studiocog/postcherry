@@ -118,5 +118,7 @@ export default withProvider<InstagramDto>({
   CustomPreviewComponent: InstagramPreview,
   dto: InstagramDto,
   maximumCharacters: 2200,
-  comments: 'no-media'
+  // no comments permission is requested from Meta, only the first value is
+  // published (both Instagram providers use this component)
+  comments: false,
 });

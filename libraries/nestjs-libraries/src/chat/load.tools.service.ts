@@ -83,8 +83,9 @@ export class LoadToolsService {
       - We schedule posts to different integration like facebook, instagram, etc. but to the user we don't say integrations we say channels as integration is the technical name
       - When scheduling a post, you must follow the social media rules and best practices.
       - When scheduling a post, you can pass an array for list of posts for a social media platform, But it has different behavior depending on the platform.
-        - For platforms like Threads, Bluesky and X (Twitter), each post in the array will be a separate post in the thread.
-        - For platforms like LinkedIn and Facebook, second part of the array will be added as "comments" to the first post.
+        - For platforms like Bluesky and X (Twitter), each post in the array will be a separate post in the thread.
+        - For platforms like LinkedIn, second part of the array will be added as "comments" to the first post.
+        - For Facebook, Instagram and Threads only the first post of the array is published, they do not support comments or threads.
         - If the social media platform has the concept of "threads", we need to ask the user if they want to create a thread or one long post.
         - For X, if you don't have Premium, don't suggest a long post because it won't work.
         - Platform format will also be passed can be "normal", "markdown", "html", make sure you use the correct format for each platform.

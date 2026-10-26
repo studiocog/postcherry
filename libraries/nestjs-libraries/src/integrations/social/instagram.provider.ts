@@ -18,7 +18,10 @@ import {
 import { InstagramDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/instagram.dto';
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
-import { META_GRAPH_API_VERSION } from '@gitroom/nestjs-libraries/integrations/social/facebook.provider';
+import {
+  META_GRAPH_API_VERSION,
+  revokeMetaPermissions,
+} from '@gitroom/nestjs-libraries/integrations/social/facebook.provider';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 
@@ -33,13 +36,14 @@ export class InstagramProvider
   name = 'Instagram\n(Facebook Business)';
   isBetweenSteps = true;
   toolTip = 'Instagram must be business and connected to a Facebook page';
+  // Minimal set for Meta App Review: no instagram_manage_comments (so no
+  // comment(), the post workflow then publishes only the first value) and no
+  // business_management (pages are listed from /me/accounts only).
   scopes = [
     'instagram_basic',
     'pages_show_list',
     'pages_read_engagement',
-    'business_management',
     'instagram_content_publish',
-    'instagram_manage_comments',
     'instagram_manage_insights',
   ];
   override maxConcurrentJob = 400;
@@ -455,6 +459,11 @@ export class InstagramProvider
 
   async generateAuthUrl() {
     const state = makeSecureId(6);
+    // Facebook Login for Business: the permissions come from the
+    // configuration (must use a User access token), not from scope=
+    const configId =
+      process.env.INSTAGRAM_FACEBOOK_LOGIN_CONFIG_ID ||
+      process.env.FACEBOOK_LOGIN_CONFIG_ID;
     return {
       url:
         `https://www.facebook.com/${META_GRAPH_API_VERSION}/dialog/oauth` +
@@ -463,7 +472,9 @@ export class InstagramProvider
           `${process.env.FRONTEND_URL}/integrations/social/instagram`
         )}` +
         `&state=${state}` +
-        `&scope=${encodeURIComponent(this.scopes.join(','))}`,
+        (configId
+          ? `&config_id=${encodeURIComponent(configId)}`
+          : `&scope=${encodeURIComponent(this.scopes.join(','))}`),
       codeVerifier: makeSecureId(10),
       state,
     };
@@ -547,44 +558,13 @@ export class InstagramProvider
       }
     };
 
-    // Fetch pages the user explicitly shared during the OAuth dialog
+    // Pages the user shared during the OAuth dialog. Pages owned by a
+    // Business Manager show up here too when the user selects them in the
+    // dialog - business_management is not requested, so /me/businesses
+    // (owned_pages / client_pages) is not used.
     await fetchPaginated(
       `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts?fields=id,instagram_business_account,username,name,picture.type(large)&limit=100&access_token=${accessToken}`
     );
-
-    // Also fetch pages via Business Manager API to discover pages
-    // not selected during the OAuth page selection step
-    try {
-      let bizUrl:
-        | string
-        | undefined = `https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/businesses?access_token=${accessToken}`;
-
-      while (bizUrl) {
-        const bizResponse = await (await fetch(bizUrl)).json();
-        if (bizResponse.data) {
-          for (const business of bizResponse.data) {
-            try {
-              await fetchPaginated(
-                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${business.id}/owned_pages?fields=id,instagram_business_account,username,name,picture.type(large)&limit=100&access_token=${accessToken}`
-              );
-            } catch {
-              // Continue with other businesses
-            }
-
-            try {
-              await fetchPaginated(
-                `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${business.id}/client_pages?fields=id,instagram_business_account,username,name,picture.type(large)&limit=100&access_token=${accessToken}`
-              );
-            } catch {
-              // Continue with other businesses
-            }
-          }
-        }
-        bizUrl = bizResponse.paging?.next;
-      }
-    } catch {
-      // Business Manager API not available for all users
-    }
 
     const onlyConnectedAccounts = await Promise.all(
       allFacebookPages
@@ -1073,46 +1053,9 @@ export class InstagramProvider
     }
   }
 
-  async comment(
-    id: string,
-    postId: string,
-    lastCommentId: string | undefined,
-    token: string,
-    postDetails: PostDetails<InstagramDto>[],
-    integration: Integration,
-    type = 'graph.facebook.com'
-  ): Promise<PostResponse[]> {
-    const [accessToken, userToken] = token.split('___');
-    const [commentPost] = postDetails;
-
-    const { id: commentId } = await (
-      await this.fetch(
-        `https://${type}/${META_GRAPH_API_VERSION}/${postId}/comments?message=${encodeURIComponent(
-          commentPost.message
-        )}&access_token=${accessToken}`,
-        {
-          method: 'POST',
-        }
-      )
-    ).json();
-
-    // Get the permalink from the parent post
-    const { permalink } = await (
-      await this.fetch(
-        `https://${type}/${META_GRAPH_API_VERSION}/${postId}?fields=permalink&access_token=${
-          userToken || accessToken
-        }`
-      )
-    ).json();
-
-    return [
-      {
-        id: commentPost.id,
-        postId: commentId,
-        releaseURL: permalink,
-        status: 'success',
-      },
-    ];
+  // token is `pageToken___userToken`, revokeMetaPermissions uses the user part
+  async revokeToken(accessToken: string): Promise<void> {
+    await revokeMetaPermissions(accessToken);
   }
 
   private setTitle(name: string) {

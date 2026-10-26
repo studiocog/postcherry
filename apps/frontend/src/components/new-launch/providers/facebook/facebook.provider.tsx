@@ -130,4 +130,7 @@ export default withProvider<FacebookDto>({
   CustomPreviewComponent: FacebookPreview,
   dto: FacebookDto,
   maximumCharacters: 63206,
+  // no comments permission is requested from Meta, only the first value is
+  // published
+  comments: false,
 });
