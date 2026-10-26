@@ -26,6 +26,7 @@ import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics'
 import useCookie from 'react-use-cookie';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
 import { DeveloperIconComponent } from '@gitroom/frontend/components/developer/developer.icon.component';
+import { TermsLinks } from '@gitroom/frontend/components/auth/terms.notice';
 
 const ModeComponent = dynamic(
   () => import('@gitroom/frontend/components/layout/mode.component'),
@@ -192,12 +193,19 @@ export const FirstBillingComponent = () => {
               )}
             </div>
           ) : !isLoading && data && stripe ? (
-            <EmbeddedBilling
-              stripe={stripe}
-              secret={data.client_secret}
-              showCoupon={period === 'MONTHLY'}
-              autoApplyCoupon={data.auto_apply_coupon}
-            />
+            <>
+              <EmbeddedBilling
+                stripe={stripe}
+                secret={data.client_secret}
+                showCoupon={period === 'MONTHLY'}
+                autoApplyCoupon={data.auto_apply_coupon}
+              />
+              <div className="text-[12px] mt-[12px] text-textItemBlur">
+                {t('by_subscribing_you_agree_to_the', 'By subscribing you agree to the')}
+                &nbsp;
+                <TermsLinks />
+              </div>
+            </>
           ) : (
             <LoadingComponent />
           )}

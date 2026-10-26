@@ -3,7 +3,7 @@ import { AdminErrorsComponent } from '@gitroom/frontend/components/admin/admin-e
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: `PostCherry Admin Errors`,
+  title: `Admin Errors`,
   description: '',
 };
 

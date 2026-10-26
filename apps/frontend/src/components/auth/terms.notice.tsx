@@ -3,12 +3,20 @@
 import { FC } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
+// The marketing website, where the legal pages live. Server components read
+// WEBSITE_URL instead; importing these from one would get a client reference.
+export const websiteUrl = 'https://postcherry.com';
+export const termsUrl = `${websiteUrl}/terms/`;
+export const privacyUrl = `${websiteUrl}/privacy/`;
+export const dataDeletionUrl = `${websiteUrl}/data-deletion/`;
+export const supportEmail = 'hello@postcherry.com';
+
 export const TermsLinks: FC = () => {
   const t = useT();
   return (
     <>
       <a
-        href="https://postcherry.com/terms"
+        href={termsUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="underline hover:font-bold"
@@ -17,7 +25,7 @@ export const TermsLinks: FC = () => {
       </a>
       &nbsp;{t('and', 'and')}&nbsp;
       <a
-        href="https://postcherry.com/privacy"
+        href={privacyUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="underline hover:font-bold"

@@ -30,6 +30,7 @@ import { ChangeDirClient } from '@gitroom/frontend/components/new-layout/change.
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.FRONTEND_URL || 'https://app.postcherry.com'),
   applicationName: 'PostCherry',
+  title: { default: 'PostCherry', template: '%s | PostCherry' },
   description:
     'Simple, AI-powered social media scheduling for creators, businesses and agencies.',
   openGraph: {

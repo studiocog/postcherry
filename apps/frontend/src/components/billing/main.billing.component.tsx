@@ -295,7 +295,7 @@ const Info: FC<{
       <div>
         <Textarea
           className="bg-newBgColorInner"
-          label={'Feedback'}
+          label={t('feedback_optional', 'Feedback (optional)')}
           name="feedback"
           disableForm={true}
           value={feedback}
@@ -303,10 +303,8 @@ const Info: FC<{
         />
       </div>
       <div>
-        <Button disabled={feedback.length < 20} onClick={cancel}>
-          {feedback.length < 20
-            ? t('please_add_at_least', 'Please add at least 20 chars')
-            : t('cancel_subscription', 'Cancel Subscription')}
+        <Button onClick={cancel}>
+          {t('cancel_subscription', 'Cancel Subscription')}
         </Button>
       </div>
     </div>

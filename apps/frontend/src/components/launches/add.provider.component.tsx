@@ -731,7 +731,10 @@ export const AddProviderComponent: FC<{
               >
                 <div>
                   {item.identifier === 'youtube' ? (
-                    <img src={`/icons/platforms/youtube.svg`} />
+                    <img
+                      src={`/icons/platforms/youtube.svg`}
+                      alt={item.name}
+                    />
                   ) : (
                     <img
                       className={clsx(
@@ -740,6 +743,7 @@ export const AddProviderComponent: FC<{
                           'rounded-full'
                       )}
                       src={`/icons/platforms/${item.identifier}.png`}
+                      alt={item.name}
                     />
                   )}
                 </div>

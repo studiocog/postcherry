@@ -30,23 +30,34 @@ export function ForgotReturn({ token }: { token: string }) {
   const fetchData = useFetch();
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     setLoading(true);
-    const { reset } = await (
-      await fetchData('/auth/forgot-return', {
-        method: 'POST',
-        body: JSON.stringify({
-          ...data,
-        }),
-      })
-    ).json();
-    setState(true);
-    if (!reset) {
+    try {
+      const { reset } = await (
+        await fetchData('/auth/forgot-return', {
+          method: 'POST',
+          body: JSON.stringify({
+            ...data,
+          }),
+        })
+      ).json();
+      if (!reset) {
+        form.setError('password', {
+          type: 'manual',
+          message: t('password_reset_link_expired', 'Your password reset link has expired. Please try again.'),
+        });
+        return false;
+      }
+      setState(true);
+    } catch (e) {
       form.setError('password', {
         type: 'manual',
-        message: t('password_reset_link_expired', 'Your password reset link has expired. Please try again.'),
+        message: t(
+          'password_reset_failed',
+          'We could not reset your password. Please try again.'
+        ),
       });
-      return false;
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
   return (
     <FormProvider {...form}>
@@ -91,8 +102,8 @@ export function ForgotReturn({ token }: { token: string }) {
           <>
             <div className="text-start mt-6">
               {t(
-                'we_successfully_reset_your_password_you_can_now_login_with_your',
-                'We successfully reset your password. You can now login with your'
+                'password_reset_success',
+                'We successfully reset your password. You can now log in with your new password.'
               )}
             </div>
             <p className="mt-4 text-sm">

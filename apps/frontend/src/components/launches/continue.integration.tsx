@@ -12,6 +12,7 @@ import { IntegrationContext } from '@gitroom/frontend/components/launches/helper
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { Button } from '@gitroom/react/form/button';
+import { websiteUrl } from '@gitroom/frontend/components/auth/terms.notice';
 
 interface TwoStepState {
   integrationId: string;
@@ -417,6 +418,16 @@ export const ContinueIntegration: FC<{
             <div className="mt-[24px] flex justify-center">
               <Button type="button" onClick={() => push('/launches')}>
                 {t('back_to_channels', 'Back to channels')}
+              </Button>
+            </div>
+          )}
+          {!logged && (
+            <div className="mt-[24px] flex justify-center">
+              <Button
+                type="button"
+                onClick={() => (window.location.href = websiteUrl)}
+              >
+                {t('back_to_postcherry', 'Back to PostCherry')}
               </Button>
             </div>
           )}

@@ -13,6 +13,7 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import {
   AnyMcpClient,
+  cliEnabled,
   CopyButton,
   getMcpConfig,
   isChatOnlyMcpClient,
@@ -22,6 +23,7 @@ import {
   McpClient,
   mcpClients,
   mcpConnectorUrls,
+  officialConnectorsEnabled,
 } from '@gitroom/frontend/components/public-api/public.component';
 import { McpClientIcon } from '@gitroom/frontend/components/public-api/mcp.client.icons';
 import {
@@ -328,6 +330,11 @@ const onboardingAgents = [
 
 type OnboardingAgent = (typeof onboardingAgents)[number];
 
+// The chat-only agents need the CLI, hide them while it is off
+const visibleOnboardingAgents = onboardingAgents.filter(
+  (agent) => cliEnabled || !isChatOnlyMcpClient(agent)
+);
+
 // Every other MCP client, grouped under one tab with its own picker
 const otherTab = 'Other agents' as const;
 const otherAgents = mcpClients.filter(
@@ -358,7 +365,8 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
   const apiKey = user?.publicApi || '';
   const available = !!apiKey && !!user?.tier?.public_api;
   // the official connectors work for self-hosted installs too
-  const officialConnectors = billingEnabled || isSelfHosted;
+  const officialConnectors =
+    officialConnectorsEnabled && (billingEnabled || isSelfHosted);
 
   const { config, hint } =
     agent === apiTab
@@ -631,7 +639,7 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
       {available ? (
         <div className="flex flex-col gap-[16px] w-full max-w-[1100px] mx-auto">
           <div className="flex flex-wrap justify-center gap-[6px]">
-            {[...onboardingAgents, otherTab, apiTab].map((item) => (
+            {[...visibleOnboardingAgents, otherTab, apiTab].map((item) => (
               <button
                 key={item}
                 type="button"
@@ -681,10 +689,14 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
           ) : (
             <>
               {connectorSection}
-              <div className="grid grid-cols-2 gap-[16px]">
-                {mcpSection}
-                {cliSection}
-              </div>
+              {cliEnabled ? (
+                <div className="grid grid-cols-2 gap-[16px]">
+                  {mcpSection}
+                  {cliSection}
+                </div>
+              ) : (
+                mcpSection
+              )}
             </>
           )}
         </div>

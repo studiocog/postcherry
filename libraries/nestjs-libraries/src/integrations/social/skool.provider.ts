@@ -17,6 +17,9 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 export class SkoolProvider extends SocialAbstract implements SocialProvider {
   identifier = 'skool';
   name = 'Skool';
+  // Connecting needs upstream Postiz's browser extension, which PostCherry
+  // does not have, so new channels can't be added for now.
+  override hidden = true;
   isBetweenSteps = false;
   isChromeExtension = true;
   scopes = [] as string[];

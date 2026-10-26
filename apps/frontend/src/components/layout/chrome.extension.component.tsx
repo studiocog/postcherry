@@ -1,7 +1,10 @@
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+// The store listing is upstream Postiz's extension, PostCherry has none yet
+const chromeExtensionEnabled = false;
+
 export const ChromeExtensionComponent = () => {
   const { billingEnabled } = useVariables();
-  if (!billingEnabled) {
+  if (!chromeExtensionEnabled || !billingEnabled) {
     return null;
   }
   return (

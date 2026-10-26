@@ -5,6 +5,10 @@ import { useSearchParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { OAuthSelfHosted } from '@gitroom/frontend/components/oauth/self.hosted.component';
+import {
+  TermsLinks,
+  websiteUrl,
+} from '@gitroom/frontend/components/auth/terms.notice';
 
 export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
   const searchParams = useSearchParams();
@@ -161,6 +165,12 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
           <div className="text-[16px] text-gray-400 max-w-[400px]">
             {error}
           </div>
+          <a
+            href={logged ? '/launches' : websiteUrl}
+            className="inline-block mt-[24px] bg-[#2A2929] hover:bg-[#3A3939] text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors"
+          >
+            Back to PostCherry
+          </a>
         </div>
       </div>
     );
@@ -238,7 +248,7 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
                   <button
                     onClick={() => handleAction('approve')}
                     disabled={submitting}
-                    className="flex-1 bg-[#D21F3C] hover:bg-[#7B3FF2] disabled:opacity-50 text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors"
+                    className="flex-1 bg-[#D21F3C] hover:bg-[#B5172F] disabled:opacity-50 text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors"
                   >
                     Authorize
                   </button>
@@ -251,12 +261,20 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={signIn}
-                  className="bg-[#D21F3C] hover:bg-[#7B3FF2] text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors"
-                >
-                  Sign in to PostCherry
-                </button>
+                <div className="flex gap-[12px]">
+                  <button
+                    onClick={signIn}
+                    className="flex-1 bg-[#D21F3C] hover:bg-[#B5172F] text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors"
+                  >
+                    Sign in to PostCherry
+                  </button>
+                  <a
+                    href={websiteUrl}
+                    className="flex-1 bg-[#2A2929] hover:bg-[#3A3939] text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors text-center"
+                  >
+                    Cancel
+                  </a>
+                </div>
               )}
 
               {!!appInfo.selfHosted && (
@@ -270,6 +288,11 @@ export const OAuthAuthorize: FC<{ logged: boolean }> = ({ logged }) => {
               )}
             </>
           )}
+
+          <div className="text-[12px] text-gray-400 text-center">
+            By continuing you agree to the&nbsp;
+            <TermsLinks />
+          </div>
         </div>
       </div>
     </div>

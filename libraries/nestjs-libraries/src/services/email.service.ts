@@ -72,9 +72,10 @@ export class EmailService {
       return;
     }
 
+    const websiteUrl = process.env.WEBSITE_URL || 'https://postcherry.com';
     const modifiedHtml = `
     <div style="
-        background: linear-gradient(to bottom right, #e6f2ff, #f0e6ff);
+        background: linear-gradient(to bottom right, #fff1f3, #ffd9df);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -118,8 +119,16 @@ export class EmailService {
                         margin: 0;
                     ">${process.env.EMAIL_FROM_NAME}</h2>
                     <div style="font-size: 12px">
-                      You can change your notification preferences in your <a href="${process.env.FRONTEND_URL}/settings">account settings.</a>
+                      You can change your notification preferences in your <a href="${process.env.FRONTEND_URL}/settings" style="color: #D21F3C;">account settings.</a>
                      </div>
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 0.75rem;">
+                      Khamarx LLC, 1209 Mountain Road Place NE, Albuquerque, NM 87110, USA
+                    </div>
+                    <div style="font-size: 12px; margin-top: 0.25rem;">
+                      <a href="${websiteUrl}/privacy/" style="color: #D21F3C;">Privacy Policy</a>
+                      &nbsp;&middot;&nbsp;
+                      <a href="${websiteUrl}/terms/" style="color: #D21F3C;">Terms of Service</a>
+                    </div>
                 </div>
             </div>
         </div>

@@ -48,7 +48,10 @@ export const AfterActivate = () => {
         <LoadingComponent />
       ) : (
         <>
-          This user is already activated,
+          {t(
+            'activation_link_invalid_or_used',
+            'This activation link is invalid or has already been used.'
+          )}
           <br />
           <Link href="/auth/login" className="underline">
             {t(

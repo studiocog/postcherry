@@ -123,6 +123,15 @@ const YoutubeSettings: FC = () => {
             className="underline hover:font-bold"
           >
             {t('youtube_terms_of_service', 'YouTube Terms of Service')}
+          </a>{' '}
+          {t('and', 'and')}{' '}
+          <a
+            href="http://www.google.com/policies/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:font-bold"
+          >
+            {t('google_privacy_policy', 'Google Privacy Policy')}
           </a>
         </div>
       </div>

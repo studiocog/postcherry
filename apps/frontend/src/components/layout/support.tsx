@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ChatbaseComponent } from '@gitroom/frontend/components/layout/chatbase.component';
+import { supportEmail } from '@gitroom/frontend/components/auth/terms.notice';
 export const supportEmitter = new EventEmitter();
 export const Support = () => {
   const [show, setShow] = useState(true);
@@ -20,7 +21,32 @@ export const Support = () => {
   if (isChatBase) {
     return <ChatbaseComponent />;
   }
-  if (!discordUrl || !show) return null;
+  if (!show) return null;
+  // No Discord community configured: email support instead
+  if (!discordUrl) {
+    return (
+      <a
+        id="support-email"
+        href={`mailto:${supportEmail}`}
+        className="bg-customColor39 w-[194px] h-[58px] fixed end-[20px] bottom-[20px] z-[500] text-[16px] text-customColor40 rounded-[30px] !rounded-br-[0] cursor-pointer flex justify-center items-center gap-[10px]"
+      >
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="m22 7-10 6L2 7" />
+        </svg>
+        <div>{t('help_and_support', 'Help & Support')}</div>
+      </a>
+    );
+  }
   return (
     <div
       id="support-discord"

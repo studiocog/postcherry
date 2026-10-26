@@ -64,6 +64,11 @@ export type McpAuth = 'oauth' | 'apikey';
 // Only the self-hosted docker images are built with a version
 export const isSelfHosted = !!process.env.NEXT_PUBLIC_VERSION;
 
+// The directory listings and the CLI / agent skill belong to upstream Postiz,
+// PostCherry has none of its own yet, so they stay off until it does
+export const officialConnectorsEnabled = false;
+export const cliEnabled = false;
+
 // The directory listings behind the "Official connector" tab
 const officialConnectorClients = [
   'Claude',
@@ -316,7 +321,8 @@ const McpSection = ({
   const t = useT();
   const { billingEnabled } = useVariables();
   const [activeClient, setActiveClient] = useState<AnyMcpClient>('Claude');
-  const officialConnectors = billingEnabled || isSelfHosted;
+  const officialConnectors =
+    officialConnectorsEnabled && (billingEnabled || isSelfHosted);
   // the directory connectors come first wherever they work
   const tabs: Array<'official' | McpAuth> = officialConnectors
     ? ['official', 'oauth', 'apikey']
@@ -462,7 +468,7 @@ const McpSection = ({
             {[
               ...Object.keys(remoteMcpClients),
               ...mcpClients,
-              ...Object.keys(chatOnlyMcpClients),
+              ...(cliEnabled ? Object.keys(chatOnlyMcpClients) : []),
             ].map((client) => (
               <button
                 key={client}
@@ -914,7 +920,7 @@ const PublicApiContent = () => {
         </div>
       </div>
 
-      <CliSection apiKey={user.publicApi} />
+      {cliEnabled && <CliSection apiKey={user.publicApi} />}
 
       <McpSection user={user} mcpBase={mcpBase} />
     </div>

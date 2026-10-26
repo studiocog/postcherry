@@ -5,6 +5,8 @@ import { withSentryConfig } from '@sentry/nextjs';
 const nextConfig = {
   experimental: {
     proxyTimeout: 90_000,
+    // several root layouts: unmatched URLs render app/global-not-found.tsx
+    globalNotFound: true,
   },
   // Document-Policy header for browser profiling
   async headers() {

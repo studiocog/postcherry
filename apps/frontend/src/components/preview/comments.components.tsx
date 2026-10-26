@@ -12,6 +12,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
+import { privacyUrl } from '@gitroom/frontend/components/auth/terms.notice';
 import dayjs from 'dayjs';
 import {
   PreviewComment,
@@ -113,6 +114,21 @@ const ReviewerNameForm: FC<{ onConfirm: (name: string) => void }> = ({
             autoFocus={true}
           />
           <Button type="submit">{t('continue', 'Continue')}</Button>
+          <div className="text-[12px] text-textItemBlur">
+            {t(
+              'preview_comment_privacy_notice',
+              'Your name is shown next to your comment.'
+            )}
+            &nbsp;
+            <a
+              href={privacyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:font-bold"
+            >
+              {t('privacy_policy', 'Privacy Policy')}
+            </a>
+          </div>
         </div>
       </form>
     </FormProvider>
