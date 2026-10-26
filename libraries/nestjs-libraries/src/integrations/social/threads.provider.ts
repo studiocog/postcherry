@@ -13,20 +13,21 @@ import {
   BadBody,
   SocialAbstract,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
-import { capitalize, chunk } from 'lodash';
+import { capitalize } from 'lodash';
 import { Plug } from '@gitroom/helpers/decorators/plug.decorator';
 import { Integration } from '@prisma/client';
-import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 
 export class ThreadsProvider extends SocialAbstract implements SocialProvider {
   identifier = 'threads';
   name = 'Threads';
   isBetweenSteps = false;
+  // Minimal set for Meta App Review: no threads_manage_replies, so no
+  // comment() (the post workflow then publishes only the first value) and the
+  // auto plug post plug is disabled
   scopes = [
     'threads_basic',
     'threads_content_publish',
-    'threads_manage_replies',
     'threads_manage_insights',
     // 'threads_profile_discovery',
   ];
@@ -206,34 +207,6 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     return 'IN_PROGRESS';
   }
 
-  private async checkLoaded(
-    mediaContainerId: string,
-    accessToken: string
-  ): Promise<boolean> {
-    // Bounded (the old version recursed forever and could hang the activity
-    // into a timeout): ~5.5 minutes at 2.2s intervals.
-    for (let i = 0; i < 150; i++) {
-      const status = await this.checkContainerStatus(
-        mediaContainerId,
-        accessToken
-      );
-
-      if (status === 'FINISHED' || status === 'PUBLISHED') {
-        await timer(2000);
-        return true;
-      }
-
-      await timer(2200);
-    }
-
-    throw new BadBody(
-      this.identifier,
-      '{}',
-      '{}',
-      'Threads took too long to process the media, please try again'
-    );
-  }
-
   private async fetchUserInfo(accessToken: string) {
     const { id, username, threads_profile_picture_url } = await (
       await this.fetch(
@@ -282,52 +255,6 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     return mediaId;
   }
 
-  private async createCarouselContent(
-    userId: string,
-    accessToken: string,
-    media: { path: string }[],
-    message: string,
-    replyToId?: string
-  ): Promise<string> {
-    // Create each media item
-    const mediaIds = [];
-    for (const mediaItem of media) {
-      const mediaId = await this.createSingleMediaContent(
-        userId,
-        accessToken,
-        mediaItem,
-        message,
-        true
-      );
-      mediaIds.push(mediaId);
-    }
-
-    // Wait for all media to be loaded
-    await Promise.all(
-      mediaIds.map((id: string) => this.checkLoaded(id, accessToken))
-    );
-
-    // Create carousel container
-    const params = new URLSearchParams({
-      text: message,
-      media_type: 'CAROUSEL',
-      children: mediaIds.join(','),
-      ...(replyToId ? { reply_to_id: replyToId } : {}),
-      access_token: accessToken,
-    });
-
-    const { id: containerId } = await (
-      await this.fetch(
-        `https://graph.threads.net/v1.0/${userId}/threads?${params.toString()}`,
-        {
-          method: 'POST',
-        }
-      )
-    ).json();
-
-    return containerId;
-  }
-
   private async createTextContent(
     userId: string,
     accessToken: string,
@@ -356,70 +283,6 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     return contentId;
-  }
-
-  private async publishThread(
-    userId: string,
-    accessToken: string,
-    creationId: string
-  ): Promise<{ threadId: string; permalink: string }> {
-    await this.checkLoaded(creationId, accessToken);
-
-    const { id: threadId } = await (
-      await this.fetch(
-        `https://graph.threads.net/v1.0/${userId}/threads_publish?creation_id=${creationId}&access_token=${accessToken}`,
-        {
-          method: 'POST',
-        }
-      )
-    ).json();
-
-    const { permalink } = await (
-      await this.fetch(
-        `https://graph.threads.net/v1.0/${threadId}?fields=id,permalink&access_token=${accessToken}`
-      )
-    ).json();
-
-    return { threadId, permalink };
-  }
-
-  private async createThreadContent(
-    userId: string,
-    accessToken: string,
-    postDetails: PostDetails,
-    replyToId?: string,
-    quoteId?: string
-  ): Promise<string> {
-    // Handle content creation based on media type
-    if (!postDetails.media || postDetails.media.length === 0) {
-      // Text-only content
-      return await this.createTextContent(
-        userId,
-        accessToken,
-        postDetails.message,
-        replyToId,
-        quoteId
-      );
-    } else if (postDetails.media.length === 1) {
-      // Single media content
-      return await this.createSingleMediaContent(
-        userId,
-        accessToken,
-        postDetails.media[0],
-        postDetails.message,
-        false,
-        replyToId
-      );
-    } else {
-      // Carousel content
-      return await this.createCarouselContent(
-        userId,
-        accessToken,
-        postDetails.media,
-        postDetails.message,
-        replyToId
-      );
-    }
   }
 
   // The thread is live, the permalink is only cosmetic: never fail (and risk
@@ -681,49 +544,6 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     }
   }
 
-  async comment(
-    userId: string,
-    postId: string,
-    lastCommentId: string | undefined,
-    accessToken: string,
-    postDetails: PostDetails<{
-      active_thread_finisher: boolean;
-      thread_finisher: string;
-    }>[],
-    integration: Integration
-  ): Promise<PostResponse[]> {
-    if (!postDetails.length) {
-      return [];
-    }
-
-    const [commentPost] = postDetails;
-    const replyToId = lastCommentId || postId;
-
-    // Create reply content
-    const replyContentId = await this.createThreadContent(
-      userId,
-      accessToken,
-      commentPost,
-      replyToId
-    );
-
-    // Publish the reply
-    const { threadId: replyThreadId, permalink } = await this.publishThread(
-      userId,
-      accessToken,
-      replyContentId
-    );
-
-    return [
-      {
-        id: commentPost.id,
-        postId: replyThreadId,
-        status: 'success',
-        releaseURL: permalink,
-      },
-    ];
-  }
-
   async analytics(
     id: string,
     accessToken: string,
@@ -759,6 +579,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
       'When a post reached a certain number of likes, add another post to it so you followers get a notification about your promotion',
     runEveryMilliseconds: 21600000,
     totalRuns: 3,
+    disabled: true,
     fields: [
       {
         name: 'likesAmount',
@@ -781,44 +602,18 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     id: string,
     fields: { likesAmount: string; post: string }
   ) {
-    const { data } = await (
-      await fetch(
-        `https://graph.threads.net/v1.0/${id}/insights?metric=likes&access_token=${integration.token}`
-      )
-    ).json();
+    // The plug publishes a reply, which needs threads_manage_replies - no
+    // longer requested. The plug is disabled (hidden and never scheduled for
+    // new posts), the method stays so plug runs already scheduled by a post
+    // workflow end cleanly instead of failing on a missing function.
+    return true;
+  }
 
-    const {
-      values: [value],
-    } = data.find((p: any) => p.name === 'likes');
-
-    if (value.value >= fields.likesAmount) {
-      await timer(2000);
-
-      const form = new FormData();
-      form.append('media_type', 'TEXT');
-      form.append('text', stripHtmlValidation('normal', fields.post, true));
-      form.append('reply_to_id', id);
-      form.append('access_token', integration.token);
-
-      const { id: replyId } = await (
-        await this.fetch('https://graph.threads.net/v1.0/me/threads', {
-          method: 'POST',
-          body: form,
-        })
-      ).json();
-
-      await (
-        await this.fetch(
-          `https://graph.threads.net/v1.0/${integration.internalId}/threads_publish?creation_id=${replyId}&access_token=${integration.token}`,
-          {
-            method: 'POST',
-          }
-        )
-      ).json();
-      return true;
-    }
-
-    return false;
+  // Threads has no endpoint to revoke a token: the user removes the app in
+  // Threads settings (Website permissions), which reaches the Meta
+  // deauthorize callback. Nothing to do here, never throws.
+  async revokeToken(accessToken: string): Promise<void> {
+    return;
   }
 
   async postAnalytics(

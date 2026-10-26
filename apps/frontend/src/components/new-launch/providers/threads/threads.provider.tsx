@@ -4,16 +4,16 @@ import {
   PostComment,
   withProvider,
 } from '@gitroom/frontend/components/new-launch/providers/high.order.provider';
-import { ThreadFinisher } from '@gitroom/frontend/components/new-launch/finisher/thread.finisher';
-const SettingsComponent = () => {
-  return <ThreadFinisher />;
-};
 
+// threads_manage_replies is not requested from Meta, so there are no thread
+// replies (and no thread finisher, which is a reply): only the first value is
+// published
 export default withProvider({
   postComment: PostComment.POST,
   minimumCharacters: [],
-  SettingsComponent: SettingsComponent,
+  SettingsComponent: null,
   CustomPreviewComponent: undefined,
   dto: undefined,
   maximumCharacters: 500,
+  comments: false,
 });
