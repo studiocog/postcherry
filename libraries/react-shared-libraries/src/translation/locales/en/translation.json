@@ -872,5 +872,14 @@
   "post_now_all_channels": "Post all channels now",
   "schedule_post_in_all_channels_question": "This post was created for more than one channel. Do you want to schedule all of them?",
   "schedule_all_channels": "Schedule all channels",
-  "only_channel": "Only"
+  "only_channel": "Only",
+  "youtube_privacy": "Privacy",
+  "youtube_select_privacy": "-- Select privacy --",
+  "youtube_made_for_kids": "Made for kids",
+  "youtube_select_made_for_kids": "-- Select an option --",
+  "youtube_community_guidelines_confirm": "I confirm this video follows the",
+  "youtube_community_guidelines": "YouTube Community Guidelines",
+  "youtube_terms_notice": "By uploading to YouTube you agree to the",
+  "youtube_terms_of_service": "YouTube Terms of Service",
+  "analytics_data_from": "Data from"
 }

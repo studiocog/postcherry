@@ -6,6 +6,7 @@ import { ChartSocial } from '@gitroom/frontend/components/analytics/chart-social
 import { Select } from '@gitroom/react/form/select';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { MissingReleaseModal } from '@gitroom/frontend/components/launches/missing-release.modal';
+import { AnalyticsSource } from '@gitroom/frontend/components/platform-analytics/analytics.source';
 
 interface AnalyticsData {
   label: string;
@@ -16,8 +17,9 @@ interface AnalyticsData {
 
 export const StatisticsModal: FC<{
   postId: string;
+  identifier?: string;
 }> = (props) => {
-  const { postId } = props;
+  const { postId, identifier } = props;
   const t = useT();
   const fetch = useFetch();
   const [dateRange, setDateRange] = useState(7);
@@ -87,9 +89,12 @@ export const StatisticsModal: FC<{
           {analyticsData && Array.isArray(analyticsData) && analyticsData.length > 0 && (
             <div className="flex flex-col gap-[14px]">
               <div className="flex items-center justify-between">
-                <h3 className="text-[18px] font-[500]">
-                  {t('post_analytics', 'Post Analytics')}
-                </h3>
+                <div className="flex items-center gap-[12px]">
+                  <h3 className="text-[18px] font-[500]">
+                    {t('post_analytics', 'Post Analytics')}
+                  </h3>
+                  <AnalyticsSource identifier={identifier} />
+                </div>
                 <div className="max-w-[150px]">
                   <Select
                     label=""

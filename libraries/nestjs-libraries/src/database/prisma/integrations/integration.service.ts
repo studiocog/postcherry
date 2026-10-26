@@ -625,6 +625,17 @@ export class IntegrationService {
       return true;
     }
 
+    // a plug that was removed or disabled after this run was scheduled never
+    // runs again, the run is reported as finished
+    const isAvailable = this._integrationManager
+      .getAllPlugs()
+      .find((p) => p.identifier === getPlugById.integration.providerIdentifier)
+      ?.plugs?.some((p: any) => p.methodName === getPlugById.plugFunction);
+
+    if (!isAvailable) {
+      return true;
+    }
+
     const integration = this._integrationManager.getSocialIntegration(
       getPlugById.integration.providerIdentifier
     );

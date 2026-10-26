@@ -54,6 +54,8 @@ export class PinterestProvider
   identifier = 'pinterest';
   name = 'Pinterest';
   isBetweenSteps = false;
+  // The single scope list (auth URL, refresh and the granted-scope check).
+  // boards:write stays: Create Pin and delete Pin require it.
   scopes = [
     'boards:read',
     'boards:write',
@@ -209,7 +211,7 @@ export class PinterestProvider
       }&redirect_uri=${encodeURIComponent(
         `${process.env.FRONTEND_URL}/integrations/social/pinterest`
       )}&response_type=code&scope=${encodeURIComponent(
-        'boards:read,boards:write,pins:read,pins:write,user_accounts:read'
+        this.scopes.join(',')
       )}&state=${state}`,
       codeVerifier: makeSecureId(10),
       state,

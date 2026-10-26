@@ -5,7 +5,6 @@ import {
   PostResponse,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
-import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id';
 import sharp from 'sharp';
 import { lookup } from 'mime-types';
@@ -18,7 +17,6 @@ import {
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { Integration } from '@prisma/client';
-import { PostPlug } from '@gitroom/helpers/decorators/post.plug';
 import { LinkedinDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/linkedin.dto';
 import imageToPDF from 'image-to-pdf';
 import { Readable } from 'stream';
@@ -61,15 +59,11 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
   oneTimeToken = true;
 
   isBetweenSteps = false;
-  scopes = [
-    'openid',
-    'profile',
-    'w_member_social',
-    'r_basicprofile',
-    'rw_organization_admin',
-    'w_organization_social',
-    'r_organization_social',
-  ];
+  // "Share on LinkedIn" + "Sign In with LinkedIn using OpenID Connect" only:
+  // openid / profile for /v2/userinfo (id, name, picture) and w_member_social
+  // to publish the member's own posts and comments. Organization scopes belong
+  // to the Community Management app (LinkedinPageProvider).
+  scopes = ['openid', 'profile', 'w_member_social'];
   override maxConcurrentJob = 8; // LinkedIn limits are daily budgets
   refreshWait = true;
   editor = 'normal' as const;
@@ -182,7 +176,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     const codeVerifier = makeSecureId(30);
     const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${
       process.env.LINKEDIN_CLIENT_ID
-    }&prompt=none&redirect_uri=${encodeURIComponent(
+    }&redirect_uri=${encodeURIComponent(
       `${process.env.FRONTEND_URL}/integrations/social/linkedin`
     )}&state=${state}&scope=${encodeURIComponent(this.scopes.join(' '))}`;
     return {
@@ -254,38 +248,6 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       name,
       picture,
       username: vanityName,
-    };
-  }
-
-  async company(token: string, data: { url: string }) {
-    const { url } = data;
-    const getCompanyVanity = url.match(
-      /^https?:\/\/(?:www\.)?linkedin\.com\/company\/([^/]+)\/?$/
-    );
-    if (!getCompanyVanity || !getCompanyVanity?.length) {
-      throw new Error('Invalid LinkedIn company URL');
-    }
-
-    const { elements } = await (
-      await fetch(
-        `https://api.linkedin.com/v2/organizations?q=vanityName&vanityName=${getCompanyVanity[1]}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Restli-Protocol-Version': '2.0.0',
-            'LinkedIn-Version': '202601',
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
-    ).json();
-
-    return {
-      options: elements.map((e: { localizedName: string; id: string }) => ({
-        label: e.localizedName,
-        value: `@[${e.localizedName}](urn:li:organization:${e.id})`,
-      }))?.[0],
     };
   }
 
@@ -1121,116 +1083,8 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     return [this.createPostResponse(commentPostId, commentPost.id, false)];
   }
 
-  @PostPlug({
-    identifier: 'linkedin-add-comment',
-    title: 'Add comments by a different account',
-    description: 'Add accounts to comment on your post',
-    pickIntegration: ['linkedin', 'linkedin-page'],
-    fields: [
-      {
-        name: 'comment',
-        description: 'The comment to add to the post',
-        type: 'textarea',
-        placeholder: 'Enter your comment here',
-      },
-    ],
-  })
-  async addComment(
-    integration: Integration,
-    originalIntegration: Integration,
-    postId: string,
-    information: any,
-    isPersonal = true
-  ) {
-    return this.comment(
-      integration.internalId,
-      postId,
-      undefined,
-      integration.token,
-      [
-        {
-          id: makeId(10),
-          message: information.comment,
-          media: [],
-          settings: {
-            post_as_images_carousel: false,
-          },
-        },
-      ],
-      integration,
-      isPersonal ? 'personal' : 'company'
-    );
-  }
-
-  @PostPlug({
-    identifier: 'linkedin-repost-post-users',
-    title: 'Add Re-posters',
-    description: 'Add accounts to repost your post',
-    pickIntegration: ['linkedin', 'linkedin-page'],
-    fields: [],
-  })
-  async repostPostUsers(
-    integration: Integration,
-    originalIntegration: Integration,
-    postId: string,
-    information: any,
-    isPersonal = true
-  ) {
-    await this.fetch(`https://api.linkedin.com/rest/posts`, {
-      body: JSON.stringify({
-        author:
-          (isPersonal ? 'urn:li:person:' : `urn:li:organization:`) +
-          `${integration.internalId}`,
-        commentary: '',
-        visibility: 'PUBLIC',
-        distribution: {
-          feedDistribution: 'MAIN_FEED',
-          targetEntities: [],
-          thirdPartyDistributionChannels: [],
-        },
-        lifecycleState: 'PUBLISHED',
-        isReshareDisabledByAuthor: false,
-        reshareContext: {
-          parent: postId,
-        },
-      }),
-      method: 'POST',
-      headers: {
-        'X-Restli-Protocol-Version': '2.0.0',
-        'Content-Type': 'application/json',
-        'LinkedIn-Version': '202601',
-        Authorization: `Bearer ${integration.token}`,
-      },
-    });
-  }
-
-  override async mention(token: string, data: { query: string }) {
-    const { elements } = await (
-      await fetch(
-        `https://api.linkedin.com/v2/organizations?q=vanityName&vanityName=${encodeURIComponent(
-          data.query
-        )}&projection=(elements*(id,localizedName,logoV2(original~:playableStreams)))`,
-        {
-          headers: {
-            'X-Restli-Protocol-Version': '2.0.0',
-            'Content-Type': 'application/json',
-            'LinkedIn-Version': '202601',
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
-    ).json();
-
-    return elements.map((p: any) => ({
-      id: String(p.id),
-      label: p.localizedName,
-      image:
-        p.logoV2?.['original~']?.elements?.[0]?.identifiers?.[0]?.identifier ||
-        '',
-    }));
-  }
-
-  mentionFormat(idOrHandle: string, name: string) {
-    return `@[${name.replace('@', '')}](urn:li:organization:${idOrHandle})`;
-  }
+  // "Add comments by a different account" (linkedin-add-comment) and "Add
+  // Re-posters" (linkedin-repost-post-users) were removed: engagement from
+  // other connected accounts is not an approved LinkedIn use case. Plugs
+  // already saved for them are skipped by processInternalPlug.
 }
