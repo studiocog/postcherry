@@ -137,6 +137,10 @@ interface StoreState {
   setLoaded?: (loaded: boolean) => void;
   setChars: (id: string, chars: number) => void;
   chars: Record<string, number>;
+  // a channel's settings can stop a publish with a message (e.g. the platform
+  // says the account can't post right now), keyed by integration id
+  setBlocker: (id: string, message?: string) => void;
+  blockers: Record<string, string>;
   setComments: (comments: boolean | 'no-media') => void;
 }
 
@@ -162,6 +166,7 @@ const initialState = {
   global: [] as Values[],
   internal: [] as Internal[],
   chars: {},
+  blockers: {} as Record<string, string>,
 };
 
 export const useLaunchStore = create<StoreState>()((set) => ({
@@ -647,6 +652,13 @@ export const useLaunchStore = create<StoreState>()((set) => ({
         [id]: chars,
       },
     })),
+  setBlocker: (id: string, message?: string) =>
+    set((state) => {
+      const { [id]: _, ...blockers } = state.blockers;
+      return {
+        blockers: message ? { ...blockers, [id]: message } : blockers,
+      };
+    }),
   setComments: (comments: boolean | 'no-media') =>
     set((state) => ({
       comments,

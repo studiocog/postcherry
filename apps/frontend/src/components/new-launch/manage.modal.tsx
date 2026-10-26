@@ -100,6 +100,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     integrations,
     setSelectedIntegrations,
     locked,
+    blockers,
     current,
     activateExitButton,
     setHide,
@@ -122,6 +123,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       integrations: state.integrations,
       setSelectedIntegrations: state.setSelectedIntegrations,
       locked: state.locked,
+      blockers: state.blockers,
       activateExitButton: state.activateExitButton,
     }))
   );
@@ -621,6 +623,19 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         );
 
         for (const item of notDrafts) {
+          if (blockers[item.id]) {
+            toaster.show(
+              `${capitalize(item.identifier.split('-')[0])} (${item.name}): ${
+                blockers[item.id]
+              }`,
+              'warning'
+            );
+            focus(item.id, 'fix');
+            setLoading(false);
+            setShowSettings(true);
+            return;
+          }
+
           if (item.valid === false) {
             toaster.show(
               `${capitalize(item.identifier.split('-')[0])} (${item.name}): ${
@@ -802,6 +817,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       addEditSets,
       dummy,
       shortlinkPreferenceData,
+      blockers,
     ]
   );
 

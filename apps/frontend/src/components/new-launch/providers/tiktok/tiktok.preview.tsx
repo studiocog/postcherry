@@ -6,6 +6,7 @@ import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import { FC, ReactNode } from 'react';
 import { SliderComponent } from '@gitroom/frontend/components/third-parties/slider.component';
 import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
+import { useTikTokCreatorInfo } from '@gitroom/frontend/components/new-launch/providers/tiktok/tiktok.creator.info';
 
 const TikTokItem: FC<{ icon: ReactNode; num: string }> = ({ icon, num }) => {
   return (
@@ -23,6 +24,8 @@ export const TiktokPreview: FC<{
   const { value: topValue, integration } = useIntegration();
   const current = useLaunchStore((state) => state.current);
   const mediaDir = useMediaDirectory();
+  // the creator's live TikTok nickname (shared SWR request with the settings)
+  const { data: creator } = useTikTokCreatorInfo();
 
   const renderContent = topValue.map((p) => {
     const newContent = stripHtmlValidation(
@@ -73,7 +76,9 @@ export const TiktokPreview: FC<{
           className="h-full bg-black aspect-[calc(9/16)] rounded-[3px] overflow-hidden"
         />
         <div className="absolute pointer-events-none w-full h-full start-0 top-0 px-[12px] py-[25px] justify-end items-start text-white flex flex-col">
-          <div className="text-[14px] font-[500]">@{integration?.name}</div>
+          <div className="text-[14px] font-[500]">
+            {creator ? creator.nickname : `@${integration?.name}`}
+          </div>
           <div dir="auto" className="text-[13px] font-[400] whitespace-pre-line line-clamp-6 w-full"
             dangerouslySetInnerHTML={{ __html: renderContent?.[0]?.text || '' }}
           />
