@@ -40,7 +40,7 @@ export class OauthProvider extends AuthProviderAbstract {
     const { authUrl, clientId, frontendUrl } = this.getConfig();
     const params = new URLSearchParams({
       client_id: clientId,
-      scope: 'openid profile email',
+      scope: process.env.POSTIZ_OAUTH_SCOPE || 'openid profile email',
       response_type: 'code',
       state: query?.state || 'login',
       redirect_uri: `${frontendUrl}/settings`,
