@@ -24,6 +24,11 @@ import dynamic from 'next/dynamic';
 import { WalletUiProvider } from '@gitroom/frontend/components/auth/providers/placeholder/wallet.ui.provider';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import useCookie from 'react-use-cookie';
+import { Checkbox } from '@gitroom/react/form/checkbox';
+import {
+  TermsLinks,
+  TermsNotice,
+} from '@gitroom/frontend/components/auth/terms.notice';
 const WalletProvider = dynamic(
   () => import('@gitroom/frontend/components/auth/providers/wallet.provider'),
   {
@@ -37,6 +42,7 @@ type Inputs = {
   company: string;
   providerToken: string;
   provider: string;
+  acceptTerms: boolean;
 };
 export function Register() {
   const getQuery = useSearchParams();
@@ -115,6 +121,7 @@ export function RegisterAfter({
     defaultValues: {
       providerToken: token,
       provider: provider,
+      acceptTerms: false,
     },
   });
   const fetchData = useFetch();
@@ -181,6 +188,7 @@ export function RegisterAfter({
                   {billingEnabled && <WalletProvider />}
                 </div>
               ))}
+            {!isAfterProvider && <TermsNotice />}
             {!isAfterProvider && (
               <div className="h-[20px] mb-[24px] mt-[24px] relative">
                 <div className="absolute w-full h-[1px] bg-fifth top-[50%] -translate-y-[50%]" />
@@ -221,30 +229,31 @@ export function RegisterAfter({
                   placeholder={t('label_company', 'Company')}
                 />
               </div>
-              <div className={clsx('text-[12px]')}>
-                {t(
-                  'by_registering_you_agree_to_our',
-                  'By registering you agree to our'
-                )}
-                &nbsp;
-                <a
-                  href={`https://postcherry.com/terms`}
-                  className="underline hover:font-bold"
-                  rel="nofollow"
-                >
-                  {t('terms_of_service', 'Terms of Service')}
-                </a>
-                &nbsp;
-                {t('and', 'and')}&nbsp;
-                <a
-                  href={`https://postcherry.com/privacy`}
-                  rel="nofollow"
-                  className="underline hover:font-bold"
-                >
-                  {t('privacy_policy', 'Privacy Policy')}
-                </a>
-                &nbsp;
-              </div>
+              {provider === 'LOCAL' ? (
+                <div className="flex flex-col gap-[6px]">
+                  <div className="flex items-center gap-[10px] text-[12px]">
+                    <Checkbox name="acceptTerms" />
+                    <div>
+                      {t('i_agree_to_the', 'I agree to the')}&nbsp;
+                      <TermsLinks />
+                    </div>
+                  </div>
+                  {!!form.formState.errors.acceptTerms?.message && (
+                    <div className="text-red-400 text-[12px]">
+                      {form.formState.errors.acceptTerms.message}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className={clsx('text-[12px]')}>
+                  {t(
+                    'by_registering_you_agree_to_our',
+                    'By registering you agree to our'
+                  )}
+                  &nbsp;
+                  <TermsLinks />
+                </div>
+              )}
               <div className="text-center mt-6">
                 <div className="w-full flex">
                   <Button

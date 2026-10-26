@@ -112,8 +112,24 @@ export class BadBody extends ApplicationFailure {
 
 export class NotEnoughScopes {
   constructor(
-    public message = 'Not enough scopes, when choosing a provider, please add all the scopes'
+    public message = 'Some required permissions were not granted. Please reconnect the channel and allow all the requested permissions.'
   ) {}
+
+  // Readable name of a scope: URL scopes (Google) keep only their last part
+  static scopeLabel(scope: string) {
+    return scope.split('/').filter(Boolean).pop() || scope;
+  }
+
+  static missing(scopes: string[]) {
+    const labels = scopes.map(NotEnoughScopes.scopeLabel).join(', ');
+    return new NotEnoughScopes(
+      `PostCherry needs ${
+        scopes.length > 1 ? 'these permissions' : 'this permission'
+      } to work with your account: ${labels}. Please reconnect the channel and allow ${
+        scopes.length > 1 ? 'them' : 'it'
+      } when asked.`
+    );
+  }
 }
 
 function safeStringify(obj: any) {
@@ -637,21 +653,20 @@ export abstract class SocialAbstract {
     );
   }
 
+  // Pass only the scopes the provider can't work without: a missing one fails
+  // the connection with a message naming it, so the user can reconnect and
+  // allow it.
   checkScopes(required: string[], got: string | string[]) {
-    if (Array.isArray(got)) {
-      if (!required.every((scope) => got.includes(scope))) {
-        throw new NotEnoughScopes();
-      }
-
-      return true;
+    let gotArray = got as string[];
+    if (!Array.isArray(got)) {
+      const newGot = decodeURIComponent(got);
+      const splitType = newGot.indexOf(',') > -1 ? ',' : ' ';
+      gotArray = newGot.split(splitType);
     }
 
-    const newGot = decodeURIComponent(got);
-
-    const splitType = newGot.indexOf(',') > -1 ? ',' : ' ';
-    const gotArray = newGot.split(splitType);
-    if (!required.every((scope) => gotArray.includes(scope))) {
-      throw new NotEnoughScopes();
+    const missing = required.filter((scope) => !gotArray.includes(scope));
+    if (missing.length) {
+      throw NotEnoughScopes.missing(missing);
     }
 
     return true;

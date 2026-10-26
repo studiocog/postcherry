@@ -398,7 +398,80 @@ export class IntegrationService {
   }
 
   async deleteChannel(org: string, id: string) {
-    return this._integrationRepository.deleteChannel(org, id);
+    // read the tokens before the deletion wipes them
+    const integration = await this._integrationRepository
+      .getIntegrationById(org, id)
+      .catch((): null => null);
+
+    const deleted = await this._integrationRepository.deleteChannel(org, id);
+
+    if (integration && !integration.deletedAt) {
+      // not awaited: a slow or failing platform must never block the deletion
+      this.revokeTokens([integration]);
+    }
+
+    return deleted;
+  }
+
+  // Reads the tokens before they are wiped, the revokes themselves run in the
+  // background so they never block deleting the account
+  async revokeOrganizationTokens(org: string) {
+    const integrations = await this._integrationRepository
+      .getIntegrationsList(org)
+      .catch((): Integration[] => []);
+
+    this.revokeTokens(integrations);
+  }
+
+  // Best effort: asks each platform to drop the access it granted, unless a
+  // channel that stays connected comes from the same login (platforms grant
+  // per user, not per page). Never rejects: when the check or the revoke
+  // fails, nothing is revoked and the error is logged.
+  revokeTokens(
+    integrations: Pick<
+      Integration,
+      | 'id'
+      | 'providerIdentifier'
+      | 'token'
+      | 'refreshToken'
+      | 'internalId'
+      | 'rootInternalId'
+    >[]
+  ) {
+    const removedIds = integrations.map((integration) => integration.id);
+    return Promise.all(
+      integrations.map(async (integration) => {
+        try {
+          const provider = this._integrationManager.getSocialIntegration(
+            integration.providerIdentifier
+          );
+
+          if (!provider?.revokeToken || !integration.token) {
+            return;
+          }
+
+          const sharingGrant =
+            await this._integrationRepository.findIntegrationSharingGrant(
+              integration,
+              removedIds
+            );
+
+          if (sharingGrant) {
+            return;
+          }
+
+          await provider.revokeToken(
+            integration.token,
+            integration.refreshToken || undefined
+          );
+        } catch (err) {
+          console.log(
+            `Could not revoke the ${integration.providerIdentifier} token:`,
+            err
+          );
+        }
+      })
+    );
   }
 
   async disableIntegrations(org: string, totalChannels: number) {

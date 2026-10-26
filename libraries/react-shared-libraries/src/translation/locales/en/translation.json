@@ -872,5 +872,8 @@
   "post_now_all_channels": "Post all channels now",
   "schedule_post_in_all_channels_question": "This post was created for more than one channel. Do you want to schedule all of them?",
   "schedule_all_channels": "Schedule all channels",
-  "only_channel": "Only"
+  "only_channel": "Only",
+  "back_to_channels": "Back to channels",
+  "i_agree_to_the": "I agree to the",
+  "by_continuing_you_agree_to_the": "By continuing you agree to the"
 }

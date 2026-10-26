@@ -1,4 +1,5 @@
 import {
+  Equals,
   IsDefined,
   IsEmail,
   IsString,
@@ -35,6 +36,14 @@ export class CreateOrgUserDto {
   @MinLength(3)
   @MaxLength(128)
   company: string;
+
+  // Only the email/password form has the checkbox, social sign ups show a
+  // notice next to their buttons instead
+  @ValidateIf((o) => o.provider === 'LOCAL')
+  @Equals(true, {
+    message: 'Please agree to the Terms of Service and Privacy Policy',
+  })
+  acceptTerms?: boolean;
 
   datafast_visitor_id: string;
 }

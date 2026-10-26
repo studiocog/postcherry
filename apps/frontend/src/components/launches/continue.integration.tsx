@@ -11,6 +11,7 @@ import { continueProviderList } from '@gitroom/frontend/components/new-launch/pr
 import { IntegrationContext } from '@gitroom/frontend/components/launches/helpers/use.integration';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { Button } from '@gitroom/react/form/button';
 
 interface TwoStepState {
   integrationId: string;
@@ -409,7 +410,16 @@ export const ContinueIntegration: FC<{
                 'An error occurred. Please try again.'
               )}
           </div>
-          {logged && <Redirect url="/launches" delay={3000} />}
+          {logged && !errorMessage && (
+            <Redirect url="/launches" delay={3000} />
+          )}
+          {logged && !!errorMessage && (
+            <div className="mt-[24px] flex justify-center">
+              <Button type="button" onClick={() => push('/launches')}>
+                {t('back_to_channels', 'Back to channels')}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );

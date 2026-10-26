@@ -790,6 +790,41 @@ export class IntegrationRepository {
       },
       data: {
         deletedAt: new Date(),
+        // the platform tokens are not needed anymore, don't keep them around
+        token: '',
+        refreshToken: null,
+      },
+    });
+  }
+
+  // A connected channel, other than the given ones, that comes from the same
+  // platform login (same root account, in any organization) or holds the same
+  // token: revoking would cut it off too
+  findIntegrationSharingGrant(
+    integration: Pick<
+      Integration,
+      'rootInternalId' | 'internalId' | 'providerIdentifier' | 'token'
+    >,
+    excludeIds: string[]
+  ) {
+    return this._integration.model.integration.findFirst({
+      select: {
+        id: true,
+      },
+      where: {
+        id: {
+          notIn: excludeIds,
+        },
+        deletedAt: null,
+        OR: [
+          integration.rootInternalId
+            ? { rootInternalId: integration.rootInternalId }
+            : {
+                internalId: integration.internalId,
+                providerIdentifier: integration.providerIdentifier,
+              },
+          { token: integration.token },
+        ],
       },
     });
   }

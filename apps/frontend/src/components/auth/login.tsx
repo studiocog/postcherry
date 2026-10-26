@@ -16,6 +16,7 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { FarcasterProvider } from '@gitroom/frontend/components/auth/providers/farcaster.provider';
 import WalletProvider from '@gitroom/frontend/components/auth/providers/wallet.provider';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { TermsNotice } from '@gitroom/frontend/components/auth/terms.notice';
 type Inputs = {
   email: string;
   password: string;
@@ -91,6 +92,7 @@ export function Login() {
                 {billingEnabled && <WalletProvider />}
               </div>
             )}
+            <TermsNotice />
             <div className="h-[20px] mb-[24px] mt-[24px] relative">
               <div className="absolute w-full h-[1px] bg-fifth top-[50%] -translate-y-[50%]" />
               <div

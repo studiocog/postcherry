@@ -3,6 +3,7 @@
 import { OauthProvider } from '@gitroom/frontend/components/auth/providers/oauth.provider';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { TermsNotice } from '@gitroom/frontend/components/auth/terms.notice';
 
 export const LoginWithOidc = () => {
   const { isGeneral, genericOauth } = useVariables();
@@ -20,6 +21,7 @@ export const LoginWithOidc = () => {
         </h1>
       </div>
       <OauthProvider />
+      <TermsNotice />
       <div className="h-[20px] mb-[24px] mt-[24px] relative">
         <div className="absolute w-full h-[1px] bg-fifth top-[50%] -translate-y-[50%]" />
         <div

@@ -15,6 +15,7 @@ export interface IAuthenticator {
     clientInformation?: ClientInformation
   ): Promise<AuthTokenDetails | string>;
   refreshToken(refreshToken: string): Promise<AuthTokenDetails>;
+  revokeToken?(accessToken: string, refreshToken?: string): Promise<void>; // Called after a channel (or the whole account) is deleted so the platform drops the app's access. Skipped while another connected channel comes from the same login (same rootInternalId, in any organization). Best effort: errors are logged and never block the deletion
   reConnect?(
     id: string,
     requiredId: string,

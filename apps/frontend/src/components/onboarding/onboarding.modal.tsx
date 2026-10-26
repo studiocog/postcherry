@@ -456,7 +456,7 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
         </div>
         <a
           className="cursor-pointer px-[24px] h-[44px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[14px] font-[600] flex items-center gap-[8px] shrink-0"
-          href="https://docs.postiz.com/public-api/introduction"
+          href="https://github.com/studiocog/postcherry"
           target="_blank"
         >
           <McpClientIcon client={apiTab} size={18} />
