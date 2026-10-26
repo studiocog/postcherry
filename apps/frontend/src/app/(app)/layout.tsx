@@ -6,6 +6,7 @@ import 'react-tooltip/dist/react-tooltip.css';
 import '@copilotkit/react-ui/styles.css';
 import LayoutContext from '@gitroom/frontend/components/layout/layout.context';
 import { ReactNode } from 'react';
+import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import PlausibleProvider from 'next-plausible';
 import clsx from 'clsx';
@@ -24,6 +25,31 @@ import {
 import { HtmlComponent } from '@gitroom/frontend/components/layout/html.component';
 import Script from 'next/script';
 import { ChangeDirClient } from '@gitroom/frontend/components/new-layout/change.dir.client';
+
+// Link previews (WhatsApp, Facebook, LinkedIn, X...) for every app page
+export const metadata: Metadata = {
+  metadataBase: new URL(process.env.FRONTEND_URL || 'https://app.postcherry.com'),
+  applicationName: 'PostCherry',
+  description:
+    'Simple, AI-powered social media scheduling for creators, businesses and agencies.',
+  openGraph: {
+    type: 'website',
+    siteName: 'PostCherry',
+    title: 'PostCherry: Just say it. We\'ll post it.',
+    description:
+      'Simple, AI-powered social media scheduling for creators, businesses and agencies.',
+    images: [
+      { url: '/og-image.png', width: 1200, height: 630, alt: 'PostCherry' },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/og-image.png'],
+  },
+  icons: {
+    apple: '/apple-touch-icon.png',
+  },
+};
 
 const jakartaSans = Plus_Jakarta_Sans({
   weight: ['600', '500'],
