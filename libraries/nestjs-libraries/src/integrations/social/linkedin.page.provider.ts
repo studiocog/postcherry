@@ -9,8 +9,6 @@ import { makeSecureId } from '@gitroom/nestjs-libraries/services/make.secure.id'
 import { LinkedinProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.provider';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
-import { Plug } from '@gitroom/helpers/decorators/plug.decorator';
-import { timer } from '@gitroom/helpers/utils/timer';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 
 @Rules(
@@ -25,10 +23,14 @@ export class LinkedinPageProvider
   override isBetweenSteps = true;
   override refreshWait = true;
   override maxConcurrentJob = 2; // LinkedIn Page has professional posting limits
+  // Community Management API only (the CM product must be alone on its app,
+  // so openid / profile don't exist there):
+  // - r_basicprofile: the member's id / name / picture (/v2/me)
+  // - rw_organization_admin: list the Pages the member runs and Page analytics
+  // - w_organization_social: publish posts and comments as the Page
+  // - r_organization_social: read the Page's posts (post statistics)
+  // No w_member_social: this provider never posts to a personal profile.
   override scopes = [
-    'openid',
-    'profile',
-    'w_member_social',
     'r_basicprofile',
     'rw_organization_admin',
     'w_organization_social',
@@ -59,25 +61,9 @@ export class LinkedinPageProvider
       })
     ).json();
 
-    const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
-
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    const { id, name, picture, username } = await this.basicProfile(
+      accessToken
+    );
 
     return {
       id,
@@ -86,44 +72,39 @@ export class LinkedinPageProvider
       expiresIn: expires_in,
       name,
       picture,
-      username: vanityName,
+      username,
     };
   }
 
-  override async addComment(
-    integration: Integration,
-    originalIntegration: Integration,
-    postId: string,
-    information: any,
-  ) {
-    return super.addComment(
-      integration,
-      originalIntegration,
-      postId,
-      information,
-      false
-    );
-  }
+  // The connected member from r_basicprofile (/v2/userinfo needs openid /
+  // profile, which the Community Management app doesn't have).
+  private async basicProfile(accessToken: string) {
+    const { id, localizedFirstName, localizedLastName, vanityName, ...me } =
+      await (
+        await fetch(
+          'https://api.linkedin.com/v2/me?projection=(id,localizedFirstName,localizedLastName,vanityName,profilePicture(displayImage~:playableStreams))',
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        )
+      ).json();
 
-  override async repostPostUsers(
-    integration: Integration,
-    originalIntegration: Integration,
-    postId: string,
-    information: any
-  ) {
-    return super.repostPostUsers(
-      integration,
-      originalIntegration,
-      postId,
-      information,
-      false
-    );
+    return {
+      id: id as string,
+      name: [localizedFirstName, localizedLastName].filter(Boolean).join(' '),
+      picture:
+        (me?.profilePicture?.['displayImage~']?.elements || []).slice(-1)?.[0]
+          ?.identifiers?.[0]?.identifier || '',
+      username: (vanityName as string) || '',
+    };
   }
 
   override async generateAuthUrl() {
     const state = makeSecureId(6);
     const codeVerifier = makeSecureId(30);
-    const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&prompt=none&client_id=${
+    const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${
       process.env.LINKEDIN_CLIENT_ID
     }&redirect_uri=${encodeURIComponent(
       `${process.env.FRONTEND_URL}/integrations/social/linkedin-page`
@@ -239,36 +220,20 @@ export class LinkedinPageProvider
 
     this.checkScopes(this.scopes, scope);
 
-    const {
-      name,
-      sub: id,
-      picture,
-    } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
-
-    const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    const { id, name, picture, username } = await this.basicProfile(
+      accessToken
+    );
 
     return {
       // namespaced placeholder so the in-between row never collides with the
-      // personal LinkedIn channel row (same org + same member sub)
+      // personal LinkedIn channel row (same org + same member id)
       id: `${this.identifier}_${id}`,
       accessToken,
       refreshToken,
       expiresIn,
       name,
       picture,
-      username: vanityName,
+      username,
     };
   }
 
@@ -567,148 +532,73 @@ export class LinkedinPageProvider
     return result as any;
   }
 
-  @Plug({
-    identifier: 'linkedin-page-autoRepostPost',
-    title: 'Auto Repost Posts',
-    description:
-      'When a post reached a certain number of likes, repost it to increase engagement (1 week old posts)',
-    runEveryMilliseconds: 21600000,
-    totalRuns: 3,
-    fields: [
-      {
-        name: 'likesAmount',
-        type: 'number',
-        placeholder: 'Amount of likes',
-        description: 'The amount of likes to trigger the repost',
-        validation: /^\d+$/,
-      },
-    ],
-  })
-  async autoRepostPost(
-    integration: Integration,
-    id: string,
-    fields: { likesAmount: string }
-  ) {
-    const {
-      likesSummary: { totalLikes },
-    } = await (
-      await this.fetch(
-        `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(id)}`,
+  // "Auto Repost Posts" (linkedin-page-autoRepostPost) and "Auto plug post"
+  // (linkedin-page-autoPlugPost) were removed: automated reposts and comments
+  // are not part of the approved Page Management use case. Plugs already
+  // saved for them are skipped by processPlugs.
+
+  // Organization lookups are Community Management API calls, so mentions of
+  // companies live on the Page provider only.
+  async company(token: string, data: { url: string }) {
+    const { url } = data;
+    const getCompanyVanity = url.match(
+      /^https?:\/\/(?:www\.)?linkedin\.com\/company\/([^/]+)\/?$/
+    );
+    if (!getCompanyVanity || !getCompanyVanity?.length) {
+      throw new Error('Invalid LinkedIn company URL');
+    }
+
+    const { elements } = await (
+      await fetch(
+        `https://api.linkedin.com/v2/organizations?q=vanityName&vanityName=${getCompanyVanity[1]}`,
         {
           method: 'GET',
           headers: {
-            'X-Restli-Protocol-Version': '2.0.0',
             'Content-Type': 'application/json',
+            'X-Restli-Protocol-Version': '2.0.0',
             'LinkedIn-Version': '202601',
-            Authorization: `Bearer ${integration.token}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       )
     ).json();
 
-    if (totalLikes >= +fields.likesAmount) {
-      await timer(2000);
-      await this.fetch(`https://api.linkedin.com/rest/posts`, {
-        body: JSON.stringify({
-          author: `urn:li:organization:${integration.internalId}`,
-          commentary: '',
-          visibility: 'PUBLIC',
-          distribution: {
-            feedDistribution: 'MAIN_FEED',
-            targetEntities: [],
-            thirdPartyDistributionChannels: [],
-          },
-          lifecycleState: 'PUBLISHED',
-          isReshareDisabledByAuthor: false,
-          reshareContext: {
-            parent: id,
-          },
-        }),
-        method: 'POST',
-        headers: {
-          'X-Restli-Protocol-Version': '2.0.0',
-          'Content-Type': 'application/json',
-          'LinkedIn-Version': '202601',
-          Authorization: `Bearer ${integration.token}`,
-        },
-      });
-      return true;
-    }
-
-    return false;
+    return {
+      options: elements.map((e: { localizedName: string; id: string }) => ({
+        label: e.localizedName,
+        value: `@[${e.localizedName}](urn:li:organization:${e.id})`,
+      }))?.[0],
+    };
   }
 
-  @Plug({
-    identifier: 'linkedin-page-autoPlugPost',
-    title: 'Auto plug post',
-    description:
-      'When a post reached a certain number of likes, add another post to it so you followers get a notification about your promotion',
-    runEveryMilliseconds: 21600000,
-    totalRuns: 3,
-    fields: [
-      {
-        name: 'likesAmount',
-        type: 'number',
-        placeholder: 'Amount of likes',
-        description: 'The amount of likes to trigger the repost',
-        validation: /^\d+$/,
-      },
-      {
-        name: 'post',
-        type: 'richtext',
-        placeholder: 'Post to plug',
-        description: 'Message content to plug',
-        validation: /^[\s\S]{3,}$/g,
-      },
-    ],
-  })
-  async autoPlugPost(
-    integration: Integration,
-    id: string,
-    fields: { likesAmount: string; post: string }
-  ) {
-    const {
-      likesSummary: { totalLikes },
-    } = await (
-      await this.fetch(
-        `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(id)}`,
+  override async mention(token: string, data: { query: string }) {
+    const { elements } = await (
+      await fetch(
+        `https://api.linkedin.com/v2/organizations?q=vanityName&vanityName=${encodeURIComponent(
+          data.query
+        )}&projection=(elements*(id,localizedName,logoV2(original~:playableStreams)))`,
         {
-          method: 'GET',
           headers: {
             'X-Restli-Protocol-Version': '2.0.0',
             'Content-Type': 'application/json',
             'LinkedIn-Version': '202601',
-            Authorization: `Bearer ${integration.token}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       )
     ).json();
 
-    if (totalLikes >= fields.likesAmount) {
-      await timer(2000);
-      await this.fetch(
-        `https://api.linkedin.com/v2/socialActions/${decodeURIComponent(
-          id
-        )}/comments`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${integration.token}`,
-          },
-          body: JSON.stringify({
-            actor: `urn:li:organization:${integration.internalId}`,
-            object: id,
-            message: {
-              text: this.fixText(fields.post),
-            },
-          }),
-        }
-      );
-      return true;
-    }
+    return elements.map((p: any) => ({
+      id: String(p.id),
+      label: p.localizedName,
+      image:
+        p.logoV2?.['original~']?.elements?.[0]?.identifiers?.[0]?.identifier ||
+        '',
+    }));
+  }
 
-    return false;
+  mentionFormat(idOrHandle: string, name: string) {
+    return `@[${name.replace('@', '')}](urn:li:organization:${idOrHandle})`;
   }
 }
 

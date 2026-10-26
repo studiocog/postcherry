@@ -296,7 +296,7 @@ const usePostActions = (onMutate?: () => void) => {
   );
 
   const openStatistics = useCallback(
-    (id: string) => () => {
+    (id: string, identifier?: string) => () => {
       modal.openModal({
         title: t('statistics', 'Statistics'),
         closeOnClickOutside: true,
@@ -305,7 +305,7 @@ const usePostActions = (onMutate?: () => void) => {
         classNames: {
           modal: 'w-[100%] max-w-[1400px]',
         },
-        children: <StatisticsModal postId={id} />,
+        children: <StatisticsModal postId={id} identifier={identifier} />,
         size: '80%',
       });
     },
@@ -731,7 +731,10 @@ export const ListView = () => {
                   isBeforeNow={false}
                   date={newDayjs(post.publishDate)}
                   state={post.state}
-                  statistics={openStatistics(post.id)}
+                  statistics={openStatistics(
+                    post.id,
+                    post.integration?.providerIdentifier
+                  )}
                   missingRelease={openMissingRelease(post.id)}
                   openPost={openPost(post)}
                   editPost={editPost(post, false)}
@@ -1072,7 +1075,10 @@ export const CalendarColumn: FC<{
                   isBeforeNow={isBeforeNow}
                   date={getDate}
                   state={post.state}
-                  statistics={openStatistics(post.id)}
+                  statistics={openStatistics(
+                    post.id,
+                    post.integration?.providerIdentifier
+                  )}
                   missingRelease={openMissingRelease(post.id)}
                   openPost={openPost(post)}
                   editPost={editPost(post, false)}

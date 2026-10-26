@@ -1,4 +1,5 @@
 import {
+  Equals,
   IsArray,
   IsDefined,
   IsIn,
@@ -15,6 +16,7 @@ import {
 } from 'class-validator';
 import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
 import { Type } from 'class-transformer';
+import { JSONSchema } from 'class-validator-jsonschema';
 
 // YouTube caps the combined length of all tags at 500 characters.
 // Tags containing whitespace are wrapped in quotes by YouTube, which adds
@@ -70,13 +72,46 @@ export class YoutubeSettingsDto {
   @IsDefined()
   title: string;
 
-  @IsIn(['public', 'private', 'unlisted'])
-  @IsDefined()
+  // YouTube API policy: the privacy status is always an explicit choice of
+  // the user, there is no default.
+  @IsIn(['public', 'private', 'unlisted'], {
+    message: 'Choose the video privacy (public, private or unlisted)',
+  })
+  @IsDefined({
+    message: 'Choose the video privacy (public, private or unlisted)',
+  })
+  @JSONSchema({
+    description:
+      'Who can see the video. Must be chosen by the user, never assumed.',
+  })
   type: string;
 
-  @IsIn(['yes', 'no'])
-  @IsOptional()
+  // Required for new and edited posts. Posts saved before this was required
+  // are not validated again when they publish, and the provider still treats
+  // a missing value as "no" for them.
+  @IsIn(['yes', 'no'], {
+    message: 'Choose whether the video is made for kids',
+  })
+  @IsDefined({
+    message: 'Choose whether the video is made for kids',
+  })
+  @JSONSchema({
+    description:
+      'Whether the video is made for kids. Must be chosen by the user, never assumed.',
+  })
   selfDeclaredMadeForKids: 'no' | 'yes';
+
+  // The user confirms the video follows the YouTube Community Guidelines.
+  // Same backward compatibility as selfDeclaredMadeForKids.
+  @Equals(true, {
+    message:
+      'Confirm that the video follows the YouTube Community Guidelines',
+  })
+  @JSONSchema({
+    description:
+      'Must be true: the user confirms the video follows the YouTube Community Guidelines (https://www.youtube.com/howyoutubeworks/policies/community-guidelines/). Ask the user, never set it on their behalf.',
+  })
+  communityGuidelines: boolean;
 
   @IsOptional()
   @ValidateNested()

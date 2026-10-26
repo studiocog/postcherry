@@ -21,7 +21,6 @@ import {
 import { Plug } from '@gitroom/helpers/decorators/plug.decorator';
 import { Integration } from '@prisma/client';
 import { timer } from '@gitroom/helpers/utils/timer';
-import { PostPlug } from '@gitroom/helpers/decorators/post.plug';
 import dayjs from 'dayjs';
 import { uniqBy } from 'lodash';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
@@ -299,83 +298,15 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     return undefined;
   }
 
-  @Plug({
-    identifier: 'x-autoRepostPost',
-    title: 'Auto Repost Posts',
-    disabled: !!process.env.DISABLE_X_ANALYTICS,
-    description:
-      'When a post reached a certain number of likes, repost it to increase engagement (1 week old posts)',
-    runEveryMilliseconds: 21600000,
-    totalRuns: 3,
-    fields: [
-      {
-        name: 'likesAmount',
-        type: 'number',
-        placeholder: 'Amount of likes',
-        description: 'The amount of likes to trigger the repost',
-        validation: /^\d+$/,
-      },
-    ],
-  })
-  async autoRepostPost(
-    integration: Integration,
-    id: string,
-    fields: { likesAmount: string }
-  ) {
-    // @ts-ignore
-    // eslint-disable-next-line prefer-rest-params
-    const [accessTokenSplit, accessSecretSplit] = integration.token.split(':');
-    const client = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
-      accessToken: accessTokenSplit,
-      accessSecret: accessSecretSplit,
-    });
+  // "Auto Repost Posts" (x-autoRepostPost) and "Add Re-posters"
+  // (x-repost-post-users) were removed: X's platform-manipulation rules and
+  // Developer Policy forbid automated and coordinated multi-account reposts.
+  // Plugs already saved for them are skipped (see processPlugs and
+  // processInternalPlug in IntegrationService).
 
-    if (
-      (await client.v2.tweetLikedBy(id)).meta.result_count >=
-      +fields.likesAmount
-    ) {
-      await timer(2000);
-      await client.v2.retweet(integration.internalId, id);
-      return true;
-    }
-
-    return false;
-  }
-
-  @PostPlug({
-    identifier: 'x-repost-post-users',
-    title: 'Add Re-posters',
-    description: 'Add accounts to repost your post',
-    pickIntegration: ['x'],
-    fields: [],
-  })
-  async repostPostUsers(
-    integration: Integration,
-    originalIntegration: Integration,
-    postId: string,
-    information: any
-  ) {
-    const [accessTokenSplit, accessSecretSplit] = integration.token.split(':');
-    const client = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
-      accessToken: accessTokenSplit,
-      accessSecret: accessSecretSplit,
-    });
-
-    const {
-      data: { id },
-    } = await client.v2.me();
-
-    try {
-      await client.v2.retweet(id, postId);
-    } catch (err) {
-      /** nothing **/
-    }
-  }
-
+  // Kept: it only replies to the user's own post, from the same account that
+  // published it (the integration's own token), once the user's threshold is
+  // reached.
   @Plug({
     identifier: 'x-autoPlugPost',
     title: 'Auto plug post',

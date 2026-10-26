@@ -60,14 +60,18 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
   name = 'YouTube';
   isBetweenSteps = true;
   dto = YoutubeSettingsDto;
+  // Minimal set for the Google verification, each one maps to a feature:
+  // - userinfo.profile: the Google account id / name / picture (oauth2 userinfo)
+  // - youtube.upload: resumable upload (videos.insert) and thumbnails.set
+  // - youtube.readonly: channels.list (channel pick / reconnect) and
+  //   videos.list (post statistics)
+  // - yt-analytics.readonly: channel analytics (reports.query)
+  // Dropped: youtube, youtube.force-ssl, youtubepartner (no playlist, comment,
+  // caption or content-owner call uses them) and userinfo.email (never read).
   scopes = [
     'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/youtube',
-    'https://www.googleapis.com/auth/youtube.force-ssl',
     'https://www.googleapis.com/auth/youtube.readonly',
     'https://www.googleapis.com/auth/youtube.upload',
-    'https://www.googleapis.com/auth/youtubepartner',
     'https://www.googleapis.com/auth/yt-analytics.readonly',
   ];
 
@@ -293,6 +297,26 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
       picture: data?.picture || '',
       username: '',
     };
+  }
+
+  // Revokes the grant at Google so a disconnected channel can't be used with
+  // this token anymore. Best effort: it never throws.
+  async revokeToken(accessToken: string): Promise<void> {
+    try {
+      await fetch(
+        `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(
+          accessToken
+        )}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
+      );
+    } catch (err) {
+      /** nothing **/
+    }
   }
 
   async generateAuthUrl() {
@@ -579,6 +603,17 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     const [firstPost, ...comments] = postDetails;
 
     const { settings }: { settings: YoutubeSettingsDto } = firstPost;
+
+    // the privacy is always the user's choice, never a default
+    if (!['public', 'private', 'unlisted'].includes(settings?.type)) {
+      throw new BadBody(
+        this.identifier,
+        '{}',
+        '{}',
+        'Choose the video privacy (public, private or unlisted) before posting'
+      );
+    }
+
     const path = firstPost?.media?.[0]?.path!;
     const videoSize = await this.youtubeMediaSize(path);
 
