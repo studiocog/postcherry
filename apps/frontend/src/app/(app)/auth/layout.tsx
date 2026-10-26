@@ -6,6 +6,7 @@ import loadDynamic from 'next/dynamic';
 import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.component';
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 import { Toaster } from '@gitroom/react/toaster/toaster';
+import { AuthShowcase } from '@gitroom/frontend/components/auth/auth.showcase';
 const ReturnUrlComponent = loadDynamic(() => import('./return.url.component'));
 export default async function AuthLayout({
   children,
@@ -13,6 +14,7 @@ export default async function AuthLayout({
   children: ReactNode;
 }) {
   const t = await getT();
+  const websiteUrl = process.env.WEBSITE_URL || 'https://postcherry.com';
 
   return (
     <MantineWrapper>
@@ -22,19 +24,23 @@ export default async function AuthLayout({
         <ReturnUrlComponent />
         <div className="flex flex-col py-[40px] px-[20px] flex-1 lg:w-[600px] lg:flex-none rounded-[12px] text-white p-[12px] bg-[#1A1919]">
           <div className="w-full max-w-[440px] mx-auto justify-center gap-[20px] h-full flex flex-col text-white">
-            <LogoTextComponent />
+            <div className="flex items-center justify-between gap-[12px]">
+              <a href={websiteUrl} aria-label="PostCherry home">
+                <LogoTextComponent />
+              </a>
+              <a
+                href={websiteUrl}
+                className="text-[14px] opacity-70 hover:opacity-100 transition-opacity flex items-center gap-[6px]"
+              >
+                <span aria-hidden="true">←</span>
+                {t('back_to_website', 'Back to website')}
+              </a>
+            </div>
             <div className="flex">{children}</div>
           </div>
         </div>
-        <div className="text-[36px] flex-1 pt-[88px] hidden lg:flex flex-col items-center">
-          <div className="text-center">
-            The cherry on top of your
-            <br />
-            <span className="text-[42px] text-[#FF7A90]">social media</span>
-          </div>
-          <div className="text-[18px] text-center mt-[16px] opacity-70">
-            Schedule, approve and report for every client, all in one place.
-          </div>
+        <div className="hidden lg:flex flex-1">
+          <AuthShowcase />
         </div>
       </div>
     </MantineWrapper>
