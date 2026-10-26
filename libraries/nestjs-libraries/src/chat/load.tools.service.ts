@@ -60,7 +60,7 @@ export class LoadToolsService {
     const tools = await this.loadTools();
     return new Agent({
       id: 'postiz',
-      name: 'postiz',
+      name: 'PostCherry',
       description:
         'Agent that helps schedule and list social media posts for users',
       instructions: ({ requestContext }) => {

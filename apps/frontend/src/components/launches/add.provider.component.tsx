@@ -288,19 +288,6 @@ const ExtensionNotFound: FC = () => {
       <div className="flex gap-[10px]">
         <Button
           type="button"
-          className="flex-1"
-          onClick={() => {
-            window.open(
-              'https://chromewebstore.google.com/detail/postiz/cidhffagahknaeodkplfbcpfeielnkjl?hl=en',
-              '_blank'
-            );
-            modals.closeCurrent();
-          }}
-        >
-          {t('install_extension', 'Install Extension')}
-        </Button>
-        <Button
-          type="button"
           className="flex-1 !bg-transparent border border-tableBorder text-textColor"
           onClick={() => modals.closeCurrent()}
         >

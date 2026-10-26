@@ -126,20 +126,20 @@ export const startMcp = async (app: INestApplication) => {
   };
 
   const serverConfig = {
-    name: 'PostCherry MCP',
+    name: 'PostCherry',
     version: '1.0.0',
     tools,
-    agents: { postiz: agent },
+    agents: { postcherry: agent },
     appResources,
   };
 
   const server = new MCPServer(serverConfig);
 
   // The directory-facing servers don't register the agent - it would be
-  // exposed as an annotation-less catch-all ask_postiz tool, which the
+  // exposed as an annotation-less catch-all ask_postcherry tool, which the
   // ChatGPT and Claude directory reviews reject
   const oauthServer = new MCPServer({
-    name: 'PostCherry MCP',
+    name: 'PostCherry',
     version: '1.0.0',
     tools,
     appResources,
@@ -149,7 +149,7 @@ export const startMcp = async (app: INestApplication) => {
   const { [CLIPPING_WIDGET_URI]: hiddenWidget, ...claudeAppResources } = appResources as Record<string, (typeof appResources)[typeof UPLOAD_WIDGET_URI]>;
 
   const claudeOauthServer = new MCPServer({
-    name: 'PostCherry MCP',
+    name: 'PostCherry',
     version: '1.0.0',
     tools: claudeTools,
     appResources: claudeAppResources,
@@ -162,12 +162,12 @@ export const startMcp = async (app: INestApplication) => {
   if (selfHostedRelayEnabled()) {
     const selfHostedTools = mcpRelayService.tools(agentTools);
     selfHostedServer = new MCPServer({
-      name: 'PostCherry MCP',
+      name: 'PostCherry',
       version: '1.0.0',
       tools: selfHostedTools,
     });
     claudeSelfHostedServer = new MCPServer({
-      name: 'PostCherry MCP',
+      name: 'PostCherry',
       version: '1.0.0',
       tools: withoutClaudeHidden(selfHostedTools),
     });

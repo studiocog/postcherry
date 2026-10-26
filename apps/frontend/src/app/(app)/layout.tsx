@@ -117,7 +117,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           recaptchaSiteKey={process.env.RECAPTCHA_SITE_KEY || ''}
           sourceCodeUrl={
             process.env.SOURCE_CODE_URL ||
-            'https://github.com/gitroomhq/postiz-app'
+            'https://github.com/studiocog/postcherry'
           }
           mediaProcessing={
             process.env.STORAGE_PROVIDER === 'cloudflare' &&

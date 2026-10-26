@@ -322,7 +322,7 @@ export const useMenuItem = () => {
           />
         </svg>
       ),
-      path: sourceCodeUrl || 'https://github.com/gitroomhq/postiz-app',
+      path: sourceCodeUrl || 'https://github.com/studiocog/postcherry',
       role: ['ADMIN', 'USER', 'SUPERADMIN'],
     },
     {
