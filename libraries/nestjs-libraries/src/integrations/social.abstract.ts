@@ -149,6 +149,9 @@ function safeStringify(obj: any) {
 export abstract class SocialAbstract {
   abstract identifier: string;
   maxConcurrentJob = 1;
+  // Left out of the add-channel screen in every deployment (HIDDEN_PROVIDERS
+  // does the same per environment). Its existing channels keep working.
+  hidden = false;
 
   public handleErrors(
     body: string,

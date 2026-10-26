@@ -38,6 +38,9 @@ export class TiktokBusinessProvider
 {
   identifier = 'tiktok-business';
   name = 'TikTok';
+  // A different TikTok API product (Business API) than the one PostCherry is
+  // approved for: new channels connect through the "tiktok" provider.
+  override hidden = true;
   isBetweenSteps = false;
   convertToJPEG = true;
   scopes = [

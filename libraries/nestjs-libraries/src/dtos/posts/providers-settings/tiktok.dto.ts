@@ -1,5 +1,5 @@
 import {
-  IsBoolean, ValidateIf, IsIn, IsString, MaxLength, IsOptional, IsDefined, IsNumber, Min, Max, ValidateNested
+  IsBoolean, ValidateIf, IsIn, IsString, MaxLength, IsOptional, IsDefined, IsNumber, Min, Max, ValidateNested, Equals
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { JSONSchema } from 'class-validator-jsonschema';
@@ -77,16 +77,22 @@ export class TikTokDto {
   })
   title: string;
 
-  @IsIn([
-    'PUBLIC_TO_EVERYONE',
-    'MUTUAL_FOLLOW_FRIENDS',
-    'FOLLOWER_OF_CREATOR',
-    'SELF_ONLY',
-  ])
-  @IsString()
+  // TikTok's Content Sharing Guidelines: the creator picks the privacy level
+  // themselves, there is no default. UPLOAD ignores it, so it's not needed there.
+  @ValidateIf((p) => p.content_posting_method !== 'UPLOAD')
+  @IsIn(
+    [
+      'PUBLIC_TO_EVERYONE',
+      'MUTUAL_FOLLOW_FRIENDS',
+      'FOLLOWER_OF_CREATOR',
+      'SELF_ONLY',
+    ],
+    { message: 'Please choose who can see this post' }
+  )
+  @IsString({ message: 'Please choose who can see this post' })
   @JSONSchema({
     description:
-      'Applied only when content_posting_method=DIRECT_POST. Ignored by TikTok on UPLOAD.',
+      'Required when content_posting_method=DIRECT_POST, there is no default: ask the user who can see the post. Ignored by TikTok on UPLOAD.',
   })
   privacy_level:
     | 'PUBLIC_TO_EVERYONE'
@@ -145,6 +151,26 @@ export class TikTokDto {
       'Applied only when content_posting_method=DIRECT_POST. Ignored by TikTok on UPLOAD.',
   })
   brand_organic_toggle: boolean;
+
+  // The composer's commercial content disclosure toggle. Once it's on, TikTok
+  // requires the creator to say who the content promotes before posting, so it
+  // can't stay on with neither brand toggle chosen.
+  @ValidateIf(
+    (p) =>
+      p.disclose === true &&
+      !p.brand_organic_toggle &&
+      !p.brand_content_toggle &&
+      p.content_posting_method !== 'UPLOAD'
+  )
+  @Equals(false, {
+    message:
+      'You need to indicate if your content promotes yourself, a third party, or both',
+  })
+  @JSONSchema({
+    description:
+      'Optional. Commercial content disclosure: when true, brand_organic_toggle and/or brand_content_toggle must be true.',
+  })
+  disclose?: boolean;
 
   @Type(() => TikTokMusic)
   @ValidateNested()
