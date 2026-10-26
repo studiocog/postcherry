@@ -459,6 +459,11 @@ export class InstagramProvider
 
   async generateAuthUrl() {
     const state = makeSecureId(6);
+    // Facebook Login for Business: the permissions come from the
+    // configuration (must use a User access token), not from scope=
+    const configId =
+      process.env.INSTAGRAM_FACEBOOK_LOGIN_CONFIG_ID ||
+      process.env.FACEBOOK_LOGIN_CONFIG_ID;
     return {
       url:
         `https://www.facebook.com/${META_GRAPH_API_VERSION}/dialog/oauth` +
@@ -467,7 +472,9 @@ export class InstagramProvider
           `${process.env.FRONTEND_URL}/integrations/social/instagram`
         )}` +
         `&state=${state}` +
-        `&scope=${encodeURIComponent(this.scopes.join(','))}`,
+        (configId
+          ? `&config_id=${encodeURIComponent(configId)}`
+          : `&scope=${encodeURIComponent(this.scopes.join(','))}`),
       codeVerifier: makeSecureId(10),
       state,
     };

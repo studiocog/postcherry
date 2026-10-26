@@ -345,7 +345,13 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
           `${process.env.FRONTEND_URL}/integrations/social/facebook`
         )}` +
         `&state=${state}` +
-        `&scope=${this.scopes.join(',')}`,
+        // Facebook Login for Business: the permissions come from the
+        // configuration (must use a User access token), not from scope=
+        (process.env.FACEBOOK_LOGIN_CONFIG_ID
+          ? `&config_id=${encodeURIComponent(
+              process.env.FACEBOOK_LOGIN_CONFIG_ID
+            )}`
+          : `&scope=${this.scopes.join(',')}`),
       codeVerifier: makeSecureId(10),
       state,
     };
