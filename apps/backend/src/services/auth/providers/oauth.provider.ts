@@ -1,7 +1,16 @@
+import { createHash, createHmac } from 'crypto';
 import {
   AuthProvider,
   AuthProviderAbstract,
 } from '@gitroom/backend/services/auth/providers.interface';
+
+// PKCE (POSTIZ_OAUTH_PKCE=true) for identity providers that require it.
+// The verifier is derived from the login state nonce, so nothing is stored.
+const pkceEnabled = () => process.env.POSTIZ_OAUTH_PKCE === 'true';
+const codeVerifier = (state: string) =>
+  createHmac('sha256', process.env.JWT_SECRET!)
+    .update(`oauth-pkce:${state}`)
+    .digest('base64url');
 
 @AuthProvider({ provider: 'GENERIC' })
 export class OauthProvider extends AuthProviderAbstract {
@@ -38,18 +47,31 @@ export class OauthProvider extends AuthProviderAbstract {
 
   generateLink(query?: { state?: string }): string {
     const { authUrl, clientId, frontendUrl } = this.getConfig();
+    const state = query?.state || 'login';
     const params = new URLSearchParams({
       client_id: clientId,
       scope: process.env.POSTIZ_OAUTH_SCOPE || 'openid profile email',
       response_type: 'code',
-      state: query?.state || 'login',
+      state,
       redirect_uri: `${frontendUrl}/settings`,
     });
+
+    if (pkceEnabled()) {
+      params.set(
+        'code_challenge',
+        createHash('sha256').update(codeVerifier(state)).digest('base64url')
+      );
+      params.set('code_challenge_method', 'S256');
+    }
 
     return `${authUrl}?${params.toString()}`;
   }
 
-  async getToken(code: string, _redirectUri?: string): Promise<string> {
+  async getToken(
+    code: string,
+    _redirectUri?: string,
+    state?: string
+  ): Promise<string> {
     const { tokenUrl, clientId, clientSecret, frontendUrl } = this.getConfig();
     const response = await fetch(`${tokenUrl}`, {
       method: 'POST',
@@ -63,6 +85,9 @@ export class OauthProvider extends AuthProviderAbstract {
         client_secret: clientSecret,
         code,
         redirect_uri: `${frontendUrl}/settings`,
+        ...(pkceEnabled() && state
+          ? { code_verifier: codeVerifier(state) }
+          : {}),
       }),
     });
 
