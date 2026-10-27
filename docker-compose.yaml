@@ -19,7 +19,7 @@ services:
       IS_GENERAL: 'true'
       DISABLE_REGISTRATION: 'false'
       # AGPL-3.0: link to the public repository with this app's source code
-      SOURCE_CODE_URL: '${SOURCE_CODE_URL:-https://github.com/gitroomhq/postiz-app}'
+      SOURCE_CODE_URL: '${SOURCE_CODE_URL:-https://github.com/studiocog/postcherry}'
       # External links, set them in the .env file (see .env.example).
       # Empty DOCS_URL = Docs buttons open the PostCherry GitHub repository, the others are hidden.
       DOCS_URL: '${DOCS_URL:-}'
