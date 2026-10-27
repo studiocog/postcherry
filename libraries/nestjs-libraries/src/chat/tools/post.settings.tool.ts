@@ -26,6 +26,7 @@ export class PostSettingsTool implements AgentToolInterface {
 Update the provider settings of an existing post (scheduled or draft) that was NOT published yet.
 Only the settings change - the content and the publish date stay exactly as they are.
 Find the post first (list your posts) and pass its "id" here.
+Before calling this tool, show the user which post and which settings will change and wait for their explicit confirmation: the new values replace the current ones.
 The settings are merged into the existing ones, so only pass the keys you want to change; anything you don't pass stays as it is.
 This relies on the integrationSchema tool [input:settings] to know which keys exist for the platform.
 If validation fails, the result contains output.errors describing what to fix; the call can be retried with corrected parameters.

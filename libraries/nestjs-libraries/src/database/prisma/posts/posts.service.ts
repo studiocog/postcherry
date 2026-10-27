@@ -379,6 +379,122 @@ export class PostsService {
     return [];
   }
 
+  // Suggests the best weekday + hour (UTC) to post from the engagement of the
+  // organization's own recently published posts: every post gets the sum of
+  // its metrics, relative to the average post of its channel (so a big channel
+  // doesn't outweigh a small one), and the slots are ranked by that average
+  async bestTimesToPost(
+    orgId: string,
+    days: number,
+    filters: { customer?: string; integrations?: string[] }
+  ) {
+    // every analyzed post is one call to the provider API
+    const maxPosts = 30;
+
+    const published = (
+      await this._postRepository.getPosts(orgId, {
+        startDate: dayjs.utc().subtract(days, 'day').toISOString(),
+        // a post of the last 2 days didn't collect its engagement yet
+        endDate: dayjs.utc().subtract(2, 'day').toISOString(),
+        customer: filters.customer,
+      } as GetPostsDto)
+    )
+      // repeating posts (listed once per repetition) are left out
+      .filter((p) => !p.actualDate)
+      .filter(
+        (p) =>
+          p.state === 'PUBLISHED' && p.releaseId && p.releaseId !== 'missing'
+      )
+      .filter(
+        (p) =>
+          !filters.integrations?.length ||
+          filters.integrations.includes(p.integration.id)
+      )
+      // only the channels that can give the stats of a post
+      .filter(
+        (p) =>
+          !!this._integrationManager.getSocialIntegration(
+            p.integration.providerIdentifier
+          )?.postAnalytics
+      )
+      .sort((a, b) => dayjs(b.publishDate).diff(dayjs(a.publishDate)))
+      .slice(0, maxPosts);
+
+    // the channels run in parallel, the posts of a channel one after the
+    // other: an expired token is refreshed once, by the first one
+    const scored = (
+      await Promise.all(
+        Object.values(groupBy(published, (p) => p.integration.id)).map(
+          async (posts) => {
+            const channelScores: Array<{
+              integration: string;
+              publishDate: Date;
+              score: number;
+            }> = [];
+            for (const post of posts) {
+              try {
+                const analytics = await this.checkPostAnalytics(
+                  orgId,
+                  post.id,
+                  days
+                );
+                if (!Array.isArray(analytics) || !analytics.length) {
+                  continue;
+                }
+                channelScores.push({
+                  integration: post.integration.id,
+                  publishDate: post.publishDate,
+                  // same totals as the statistics of a post in the app
+                  score: analytics.reduce(
+                    (all, metric) =>
+                      all +
+                      (metric.data || []).reduce(
+                        (sum, current) => sum + (Number(current.total) || 0),
+                        0
+                      ),
+                    0
+                  ),
+                });
+              } catch (err) {}
+            }
+            return channelScores;
+          }
+        )
+      )
+    ).flat();
+
+    const relative = Object.values(groupBy(scored, (p) => p.integration))
+      .flatMap((posts) => {
+        const average =
+          posts.reduce((all, p) => all + p.score, 0) / posts.length;
+        return average
+          ? posts.map((p) => ({ ...p, score: p.score / average }))
+          : [];
+      });
+
+    const slots = Object.values(
+      groupBy(relative, (p) => {
+        const date = dayjs.utc(p.publishDate);
+        return `${date.day()}-${date.hour()}`;
+      })
+    )
+      .map((posts) => ({
+        day: dayjs.utc(posts[0].publishDate).format('dddd'),
+        hour: dayjs.utc(posts[0].publishDate).hour(),
+        posts: posts.length,
+        score: Number(
+          (posts.reduce((all, p) => all + p.score, 0) / posts.length).toFixed(2)
+        ),
+      }))
+      .sort((a, b) => b.score - a.score || b.posts - a.posts)
+      .slice(0, 5);
+
+    return {
+      analyzedPosts: relative.length,
+      slots,
+    };
+  }
+
   async getStatistics(orgId: string, id: string) {
     const getPost = await this.getPostsRecursively(id, true, orgId, true);
     const content = getPost.map((p) => p.content);

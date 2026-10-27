@@ -26,7 +26,7 @@ export class GenerateImageTool implements AgentToolInterface {
       `,
       mcp: {
         annotations: {
-          title: 'Generate Image',
+          title: 'Generate AI Image',
           readOnlyHint: false,
           destructiveHint: false,
           idempotentHint: false,

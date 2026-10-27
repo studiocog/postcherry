@@ -17,7 +17,7 @@ export class GroupListTool implements AgentToolInterface {
       inputSchema: z.object({}),
       mcp: {
         annotations: {
-          title: 'List Groups',
+          title: 'List Channel Groups',
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,

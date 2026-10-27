@@ -72,6 +72,8 @@ export interface AnalyticsData {
   label: string;
   data: Array<{ total: string; date: string }>;
   percentageChange: number;
+  // the total of the period is the average of the points (like a rate in %)
+  average?: boolean;
 }
 
 

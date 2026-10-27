@@ -27,7 +27,7 @@ export class GenerateVideoTool implements AgentToolInterface {
       id: 'generateVideoTool',
       mcp: {
         annotations: {
-          title: 'Generate Video',
+          title: 'Generate AI Video',
           readOnlyHint: false,
           destructiveHint: false,
           idempotentHint: false,
