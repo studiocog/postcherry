@@ -19,6 +19,7 @@ import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/in
 import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
 import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { TypedSearchAttributes } from '@temporalio/common';
+import { Context } from '@temporalio/activity';
 import {
   organizationId,
   postId as postIdSearchParam,
@@ -59,6 +60,10 @@ function slimPost(post: any) {
   } = post;
   return rest;
 }
+
+// Post workflow versions whose 'info' notifications (channel needs a
+// reconnect / is disabled) are not followed by changeState(ERROR)
+const UNPAIRED_INFO_WORKFLOWS = ['postWorkflowV101', 'postWorkflowV102'];
 
 // A genuinely missed occurrence (dead workflow) is only recovered by the
 // missing-posts sweep, which runs every hour - so anything later than the
@@ -448,6 +453,20 @@ export class PostActivity {
     digest = false,
     type: NotificationType = 'success'
   ) {
+    // Post workflows only send 'fail' / 'info' notifications for a failed
+    // post, and pair them with changeState(ERROR), which now sends the post
+    // failure alert (post link, reconnect link, throttled email). Skipped
+    // here so a failure isn't notified twice, since the workflows themselves
+    // can't change. The only unpaired ones are the 'info' channel checks of
+    // the first two versions, which return without changeState.
+    if (
+      type === 'fail' ||
+      (type === 'info' &&
+        !UNPAIRED_INFO_WORKFLOWS.includes(Context.current().info.workflowType))
+    ) {
+      return;
+    }
+
     await this._notificationService.inAppNotification(
       orgId,
       subject,

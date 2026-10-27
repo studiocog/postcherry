@@ -133,22 +133,28 @@ export class PostsRepository {
   // the 'Unknown Error' placeholder instead). Internal debug strings (e.g.
   // 'Refresh channel needed') and unmapped failures come out as null.
   private curatedError(error?: string | null): string | null {
+    const { type, message } = this.failureCause(error);
+    return type === 'bad_body' && message && message !== 'Unknown Error'
+      ? message
+      : null;
+  }
+
+  // The failure type (bad_body, refresh_token...) and message of a serialized
+  // workflow failure stored in Post.error, empty for plain string errors
+  failureCause(error?: string | null): { type?: string; message?: string } {
     if (!error) {
-      return null;
+      return {};
     }
     try {
       const parsed = JSON.parse(error);
-      const [type, message] = parsed?.cause?.failure?.message
-        ? [parsed?.cause?.type, parsed?.cause?.failure?.message]
-        : [
-            parsed?.failure?.cause?.applicationFailureInfo?.type,
-            parsed?.failure?.cause?.message,
-          ];
-      return type === 'bad_body' && message && message !== 'Unknown Error'
-        ? message
-        : null;
+      return parsed?.cause?.failure?.message
+        ? { type: parsed?.cause?.type, message: parsed?.cause?.failure?.message }
+        : {
+            type: parsed?.failure?.cause?.applicationFailureInfo?.type,
+            message: parsed?.failure?.cause?.message,
+          };
     } catch (err) {
-      return null;
+      return {};
     }
   }
 
@@ -522,7 +528,11 @@ export class PostsRepository {
       include: {
         integration: {
           select: {
+            id: true,
+            name: true,
             providerIdentifier: true,
+            refreshNeeded: true,
+            inBetweenSteps: true,
           },
         },
       },
