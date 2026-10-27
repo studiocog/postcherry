@@ -36,11 +36,16 @@ export class NotificationsRepository {
     };
   }
 
-  async createNotification(organizationId: string, content: string) {
+  async createNotification(
+    organizationId: string,
+    content: string,
+    link?: string
+  ) {
     await this._notifications.model.notifications.create({
       data: {
         organizationId,
         content,
+        ...(link ? { link } : {}),
       },
     });
   }

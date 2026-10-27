@@ -33,6 +33,7 @@ import { ChannelsAfterPayment } from '@gitroom/frontend/components/layout/check.
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Input } from '@gitroom/react/form/input';
 import { Button } from '@gitroom/react/form/button';
+import { ChannelHealthComponent } from '@gitroom/frontend/components/launches/channel.health.component';
 
 export const SVGLine = () => {
   return (
@@ -439,6 +440,21 @@ export const MenuComponent: FC<
         )}
       >
         {integration.name}
+        {(integration.refreshNeeded || integration.inBetweenSteps) && (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              (integration.refreshNeeded
+                ? refreshChannel(integration)
+                : continueIntegration(integration))();
+            }}
+            className="mt-[2px] w-fit px-[8px] py-[1px] rounded-full bg-red-500 text-white text-[11px] font-[600] cursor-pointer hover:opacity-80"
+          >
+            {integration.refreshNeeded
+              ? t('reconnect', 'Reconnect')
+              : t('finish_setup', 'Finish setup')}
+          </div>
+        )}
       </div>
       <Menu
         canChangeProfilePicture={integration.changeProfilePicture}
@@ -587,6 +603,53 @@ export const LaunchesComponent = () => {
       },
     []
   );
+  // Disconnected channel emails link to /launches?reconnect=<channel id>:
+  // start the same reconnect flow as the channel menu once the list loaded
+  const [reconnectHandled, setReconnectHandled] = useState(false);
+  useEffect(() => {
+    const reconnectId = search.get('reconnect');
+    if (!reconnectId || reconnectHandled || isLoading) {
+      return;
+    }
+    setReconnectHandled(true);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('reconnect');
+    window.history.replaceState(null, '', url.toString());
+
+    const integration = integrations?.find((p: any) => p.id === reconnectId);
+    if (!integration) {
+      toast.show(
+        t(
+          'reconnect_channel_not_found',
+          'This channel was not found in the current workspace'
+        ),
+        'warning'
+      );
+      return;
+    }
+
+    if (integration.refreshNeeded) {
+      refreshChannel(integration)();
+      return;
+    }
+
+    if (integration.inBetweenSteps) {
+      continueIntegration(integration)();
+      return;
+    }
+
+    toast.show(
+      t('channel_already_connected', 'This channel is already connected'),
+      'success'
+    );
+  }, [
+    search,
+    integrations,
+    isLoading,
+    reconnectHandled,
+    refreshChannel,
+    continueIntegration,
+  ]);
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -789,6 +852,11 @@ export const LaunchesComponent = () => {
               </div>
             )}
           </div>
+          <ChannelHealthComponent
+            integrations={sortedIntegrations}
+            refreshChannel={refreshChannel}
+            continueIntegration={continueIntegration}
+          />
           <Filters />
           <div className="flex-1 flex">
             <Calendar />

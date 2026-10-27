@@ -18,7 +18,7 @@ import {
 } from '@prisma/client';
 import { GetPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.dto';
 import { GetPostsListDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.list.dto';
-import { groupBy, shuffle, uniqBy } from 'lodash';
+import { escape, groupBy, shuffle, uniqBy } from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateGeneratedPostsDto } from '@gitroom/nestjs-libraries/dtos/generator/create.generated.posts.dto';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -57,6 +57,7 @@ import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validatio
 import { postContentPlainText } from '@gitroom/helpers/utils/sanitize.post.content';
 import { CreatePublicCommentDto } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
 import { countLength } from '@gitroom/helpers/utils/count.length';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 
 type PostWithConditionals = Post & {
   integration?: Integration;
@@ -74,7 +75,8 @@ export class PostsService {
     private _shortLinkService: ShortLinkService,
     private _openaiService: OpenaiService,
     private _temporalService: TemporalService,
-    private _refreshIntegrationService: RefreshIntegrationService
+    private _refreshIntegrationService: RefreshIntegrationService,
+    private _notificationService: NotificationService
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -1329,7 +1331,116 @@ export class PostsService {
   }
 
   async changeState(id: string, state: State, err?: any, body?: any) {
-    return this._postRepository.changeState(id, state, err, body);
+    const update = await this._postRepository.changeState(
+      id,
+      state,
+      err,
+      body
+    );
+
+    if (state === 'ERROR') {
+      await this.informAboutPostFailure(update);
+    }
+
+    return update;
+  }
+
+  // Every post workflow version marks a failed publish through changeState,
+  // so this is the one place that alerts the organization about it: an in-app
+  // notification for every failure, and an email (failure email preference)
+  // at most once per channel per hour. Best-effort, never throws: the post
+  // state is already saved.
+  private async informAboutPostFailure(post: {
+    group: string;
+    organizationId: string;
+    deletedAt: Date | null;
+    parentPostId: string | null;
+    error: string | null;
+    releaseURL: string | null;
+    intervalInDays: number | null;
+    integration: {
+      id: string;
+      name: string;
+      providerIdentifier: string;
+      refreshNeeded: boolean;
+      inBetweenSteps: boolean;
+    } | null;
+  }) {
+    try {
+      // 'Already posted' is a re-run of a post that is no longer queued,
+      // not a failed publish
+      if (
+        !post.integration ||
+        post.deletedAt ||
+        post.parentPostId ||
+        post.error === 'Already posted'
+      ) {
+        return;
+      }
+
+      const { type, message } = this._postRepository.failureCause(post.error);
+      const reconnect =
+        post.integration.refreshNeeded ||
+        post.integration.inBetweenSteps ||
+        type === 'refresh_token';
+
+      const reason = reconnect
+        ? 'The channel is disconnected and needs to be reconnected.'
+        : post.error === 'Channel disabled'
+        ? 'The channel is disabled.'
+        : post.error === 'No Post'
+        ? 'The post could not be loaded, please check that your subscription is active.'
+        : type === 'bad_body'
+        ? message && message !== 'Unknown Error'
+          ? message.slice(0, 300)
+          : 'The platform rejected the post.'
+        : "We couldn't confirm it was published, please check the channel before posting it again to avoid a duplicate.";
+
+      const platform = this._integrationManager.getPlatformName(
+        post.integration.providerIdentifier
+      );
+
+      // the workflows mark the root post for a failed comment too: once the
+      // root has a release URL (and isn't a repeated post that keeps the
+      // previous one), only its comments failed
+      const what =
+        post.releaseURL && !post.intervalInDays
+          ? 'The comments of your post'
+          : 'Your post';
+
+      const postUrl = `${process.env.FRONTEND_URL}/launches?post=${post.group}`;
+      const reconnectUrl = `${process.env.FRONTEND_URL}/launches?reconnect=${post.integration.id}`;
+      const channel = `${escape(post.integration.name)} (${escape(platform)})`;
+
+      await this._notificationService.alertNotification(
+        post.organizationId,
+        `${what} to ${post.integration.name} (${platform}) failed`,
+        `${what} to ${channel} failed: ${escape(
+          reason
+        )} Open the post: ${postUrl}${
+          reconnect ? ` Reconnect the channel: ${reconnectUrl}` : ''
+        }`,
+        `<p>${what} to <strong>${channel}</strong> failed: ${escape(
+          reason
+        )}</p>
+${this._notificationService.emailButton(postUrl, 'Open post')}${
+          reconnect
+            ? `
+<p style="margin-top: 16px;">
+  <a href="${reconnectUrl}" style="color: #D21F3C; font-weight: 600;">Reconnect channel</a>
+</p>`
+            : ''
+        }`,
+        postUrl,
+        'fail',
+        {
+          key: `postFailureEmail:${post.integration.id}`,
+          seconds: 3600,
+        }
+      );
+    } catch (err) {
+      console.error('Could not send the post failure notification', err);
+    }
   }
 
   async changePostStatus(

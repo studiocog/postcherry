@@ -5,6 +5,7 @@ import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prism
 import { TemporalService } from 'nestjs-temporal-core';
 import { TypedSearchAttributes } from '@temporalio/common';
 import { organizationId } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 
 export type NotificationType = 'success' | 'fail' | 'info';
 
@@ -83,6 +84,49 @@ export class NotificationService {
     }
 
     await this.sendEmailsToOrg(orgId, subject, message, type);
+  }
+
+  // Actionable alerts (a failed post, a disconnected channel): the in-app
+  // notification always lands, the email carries its own HTML (buttons) and
+  // can be throttled - while the Redis key is held no email is sent, so a
+  // burst of failures sends one email per window instead of one per failure.
+  async alertNotification(
+    orgId: string,
+    subject: string,
+    message: string,
+    html: string,
+    link: string,
+    type: NotificationType,
+    throttle?: { key: string; seconds: number }
+  ) {
+    await this._notificationRepository.createNotification(orgId, message, link);
+
+    // fails open: without Redis the email is sent, unthrottled
+    if (
+      throttle &&
+      !(await ioRedis
+        .set(throttle.key, '1', 'EX', throttle.seconds, 'NX')
+        .catch(() => 'OK'))
+    ) {
+      return;
+    }
+
+    try {
+      await this.sendEmailsToOrg(orgId, subject, html, type);
+    } catch (err) {
+      // nothing was sent, the next failure in the window may email again
+      if (throttle) {
+        await ioRedis.del(throttle.key).catch(() => 0);
+      }
+      throw err;
+    }
+  }
+
+  // The call-to-action button of an alert email
+  emailButton(url: string, label: string) {
+    return `<p style="margin-top: 24px;">
+  <a href="${url}" style="display: inline-block; background-color: #D21F3C; color: #ffffff; padding: 12px 20px; border-radius: 8px; text-decoration: none; font-weight: 600;">${label}</a>
+</p>`;
   }
 
   async sendEmailsToOrg(

@@ -899,5 +899,12 @@
   "feedback_optional": "Feedback (optional)",
   "google_privacy_policy": "Google Privacy Policy",
   "activation_link_invalid_or_used": "This activation link is invalid or has already been used.",
-  "back_to_postcherry": "Back to PostCherry"
+  "back_to_postcherry": "Back to PostCherry",
+  "reconnect": "Reconnect",
+  "finish_setup": "Finish setup",
+  "all_channels_connected": "All channels connected",
+  "one_channel_needs_attention": "1 channel needs attention",
+  "channels_need_attention": "{{count}} channels need attention",
+  "reconnect_channel_not_found": "This channel was not found in the current workspace",
+  "channel_already_connected": "This channel is already connected"
 }

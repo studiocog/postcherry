@@ -23,7 +23,7 @@ import {
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
-import { difference, uniq } from 'lodash';
+import { difference, escape, uniq } from 'lodash';
 import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -122,24 +122,29 @@ export class IntegrationService {
           })
       : undefined;
 
-    return this._integrationRepository.createOrUpdateIntegration(
-      additionalSettings,
-      oneTimeToken,
-      org,
-      name,
-      uploadedPicture,
-      type,
-      internalId,
-      provider,
-      token,
-      refreshToken,
-      expiresIn,
-      username,
-      isBetweenSteps,
-      refresh,
-      timezone,
-      customInstanceDetails
-    );
+    const integration =
+      await this._integrationRepository.createOrUpdateIntegration(
+        additionalSettings,
+        oneTimeToken,
+        org,
+        name,
+        uploadedPicture,
+        type,
+        internalId,
+        provider,
+        token,
+        refreshToken,
+        expiresIn,
+        username,
+        isBetweenSteps,
+        refresh,
+        timezone,
+        customInstanceDetails
+      );
+
+    await this.releaseDisconnectAlert(integration.id);
+
+    return integration;
   }
 
   updateIntegrationGroup(org: string, id: string, group: string) {
@@ -313,19 +318,59 @@ export class IntegrationService {
     );
   }
 
+  // Once per disconnect: every failed refresh, analytics load or post on a
+  // disconnected channel ends up here, so the alert is claimed with a Redis
+  // key that is released when the channel is connected again
+  // (createOrUpdateIntegration / saveProviderPage). The TTL turns a channel
+  // that stays disconnected into a weekly reminder at most.
   async informAboutRefreshError(
     orgId: string,
     integration: Integration,
     err = ''
   ) {
-    await this._notificationService.inAppNotification(
-      orgId,
-      `Could not refresh your ${integration.providerIdentifier} channel`,
-      `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/launches`,
-      true,
-      false,
-      'info'
-    );
+    // fails open: without Redis every disconnect event alerts
+    const first = await ioRedis
+      .set(
+        `channelDisconnected:${integration.id}`,
+        '1',
+        'EX',
+        7 * 24 * 60 * 60,
+        'NX'
+      )
+      .catch(() => 'OK');
+
+    if (!first) {
+      return;
+    }
+
+    try {
+      const platform = this._integrationManager.getPlatformName(
+        integration.providerIdentifier
+      );
+
+      const reconnectUrl = `${process.env.FRONTEND_URL}/launches?reconnect=${integration.id}`;
+      const channel = `${escape(integration.name)} (${escape(platform)})`;
+      const reason = err ? ` (${escape(String(err).slice(0, 300))})` : '';
+
+      await this._notificationService.alertNotification(
+        orgId,
+        `${integration.name} (${platform}) needs to be reconnected`,
+        `${channel} was disconnected${reason} and needs to be reconnected, scheduled posts to it will fail until then. Reconnect it: ${reconnectUrl}`,
+        `<p><strong>${channel}</strong> was disconnected${reason} and needs to be reconnected. Scheduled posts to this channel will fail until it is reconnected.</p>
+${this._notificationService.emailButton(reconnectUrl, 'Reconnect channel')}`,
+        reconnectUrl,
+        'info'
+      );
+    } catch (e) {
+      // not alerted: let the next failure of this channel try again
+      await this.releaseDisconnectAlert(integration.id);
+      console.error('Could not send the channel disconnected notification', e);
+    }
+  }
+
+  // The channel is connected again: the next disconnect alerts again
+  private async releaseDisconnectAlert(id: string) {
+    await ioRedis.del(`channelDisconnected:${id}`).catch(() => 0);
   }
 
   async refreshNeeded(org: string, id: string) {
@@ -527,6 +572,8 @@ export class IntegrationService {
       token: getIntegrationInformation.access_token,
       profile: getIntegrationInformation.username,
     });
+
+    await this.releaseDisconnectAlert(id);
 
     return { success: true };
   }

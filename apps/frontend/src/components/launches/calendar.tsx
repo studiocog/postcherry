@@ -5,9 +5,11 @@ import React, {
   Fragment,
   memo,
   useCallback,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   CalendarContext,
   Integrations,
@@ -754,10 +756,31 @@ export const ListView = () => {
   );
 };
 
+// Post failure emails link to /launches?post=<post group>: open the post
+// editor once, the same way clicking the post in the calendar does
+const EditPostFromUrl: FC = () => {
+  const searchParams = useSearchParams();
+  const { editPost } = usePostActions();
+  const [handled, setHandled] = useState(false);
+  useEffect(() => {
+    const group = searchParams.get('post');
+    if (!group || handled) {
+      return;
+    }
+    setHandled(true);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('post');
+    window.history.replaceState(null, '', url.toString());
+    editPost({ group })();
+  }, [searchParams, handled, editPost]);
+  return null;
+};
+
 export const Calendar = () => {
   const { display } = useCalendar();
   return (
     <>
+      <EditPostFromUrl />
       {display === 'list' ? (
         <ListView />
       ) : display === 'day' ? (

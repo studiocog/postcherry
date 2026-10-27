@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 
 import { Injectable } from '@nestjs/common';
+import { capitalize } from 'lodash';
 import { XProvider } from '@gitroom/nestjs-libraries/integrations/social/x.provider';
 import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { LinkedinProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.provider';
@@ -222,5 +223,12 @@ export class IntegrationManager {
   }
   getSocialIntegration(integration: string): SocialProvider {
     return socialIntegrationList.find((i) => i.identifier === integration)!;
+  }
+
+  // The display name of a platform ("X", "LinkedIn Page"...) for messages
+  getPlatformName(integration: string) {
+    return (
+      this.getSocialIntegration(integration)?.name || capitalize(integration)
+    );
   }
 }
