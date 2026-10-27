@@ -107,13 +107,6 @@ export const AuthShowcase: FC = () => {
 
   // Drive one scene: type the prompt, "think", schedule each platform, then move on
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setTyped(scene.prompt.length);
-      setStage('tool');
-      setScheduled(scene.platforms.length);
-      return;
-    }
-
     let timer: ReturnType<typeof setTimeout>;
     if (stage === 'typing') {
       timer =

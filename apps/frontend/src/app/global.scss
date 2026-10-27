@@ -1144,9 +1144,3 @@ html[dir='rtl'] [dir='ltr'] {
     opacity: 1;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .pc-showcase *,
-  .pc-showcase__glow {
-    animation: none !important;
-  }
-}
