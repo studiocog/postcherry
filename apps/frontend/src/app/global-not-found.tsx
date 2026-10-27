@@ -1,4 +1,4 @@
-// The app has several root layouts ((app), (extension), (provider)), so an
+// The app has several root layouts ((app), (approval), (extension), (provider)), so an
 // unmatched URL can't use a plain not-found.tsx: this page replaces them all
 // and brings its own <html>, styles and font (experimental.globalNotFound).
 import './global.scss';

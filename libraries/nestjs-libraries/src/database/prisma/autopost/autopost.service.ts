@@ -19,6 +19,7 @@ import { TypedSearchAttributes } from '@temporalio/common';
 import {
   organizationId,
 } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
+import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
 const parser = new Parser();
 
 interface WorkflowChannelsState {
@@ -64,7 +65,8 @@ export class AutopostService {
     private _autopostsRepository: AutopostRepository,
     private _temporalService: TemporalService,
     private _integrationService: IntegrationService,
-    private _postsService: PostsService
+    private _postsService: PostsService,
+    private _brandKitService: BrandKitService
   ) {}
 
   async stopAll(org: string) {
@@ -86,6 +88,21 @@ export class AutopostService {
     );
 
     await this.processCron(body.active, orgId, data.id);
+
+    return data;
+  }
+
+  async updateAutopost(orgId: string, id: string, body: AutopostDto) {
+    const data = await this._autopostsRepository.updateAutopost(
+      orgId,
+      id,
+      body
+    );
+    if (!data) {
+      return null;
+    }
+
+    await this.processCron(body.active, orgId, id);
 
     return data;
   }
@@ -220,6 +237,9 @@ export class AutopostService {
       };
     }
 
+    const brandVoice = await this._brandKitService.getAiContext(
+      state.body.organizationId
+    );
     const structuredOutput = model.withStructuredOutput(generateContent);
     const { socialMediaPostContent } = await ChatPromptTemplate.fromTemplate(
       `
@@ -229,7 +249,11 @@ export class AutopostService {
         - Try to make it a short as possible to fit any social media
         - Add line breaks between sentences (\\n) 
         - Don't add hashtags
-        - Add emojis when needed
+        - Add emojis when needed${
+          brandVoice
+            ? '\n        - Follow this brand voice, the rules above still come first:\n        {brandVoice}'
+            : ''
+        }
         
         'description':
         {content}
@@ -238,6 +262,8 @@ export class AutopostService {
       .pipe(structuredOutput)
       .invoke({
         content: description,
+        // only read by the prompt when a brand voice is set
+        brandVoice,
       });
 
     return {

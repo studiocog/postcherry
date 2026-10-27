@@ -11,6 +11,7 @@ import {
 } from '@gitroom/frontend/components/media/media.component';
 import copy from 'copy-to-clipboard';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useExternalLinks } from '@gitroom/react/helpers/external.links';
 
 const useOAuthApp = () => {
   const fetch = useFetch();
@@ -70,6 +71,8 @@ export const DeveloperComponent: FC = () => {
   const decision = useDecisionModal();
   const modals = useModals();
   const t = useT();
+  const { docsLink } = useExternalLinks();
+  const oauthDocs = docsLink('/public-api/oauth');
   const { data: app, mutate } = useOAuthApp();
   const [plaintextSecret, setPlaintextSecret] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -247,7 +250,7 @@ export const DeveloperComponent: FC = () => {
             <div className="flex flex-wrap gap-[6px] shrink-0 pt-[2px]">
               <a
                 className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-                href="https://github.com/studiocog/postcherry"
+                href={oauthDocs}
                 target="_blank"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
@@ -410,7 +413,7 @@ export const DeveloperComponent: FC = () => {
           <div className="flex flex-wrap gap-[6px] shrink-0 pt-[2px]">
             <a
               className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-              href="https://github.com/studiocog/postcherry"
+              href={oauthDocs}
               target="_blank"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>

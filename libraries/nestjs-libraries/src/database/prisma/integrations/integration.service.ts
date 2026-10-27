@@ -56,6 +56,28 @@ export class IntegrationService {
     return true;
   }
 
+  // Turns the org's active RSS auto-posts off (a plan without auto-posting),
+  // they stay saved and the user can turn them back on with a plan that has it
+  async pauseAutoposts(orgId: string) {
+    const data = await this._autopostsRepository.getAutoposts(orgId);
+
+    for (const item of data.filter((f) => f.active)) {
+      try {
+        await this._autopostsRepository.changeActive(orgId, item.id, false);
+      } catch (err) {
+        console.error('autopost_pause_failed', { orgId, id: item.id, err });
+        continue;
+      }
+
+      // no running workflow is fine, the feed is off either way
+      try {
+        await this._temporalService.terminateWorkflow(`autopost-${item.id}`);
+      } catch (err) {}
+    }
+
+    return true;
+  }
+
   getMentions(platform: string, q: string) {
     return this._integrationRepository.getMentions(platform, q);
   }

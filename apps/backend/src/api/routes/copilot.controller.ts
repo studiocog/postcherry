@@ -22,11 +22,13 @@ import { Request, Response } from 'express';
 import { RequestContext } from '@mastra/core/di';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
 
 export type ChannelsContext = {
   integrations: string;
   organization: string;
   ui: string;
+  brandVoice: string;
 };
 
 // the copilot runtime writes its own CORS headers on the response, keep them aligned with main.ts
@@ -43,7 +45,8 @@ const copilotCors = () => ({
 export class CopilotController {
   constructor(
     private _subscriptionService: SubscriptionService,
-    private _mastraService: MastraService
+    private _mastraService: MastraService,
+    private _brandKitService: BrandKitService
   ) {}
   @Post('/chat')
   chatAgent(@Req() req: Request, @Res() res: Response) {
@@ -90,6 +93,11 @@ export class CopilotController {
 
     requestContext.set('organization', JSON.stringify(organization));
     requestContext.set('ui', 'true');
+    // only set here, the MCP server never gets the brand voice
+    requestContext.set(
+      'brandVoice',
+      await this._brandKitService.getAiContext(organization.id)
+    );
 
     const agents = MastraAgent.getLocalAgents({
       resourceId: organization.id,

@@ -8,7 +8,10 @@ import {
 } from '@gitroom/nestjs-libraries/services/payment/payment.provider.interface';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  isLegacyTier,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 import { REVENUECAT_PROVIDER } from '@gitroom/nestjs-libraries/services/payment/payment.providers';
 
@@ -168,10 +171,8 @@ export class RevenueCatProvider extends PaymentProviderAbstract {
     const period = (parts.pop() || '').toUpperCase();
     const billing = (parts.pop() || '').toUpperCase();
 
-    if (
-      !['MONTHLY', 'YEARLY'].includes(period) ||
-      !['STANDARD', 'TEAM', 'PRO', 'ULTIMATE'].includes(billing)
-    ) {
+    // the store products only exist for the legacy tiers
+    if (!['MONTHLY', 'YEARLY'].includes(period) || !isLegacyTier(billing)) {
       throw new HttpException(
         `Unknown RevenueCat product identifier: ${productId}`,
         400
@@ -179,7 +180,7 @@ export class RevenueCatProvider extends PaymentProviderAbstract {
     }
 
     return {
-      billing: billing as 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+      billing,
       period: period as 'MONTHLY' | 'YEARLY',
     };
   }

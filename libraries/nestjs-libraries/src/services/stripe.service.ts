@@ -6,7 +6,12 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { BillingSubscribeDto } from '@gitroom/nestjs-libraries/dtos/billing/billing.subscribe.dto';
 import { groupBy } from 'lodash';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  isPaidTier,
+  PaidTier,
+  PLAN_NAMES,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
@@ -144,9 +149,17 @@ export class StripeService extends PaymentProviderAbstract {
     }
   }
 
+  // The channel limit of a plan, null when the webhook metadata names a tier
+  // we don't sell, so the webhook can skip it instead of throwing
+  private planChannels(billing?: string) {
+    return isPaidTier(billing) && typeof pricing[billing]?.channel === 'number'
+      ? pricing[billing].channel
+      : null;
+  }
+
   async createSubscription(event: Stripe.CustomerSubscriptionCreatedEvent) {
     const { uniqueId, billing, period } = event.data.object.metadata as {
-      billing: 'STANDARD' | 'PRO';
+      billing: string;
       period: 'MONTHLY' | 'YEARLY';
       uniqueId: string;
     };
@@ -173,6 +186,17 @@ export class StripeService extends PaymentProviderAbstract {
       return { ok: true };
     }
 
+    const channels = this.planChannels(billing);
+    if (channels === null || !isPaidTier(billing) || !period) {
+      console.error('stripe_unknown_tier', {
+        stripe_event_type: event.type,
+        stripe_event_id: event.id,
+        stripe_subscription_id: event.data.object.id,
+        billing,
+      });
+      return { ok: true };
+    }
+
     try {
       const check = await this.checkValidCard(event);
       if (!check) {
@@ -187,7 +211,7 @@ export class StripeService extends PaymentProviderAbstract {
       event.data.object.status !== 'active',
       uniqueId,
       event.data.object.customer as string,
-      pricing[billing].channel!,
+      channels,
       billing,
       period,
       event.data.object.cancel_at
@@ -195,10 +219,21 @@ export class StripeService extends PaymentProviderAbstract {
   }
   async updateSubscription(event: Stripe.CustomerSubscriptionUpdatedEvent) {
     const { uniqueId, billing, period } = event.data.object.metadata as {
-      billing: 'STANDARD' | 'PRO';
+      billing: string;
       period: 'MONTHLY' | 'YEARLY';
       uniqueId: string;
     };
+
+    const channels = this.planChannels(billing);
+    if (channels === null || !isPaidTier(billing) || !period) {
+      console.error('stripe_unknown_tier', {
+        stripe_event_type: event.type,
+        stripe_event_id: event.id,
+        stripe_subscription_id: event.data.object.id,
+        billing,
+      });
+      return { ok: true };
+    }
 
     const check = await this.checkValidCard(event);
     if (!check) {
@@ -210,7 +245,7 @@ export class StripeService extends PaymentProviderAbstract {
       event.data.object.status !== 'active',
       uniqueId,
       event.data.object.customer as string,
-      pricing[billing].channel!,
+      channels,
       billing,
       period,
       event.data.object.cancel_at
@@ -229,18 +264,19 @@ export class StripeService extends PaymentProviderAbstract {
     }
 
     const { uniqueId, billing, period } = survivor.metadata as {
-      billing: 'STANDARD' | 'PRO';
+      billing: string;
       period: 'MONTHLY' | 'YEARLY';
       uniqueId: string;
     };
+    const channels = this.planChannels(billing);
     console.log('stripe_subscription_deleted_survivor_kept', {
       stripe_event_type: event.type,
       stripe_event_id: event.id,
       stripe_subscription_id: event.data.object.id,
       stripe_survivor_id: survivor.id,
-      outcome: pricing[billing] && period ? 'resynced' : 'metadata_missing',
+      outcome: channels !== null && period ? 'resynced' : 'metadata_missing',
     });
-    if (!pricing[billing] || !period) {
+    if (channels === null || !isPaidTier(billing) || !period) {
       return;
     }
 
@@ -249,7 +285,7 @@ export class StripeService extends PaymentProviderAbstract {
       survivor.status !== 'active',
       uniqueId,
       customer,
-      pricing[billing].channel!,
+      channels,
       billing,
       period,
       survivor.cancel_at
@@ -336,27 +372,56 @@ export class StripeService extends PaymentProviderAbstract {
     return { ...productsList };
   }
 
+  // The Stripe product of a plan, created the first time the plan is used.
+  // It's found by metadata.tier, so it can be renamed in Stripe; the products
+  // made before that are named after the tier and get tagged when found.
+  // Every page of products is read, the first page alone (10) would miss
+  // plans and create a duplicate product on every checkout
+  private async findOrCreateProduct(billing: PaidTier) {
+    const products = await stripe.products
+      .list({ active: true, limit: 100 })
+      .autoPagingToArray({ limit: 10000 });
+
+    const byTier = products.find(
+      (product) => product.metadata?.tier === billing
+    );
+    if (byTier) {
+      return byTier;
+    }
+
+    const byName = products.find(
+      (product) => product.name.toUpperCase() === billing.toUpperCase()
+    );
+    if (byName) {
+      await stripe.products
+        .update(byName.id, { metadata: { tier: billing } })
+        .catch((err) => {
+          console.error('stripe_product_tag_failed', {
+            stripe_product_id: byName.id,
+            billing,
+            err,
+          });
+        });
+      return byName;
+    }
+
+    return stripe.products.create({
+      active: true,
+      name: `PostCherry ${PLAN_NAMES[billing]}`,
+      metadata: { tier: billing },
+    });
+  }
+
   async prorate(organizationId: string, body: BillingSubscribeDto) {
     const org = await this._organizationService.getOrgById(organizationId);
     const customer = await this.createOrGetCustomer(org!);
     const priceData = pricing[body.billing];
-    const allProducts = await stripe.products.list({
-      active: true,
-      expand: ['data.prices'],
-    });
-
-    const findProduct =
-      allProducts.data.find(
-        (product) => product.name.toUpperCase() === body.billing.toUpperCase()
-      ) ||
-      (await stripe.products.create({
-        active: true,
-        name: body.billing,
-      }));
+    const findProduct = await this.findOrCreateProduct(body.billing);
 
     const pricesList = await stripe.prices.list({
       active: true,
-      product: findProduct!.id,
+      product: findProduct.id,
+      limit: 100,
     });
 
     const findPrice =
@@ -373,7 +438,7 @@ export class StripeService extends PaymentProviderAbstract {
       ) ||
       (await stripe.prices.create({
         active: true,
-        product: findProduct!.id,
+        product: findProduct.id,
         currency: 'usd',
         nickname: body.billing + ' ' + body.period,
         unit_amount:
@@ -908,23 +973,12 @@ export class StripeService extends PaymentProviderAbstract {
     if ((await this.getLiveSubscriptions(customer)).length) {
       return { blocked: true };
     }
-    const allProducts = await stripe.products.list({
-      active: true,
-      expand: ['data.prices'],
-    });
-
-    const findProduct =
-      allProducts.data.find(
-        (product) => product.name.toUpperCase() === body.billing.toUpperCase()
-      ) ||
-      (await stripe.products.create({
-        active: true,
-        name: body.billing,
-      }));
+    const findProduct = await this.findOrCreateProduct(body.billing);
 
     const pricesList = await stripe.prices.list({
       active: true,
-      product: findProduct!.id,
+      product: findProduct.id,
+      limit: 100,
     });
 
     const findPrice =
@@ -940,7 +994,7 @@ export class StripeService extends PaymentProviderAbstract {
       ) ||
       (await stripe.prices.create({
         active: true,
-        product: findProduct!.id,
+        product: findProduct.id,
         currency: 'usd',
         nickname: body.billing + ' ' + body.period,
         unit_amount:
@@ -974,23 +1028,12 @@ export class StripeService extends PaymentProviderAbstract {
     const priceData = pricing[body.billing];
     const org = await this._organizationService.getOrgById(organizationId);
     const customer = await this.createOrGetCustomer(org!);
-    const allProducts = await stripe.products.list({
-      active: true,
-      expand: ['data.prices'],
-    });
-
-    const findProduct =
-      allProducts.data.find(
-        (product) => product.name.toUpperCase() === body.billing.toUpperCase()
-      ) ||
-      (await stripe.products.create({
-        active: true,
-        name: body.billing,
-      }));
+    const findProduct = await this.findOrCreateProduct(body.billing);
 
     const pricesList = await stripe.prices.list({
       active: true,
-      product: findProduct!.id,
+      product: findProduct.id,
+      limit: 100,
     });
 
     const findPrice =
@@ -1006,7 +1049,7 @@ export class StripeService extends PaymentProviderAbstract {
       ) ||
       (await stripe.prices.create({
         active: true,
-        product: findProduct!.id,
+        product: findProduct.id,
         currency: 'usd',
         nickname: body.billing + ' ' + body.period,
         unit_amount:

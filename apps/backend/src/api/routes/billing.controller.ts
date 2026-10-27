@@ -25,6 +25,7 @@ import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { isPaidTier } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 @ApiTags('Billing')
 @Controller('/billing')
@@ -40,6 +41,18 @@ export class BillingController {
   // default when it has none) handles the action.
   private provider(org: Organization) {
     return this._paymentService.getProviderForOrganization(org.id, 'web');
+  }
+
+  // the legacy tiers are not sold anymore, except to their own subscribers
+  private async assertCanPurchase(
+    org: Organization,
+    body: BillingSubscribeDto
+  ) {
+    if (
+      !(await this._subscriptionService.canPurchaseTier(org.id, body.billing))
+    ) {
+      throw new HttpException('This plan is no longer available', 400);
+    }
   }
 
   private async assertNoOtherSubscribedAccount(user: User) {
@@ -103,6 +116,8 @@ export class BillingController {
       return { blocked: true };
     }
 
+    await this.assertCanPurchase(org, body);
+
     const uniqueId = req?.cookies?.track;
     return (await this.provider(org)).embedded(
       uniqueId,
@@ -123,6 +138,8 @@ export class BillingController {
     if (await this.assertNoOtherSubscribedAccount(user)) {
       return { blocked: true };
     }
+
+    await this.assertCanPurchase(org, body);
 
     const uniqueId = req?.cookies?.track;
     return (await this.provider(org)).subscribe(
@@ -199,6 +216,12 @@ export class BillingController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: BillingSubscribeDto
   ) {
+    if (
+      !(await this._subscriptionService.canPurchaseTier(org.id, body.billing))
+    ) {
+      return { price: 0 };
+    }
+
     return (await this.provider(org)).prorate(org.id, body);
   }
 
@@ -308,6 +331,10 @@ export class BillingController {
   ) {
     if (!user.isSuperAdmin) {
       throw new Error('Unauthorized');
+    }
+
+    if (!isPaidTier(body.subscription)) {
+      throw new HttpException('Unknown plan', 400);
     }
 
     await this._subscriptionService.addSubscription(

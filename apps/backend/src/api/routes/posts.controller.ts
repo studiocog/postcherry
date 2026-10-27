@@ -27,6 +27,7 @@ import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dt
 import {
   AuthorizationActions,
   Sections,
+  SubscriptionException,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { PostValidationException } from '@gitroom/backend/api/routes/posts.validation.exception';
 import {
@@ -34,6 +35,8 @@ import {
   ResolveCommentDto,
 } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
 import { RealIP } from 'nestjs-real-ip';
+import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 
 @ApiTags('Posts')
 @Controller('/posts')
@@ -41,7 +44,9 @@ export class PostsController {
   constructor(
     private _postsService: PostsService,
     private _agentGraphService: AgentGraphService,
-    private _shortLinkService: ShortLinkService
+    private _shortLinkService: ShortLinkService,
+    private _brandKitService: BrandKitService,
+    private _subscriptionService: SubscriptionService
   ) {}
 
   @Get('/:id/statistics')
@@ -245,6 +250,19 @@ export class PostsController {
     }
 
     const body = await this._postsService.mapTypeToPost(rawBody, org.id);
+    if (
+      body.inter &&
+      !(await this._subscriptionService.hasPlanFeature(
+        org.id,
+        'recurring_posts'
+      ))
+    ) {
+      throw new SubscriptionException({
+        action: AuthorizationActions.Create,
+        section: Sections.RECURRING_POSTS,
+      });
+    }
+
     return this._postsService.createPost(org.id, body, 'WEB');
   }
 
@@ -264,9 +282,20 @@ export class PostsController {
     @Body() body: GeneratorDto,
     @Res({ passthrough: false }) res: Response
   ) {
+    // the pictures are AI images, a plan without AI image credits gets the
+    // posts without them
+    const isPicture =
+      !!body.isPicture &&
+      (await this._subscriptionService.hasAiImages(org.id));
+
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const brandVoice = await this._brandKitService.getAiContext(org.id);
     try {
-      for await (const event of this._agentGraphService.start(org.id, body)) {
+      for await (const event of this._agentGraphService.start(
+        org.id,
+        { ...body, isPicture },
+        brandVoice
+      )) {
         res.write(JSON.stringify(event) + '\n');
       }
     } catch (err) {

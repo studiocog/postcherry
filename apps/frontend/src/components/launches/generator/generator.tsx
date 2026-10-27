@@ -25,6 +25,9 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 
 const FirstStep: FC = (props) => {
   const { integrations, reloadCalendarView } = useCalendar();
+  const user = useUser();
+  // like the media AI image button, a plan without AI image credits has no pictures
+  const canAddPictures = !!user?.tier?.image_generation_count;
   const modal = useModals();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -280,15 +283,20 @@ const FirstStep: FC = (props) => {
                     )}
                   </option>
                 </Select>
-                <div
-                  className={clsx('flex items-center', loading && 'opacity-50')}
-                >
-                  <Checkbox
-                    disabled={loading}
-                    {...form.register('isPicture')}
-                    label={t('add_pictures', 'Add pictures?')}
-                  />
-                </div>
+                {canAddPictures && (
+                  <div
+                    className={clsx(
+                      'flex items-center',
+                      loading && 'opacity-50'
+                    )}
+                  >
+                    <Checkbox
+                      disabled={loading}
+                      {...form.register('isPicture')}
+                      label={t('add_pictures', 'Add pictures?')}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

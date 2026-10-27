@@ -11,6 +11,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { useExternalLinks } from '@gitroom/react/helpers/external.links';
 import {
   AnyMcpClient,
   CopyButton,
@@ -350,6 +351,9 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
   const mcpBase = mcpUrl || backendUrl;
   const apiKey = user?.publicApi || '';
   const available = !!apiKey && !!user?.tier?.public_api;
+  // the REST API is a plan feature, MCP is not
+  const developerApi = user?.tier?.developer_api !== false;
+  const { docsLink } = useExternalLinks();
 
   const { config, hint } =
     agent === apiTab
@@ -382,7 +386,7 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
         </div>
         <a
           className="cursor-pointer px-[24px] h-[44px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[14px] font-[600] flex items-center gap-[8px] shrink-0"
-          href="https://github.com/studiocog/postcherry"
+          href={docsLink('/public-api/introduction')}
           target="_blank"
         >
           <McpClientIcon client={apiTab} size={18} />
@@ -502,7 +506,11 @@ const OnboardingStep2: FC<{ onBack: () => void; onNext: () => void }> = ({
       {available ? (
         <div className="flex flex-col gap-[16px] w-full max-w-[1100px] mx-auto">
           <div className="flex flex-wrap justify-center gap-[6px]">
-            {[...onboardingAgents, otherTab, apiTab].map((item) => (
+            {[
+              ...onboardingAgents,
+              otherTab,
+              ...(developerApi ? [apiTab] : []),
+            ].map((item) => (
               <button
                 key={item}
                 type="button"

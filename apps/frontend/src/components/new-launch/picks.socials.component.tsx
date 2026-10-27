@@ -10,7 +10,7 @@ import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
 import { Check } from '@gitroom/frontend/components/launches/tags.component';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
 
-const PlatformBadge: FC<{ integration: Integrations }> = ({ integration }) => {
+export const PlatformBadge: FC<{ integration: Integrations }> = ({ integration }) => {
   return integration.identifier === 'youtube' ? (
     <img
       src="/icons/platforms/youtube.svg"

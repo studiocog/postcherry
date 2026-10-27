@@ -8,8 +8,11 @@ import {
   Req,
   Res,
   StreamableFile,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { ThrottlerRealIpGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { RealIP } from 'nestjs-real-ip';
@@ -21,13 +24,18 @@ import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.man
 import { AgentGraphInsertService } from '@gitroom/nestjs-libraries/agent/agent.graph.insert.service';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  BillingTier,
+  pricing,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { Readable, pipeline } from 'stream';
 import { promisify } from 'util';
 import { OnlyURL } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { CreatePublicCommentDto } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
+import { PostApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/post-approvals/post.approvals.service';
+import { PostApprovalDecisionDto } from '@gitroom/nestjs-libraries/dtos/post-approvals/post.approval.dto';
 
 const pump = promisify(pipeline);
 
@@ -38,7 +46,8 @@ export class PublicController {
     private _trackService: TrackService,
     private _agentGraphInsertService: AgentGraphInsertService,
     private _postsService: PostsService,
-    private _subscriptionService: SubscriptionService
+    private _subscriptionService: SubscriptionService,
+    private _postApprovalsService: PostApprovalsService
   ) {}
   @Post('/agent')
   async createAgent(@Body() body: { text: string; apiKey: string }) {
@@ -52,30 +61,55 @@ export class PublicController {
     return this._agentGraphInsertService.newPost(body.text);
   }
 
+  // preview links are a plan feature, without it the preview shows
+  // "Post not found" and its comments are closed
+  private async previewAllowed(postId: string) {
+    const organizationId = await this._postsService.getPostOrganizationId(
+      postId
+    );
+    return (
+      !organizationId ||
+      this._subscriptionService.hasPlanFeature(organizationId, 'preview_links')
+    );
+  }
+
   @Get(`/posts/:id`)
   async getPreview(@Param('id') id: string) {
+    const posts = await this._postsService.getPostsRecursively(id, true);
+    if (
+      posts.length &&
+      !(await this._subscriptionService.hasPlanFeature(
+        posts[0].organizationId,
+        'preview_links'
+      ))
+    ) {
+      return [];
+    }
+
     // the batch only links the posts in the dashboard, it stays out of the
     // public preview
-    return (await this._postsService.getPostsRecursively(id, true)).map(
-      ({ childrenPost, batchId, ...p }) => ({
-        ...p,
-        ...(p.integration
-          ? {
-              integration: {
-                id: p.integration.id,
-                name: p.integration.name,
-                picture: p.integration.picture,
-                providerIdentifier: p.integration.providerIdentifier,
-                profile: p.integration.profile,
-              },
-            }
-          : {}),
-      })
-    );
+    return posts.map(({ childrenPost, batchId, ...p }) => ({
+      ...p,
+      ...(p.integration
+        ? {
+            integration: {
+              id: p.integration.id,
+              name: p.integration.name,
+              picture: p.integration.picture,
+              providerIdentifier: p.integration.providerIdentifier,
+              profile: p.integration.profile,
+            },
+          }
+        : {}),
+    }));
   }
 
   @Get(`/posts/:id/comments`)
   async getComments(@Param('id') postId: string) {
+    if (!(await this.previewAllowed(postId))) {
+      return { comments: [] };
+    }
+
     return { comments: await this._postsService.getComments(postId) };
   }
 
@@ -85,7 +119,30 @@ export class PublicController {
     @Body() body: CreatePublicCommentDto,
     @RealIP() ip: string
   ) {
+    if (!(await this.previewAllowed(postId))) {
+      return { ok: false };
+    }
+
     return this._postsService.createPublicComment(postId, body, null, ip);
+  }
+
+  // the client opens the approval link without logging in, the token is the
+  // credential, so cap the calls per client
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 120, ttl: 3600000 } })
+  @Get(`/approvals/:token`)
+  async getApproval(@Param('token') token: string) {
+    return this._postApprovalsService.getPublic(token);
+  }
+
+  @UseGuards(ThrottlerRealIpGuard)
+  @Throttle({ default: { limit: 20, ttl: 3600000 } })
+  @Post(`/approvals/:token/decision`)
+  async decideApproval(
+    @Param('token') token: string,
+    @Body() body: PostApprovalDecisionDto
+  ) {
+    return this._postApprovalsService.decide(token, body);
   }
 
   @Post('/t')
@@ -145,7 +202,7 @@ export class PublicController {
     try {
       const load = AuthService.verifyJWT(params) as {
         orgId: string;
-        billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
+        billing: BillingTier;
       };
 
       if (!load || !load.orgId || !load.billing || !pricing[load.billing]) {

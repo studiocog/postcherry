@@ -183,7 +183,7 @@ export const ShowMediaBoxModal: FC = () => {
   const modals = useModals();
   const t = useT();
   useEffect(() => {
-    showModalEmitter.on('show-modal', (cCallback) => {
+    showModalEmitter.on('show-modal', (cCallback, type) => {
       modals.openModal({
         title: t('media_library', 'Media Library'),
         askClose: false,
@@ -195,6 +195,7 @@ export const ShowMediaBoxModal: FC = () => {
           <MediaBox
             setMedia={(media) => cCallback(media[0])}
             closeModal={close}
+            type={type}
           />
         ),
       });
@@ -206,9 +207,11 @@ export const ShowMediaBoxModal: FC = () => {
   return null;
 };
 export const showMediaBox = (
-  callback: (params: { id: string; path: string }) => void
+  callback: (params: { id: string; path: string }) => void,
+  // limits the library and the uploader, all media when not set
+  type?: 'image' | 'video'
 ) => {
-  showModalEmitter.emit('show-modal', callback);
+  showModalEmitter.emit('show-modal', callback, type);
 };
 const CHUNK_SIZE = 1024 * 1024;
 const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024; // 1 GB
@@ -987,8 +990,11 @@ export const MultiMediaComponent: FC<{
 
                 {!!user?.tier?.ai && (
                   <>
-                    <AiImage value={text} onChange={changeMedia} />
-                    {!insertInContent && (
+                    {/* plans without AI media credits have no generator */}
+                    {!!user.tier.image_generation_count && (
+                      <AiImage value={text} onChange={changeMedia} />
+                    )}
+                    {!insertInContent && !!user.tier.generate_videos && (
                       <AiVideo value={text} onChange={changeMedia} />
                     )}
                   </>

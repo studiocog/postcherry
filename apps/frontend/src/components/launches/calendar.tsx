@@ -59,6 +59,8 @@ import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validatio
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { Button } from '@gitroom/react/form/button';
 import { ChevronUpIcon } from '@gitroom/frontend/components/ui/icons';
+import { ApprovalStatusBadge } from '@gitroom/frontend/components/post-approvals/post.approval.badge';
+import { PostApprovalBadgeData } from '@gitroom/frontend/components/post-approvals/post.approval.hooks';
 
 // Extend dayjs with necessary plugins
 extend(isSameOrAfter);
@@ -673,7 +675,8 @@ export const MonthView = () => {
 export const ListView = () => {
   const t = useT();
   const user = useUser();
-  const { integrations, loading, listPosts, listState } = useCalendar();
+  const { integrations, loading, listPosts, listState, approvalStatuses } =
+    useCalendar();
   const emptyMessage =
     listState === 'scheduled'
       ? t('no_upcoming_posts', 'No upcoming posts scheduled')
@@ -741,6 +744,7 @@ export const ListView = () => {
                   duplicatePost={editPost(post, true)}
                   copyDebugJson={user?.isSuperAdmin ? copyDebugJson(post) : undefined}
                   post={post}
+                  approval={approvalStatuses[post.id]}
                   integrations={integrations}
                   deletePost={deletePost(post)}
                   showTime={true}
@@ -788,6 +792,7 @@ export const CalendarColumn: FC<{
     signature,
     loading,
     currentHour,
+    approvalStatuses,
   } = useCalendar();
   const modal = useModals();
   const fetch = useFetch();
@@ -1085,6 +1090,7 @@ export const CalendarColumn: FC<{
                   duplicatePost={editPost(post, true)}
                   copyDebugJson={user?.isSuperAdmin ? copyDebugJson(post) : undefined}
                   post={post}
+                  approval={approvalStatuses[post.id]}
                   integrations={integrations}
                   deletePost={deletePost(post)}
                 />
@@ -1217,6 +1223,8 @@ const CalendarItem: FC<{
       tag: Tags;
     }[];
   };
+  // the latest client approval of the post
+  approval?: PostApprovalBadgeData;
 }> = memo((props) => {
   const t = useT();
   const {
@@ -1233,6 +1241,7 @@ const CalendarItem: FC<{
     showTime,
     missingRelease,
     openPost,
+    approval,
   } = props;
   const { disableXAnalytics } = useVariables();
   const user = useUser();
@@ -1292,6 +1301,16 @@ const CalendarItem: FC<{
           )}
         >
           ✓
+        </div>
+      )}
+      {!!approval && state !== 'PUBLISHED' && (
+        <div
+          className={clsx(
+            'absolute -top-[6px] -end-[6px] z-20',
+            display === 'month' && 'mobile:hidden'
+          )}
+        >
+          <ApprovalStatusBadge variant="dot" approval={approval} />
         </div>
       )}
       {showCreationMethodBadge && (
@@ -1368,15 +1387,17 @@ const CalendarItem: FC<{
         ) : (
           <></>
         )}{' '}
-        <div
-          className={clsx(
-            'hidden group-hover:block hover:underline cursor-pointer',
-            post?.tags?.[0]?.tag?.color && 'text-shadow-tags'
-          )}
-          onClick={preview}
-        >
-          <Preview />
-        </div>
+        {user?.tier?.preview_links !== false && (
+          <div
+            className={clsx(
+              'hidden group-hover:block hover:underline cursor-pointer',
+              post?.tags?.[0]?.tag?.color && 'text-shadow-tags'
+            )}
+            onClick={preview}
+          >
+            <Preview />
+          </div>
+        )}
         <div
           className={clsx(
             'hidden group-hover:block hover:underline cursor-pointer',

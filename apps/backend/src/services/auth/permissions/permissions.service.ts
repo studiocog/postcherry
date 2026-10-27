@@ -101,6 +101,18 @@ export class PermissionsService {
         }
       }
 
+      // RSS auto-post is a plan feature; the plans sold before it was one
+      // allowed it while a webhook slot was free, which keeps working
+      if (section === Sections.AUTOPOST) {
+        if (
+          options.autoPost ||
+          (await this._webhooksService.getTotal(orgId)) < options.webhooks
+        ) {
+          can(action, section);
+          continue;
+        }
+      }
+
       // check for posts per month
       if (section === Sections.POSTS_PER_MONTH) {
         const createdAt =

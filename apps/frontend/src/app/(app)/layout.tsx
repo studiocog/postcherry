@@ -119,6 +119,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             process.env.SOURCE_CODE_URL ||
             'https://github.com/studiocog/postcherry'
           }
+          docsUrl={process.env.DOCS_URL || ''}
+          extensionStoreUrl={process.env.EXTENSION_STORE_URL || ''}
+          n8nNodeUrl={process.env.N8N_NODE_URL || ''}
           mediaProcessing={
             process.env.STORAGE_PROVIDER === 'cloudflare' &&
             !!process.env.RUNPOD_API_KEY &&

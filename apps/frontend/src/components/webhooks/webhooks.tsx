@@ -17,16 +17,27 @@ import clsx from 'clsx';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
+// The workspace webhooks. Settings also reads it (enabled) to keep the tab for
+// webhooks that still run on a plan without webhooks
+export const useWebhookList = (enabled = true) => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    return (await fetch('/webhooks')).json();
+  }, []);
+
+  return useSWR(enabled ? 'webhooks' : null, load);
+};
+
 export const Webhooks: FC = () => {
   const fetch = useFetch();
   const user = useUser();
   const modal = useModals();
   const toaster = useToaster();
   const t = useT();
-  const list = useCallback(async () => {
-    return (await fetch('/webhooks')).json();
-  }, []);
-  const { data, mutate } = useSWR('webhooks', list);
+  const { data, mutate } = useWebhookList();
+  // a plan without webhooks keeps the existing ones running (see the downgrade
+  // policy in pricing.ts), they can be edited or deleted but not added
+  const canAdd = !!user?.tier?.webhooks;
   const addWebhook = useCallback(
     (data?: any) => () => {
       modal.openModal({
@@ -61,7 +72,8 @@ export const Webhooks: FC = () => {
   return (
     <div className="flex flex-col">
       <h3 className="text-[20px]">
-        {t('webhooks', 'Webhooks')} ({data?.length || 0}/{user?.tier?.webhooks})
+        {t('webhooks', 'Webhooks')}
+        {canAdd && ` (${data?.length || 0}/${user?.tier?.webhooks})`}
       </h3>
       <div className="text-customColor18 mt-[4px]">
         {t(
@@ -99,14 +111,28 @@ export const Webhooks: FC = () => {
               ))}
             </div>
           )}
-          <div>
-            <Button
-              onClick={addWebhook()}
-              className={clsx((data?.length || 0) > 0 && 'my-[16px]')}
+          {canAdd ? (
+            <div>
+              <Button
+                onClick={addWebhook()}
+                className={clsx((data?.length || 0) > 0 && 'my-[16px]')}
+              >
+                {t('add_a_webhook', 'Add a webhook')}
+              </Button>
+            </div>
+          ) : (
+            <div
+              className={clsx(
+                'text-[13px] text-textItemBlur',
+                (data?.length || 0) > 0 && 'mt-[16px]'
+              )}
             >
-              {t('add_a_webhook', 'Add a webhook')}
-            </Button>
-          </div>
+              {t(
+                'webhooks_not_in_plan',
+                'Your plan does not include webhooks. The ones above keep working, and you can still edit or delete them.'
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

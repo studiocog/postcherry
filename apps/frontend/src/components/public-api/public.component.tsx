@@ -11,6 +11,8 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useDecisionModal } from '@gitroom/frontend/components/layout/new-modal';
 import { McpClientIcon } from '@gitroom/frontend/components/public-api/mcp.client.icons';
 import clsx from 'clsx';
+import Link from 'next/link';
+import { useExternalLinks } from '@gitroom/react/helpers/external.links';
 
 // Remote clients can't set headers, they get a URL to paste (hint = where)
 export const remoteMcpClients = {
@@ -274,6 +276,7 @@ const McpSection = ({
   mcpBase: string;
 }) => {
   const t = useT();
+  const { docsLink } = useExternalLinks();
   const [activeClient, setActiveClient] = useState<AnyMcpClient>('Claude');
   const [auth, setAuth] = useState<McpAuth>('oauth');
   const [revealed, setRevealed] = useState(false);
@@ -312,7 +315,7 @@ const McpSection = ({
         <div className="flex flex-wrap gap-[6px] shrink-0 pt-[2px]">
           <a
             className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-            href="https://github.com/studiocog/postcherry"
+            href={docsLink('/mcp/introduction')}
             target="_blank"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
@@ -424,9 +427,36 @@ const McpSection = ({
   );
 };
 
+const DeveloperApiUpgrade = () => {
+  const t = useT();
+
+  return (
+    <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder px-[20px] mobile:px-[14px] py-[14px] flex items-center justify-between gap-[12px] mobile:flex-col mobile:items-start">
+      <div>
+        <div className="text-[15px] font-[600]">
+          {t('developer_api_title', 'Public API')}
+        </div>
+        <div className="text-[13px] text-textItemBlur mt-[2px]">
+          {t(
+            'developer_api_upgrade',
+            'The public API is included in the Agency Pro plan.'
+          )}
+        </div>
+      </div>
+      <Link
+        href="/billing?plans=AGENCY"
+        className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center shrink-0"
+      >
+        {t('see_plans', 'See plans')}
+      </Link>
+    </div>
+  );
+};
+
 const PublicApiContent = () => {
   const user = useUser();
   const { backendUrl, frontEndUrl, mcpUrl } = useVariables();
+  const { docsLink, n8nNodeUrl } = useExternalLinks();
   const toaster = useToaster();
   const fetch = useFetch();
   const decision = useDecisionModal();
@@ -459,6 +489,16 @@ const PublicApiContent = () => {
   }
 
   const mcpBase = mcpUrl || backendUrl;
+
+  // the REST API is a plan feature, MCP is not
+  if (user.tier?.developer_api === false) {
+    return (
+      <div className="flex flex-col gap-[40px]">
+        <DeveloperApiUpgrade />
+        <McpSection user={user} mcpBase={mcpBase} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-[40px]">
@@ -499,12 +539,22 @@ const PublicApiContent = () => {
           <div className="flex flex-wrap gap-[6px] shrink-0 pt-[2px]">
             <a
               className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-              href="https://github.com/studiocog/postcherry"
+              href={docsLink('/public-api')}
               target="_blank"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
             {t('read_the_docs', 'Docs')}
             </a>
+            {!!n8nNodeUrl && (
+              <a
+                className="cursor-pointer px-[16px] h-[36px] bg-[#D21F3C] hover:bg-[#A9172F] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+                href={n8nNodeUrl}
+                target="_blank"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                {t('n8n_node', 'N8N Node')}
+              </a>
+            )}
           </div>
         </div>
         <div className="p-[20px] mobile:p-[14px] flex flex-col gap-[16px]">

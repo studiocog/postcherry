@@ -1,5 +1,8 @@
 import nodemailer from 'nodemailer';
-import { EmailInterface } from '@gitroom/nestjs-libraries/emails/email.interface';
+import {
+  EmailAttachment,
+  EmailInterface,
+} from '@gitroom/nestjs-libraries/emails/email.interface';
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
@@ -25,7 +28,10 @@ export class NodeMailerProvider implements EmailInterface {
     subject: string,
     html: string,
     emailFromName: string,
-    emailFromAddress: string
+    emailFromAddress: string,
+    // not used by this provider, same as before
+    replyTo?: string,
+    attachments?: EmailAttachment[]
   ) {
     const sends = await transporter.sendMail({
       from: `${emailFromName} <${emailFromAddress}>`, // sender address
@@ -33,6 +39,15 @@ export class NodeMailerProvider implements EmailInterface {
       subject: subject, // Subject line
       text: html, // plain text body
       html: html, // html body
+      ...(attachments?.length
+        ? {
+            attachments: attachments.map((attachment) => ({
+              filename: attachment.filename,
+              content: attachment.content,
+              contentType: attachment.contentType,
+            })),
+          }
+        : {}),
     });
 
     return sends;

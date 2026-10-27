@@ -15,7 +15,9 @@ Starting from Postiz `v2.25.0-135-g91c91f63` (October 2026), PostCherry changed:
 - **Branding:** product name, logos, favicon and colors (purple → cherry red) across the web app,
   emails, AI assistant texts and all translations.
 - **Marketing texts:** removed Postiz user counts, testimonials and tutorial videos.
-- **Links:** terms, privacy, affiliate and analytics domains point to postcherry.com.
+- **Links:** terms, privacy, affiliate and analytics domains point to postcherry.com. The
+  documentation, browser extension and n8n links are configurable (`DOCS_URL`,
+  `EXTENSION_STORE_URL`, `N8N_NODE_URL`) and no longer point to Postiz services.
 - **Agency emails:** new agency submissions go to the `ADMIN_EMAIL` setting instead of a Postiz address.
 - **Source code link:** a "Source code" menu item and the billing FAQ link to `SOURCE_CODE_URL`,
   so every user can get the source code of the version they use (AGPL-3.0 section 13).

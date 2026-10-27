@@ -57,6 +57,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           disableXAnalytics={!!process.env.DISABLE_X_ANALYTICS}
           sentryDsn={process.env.NEXT_PUBLIC_SENTRY_DSN!}
           extensionId={process.env.EXTENSION_ID || ''}
+          docsUrl={process.env.DOCS_URL || ''}
+          extensionStoreUrl={process.env.EXTENSION_STORE_URL || ''}
+          n8nNodeUrl={process.env.N8N_NODE_URL || ''}
           mediaProcessing={
             process.env.STORAGE_PROVIDER === 'cloudflare' &&
             !!process.env.RUNPOD_API_KEY &&

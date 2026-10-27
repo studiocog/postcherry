@@ -5,6 +5,7 @@ import {
 } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import dayjs from 'dayjs';
 import { Organization } from '@prisma/client';
+import { PaidTier } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 @Injectable()
 export class SubscriptionRepository {
@@ -163,7 +164,7 @@ export class SubscriptionRepository {
     identifier: string,
     customerId: string,
     totalChannels: number,
-    billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+    billing: PaidTier,
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null,
     code?: string,

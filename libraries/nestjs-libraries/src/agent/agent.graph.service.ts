@@ -52,6 +52,7 @@ interface WorkflowChannelsState {
   }[];
   isPicture?: boolean;
   popularPosts?: { content: string; hook: string }[];
+  brandVoice?: string;
 }
 
 const category = z.object({
@@ -129,6 +130,7 @@ export class AgentGraphService {
         popularPosts: null,
         topic: null,
         isPicture: null,
+        brandVoice: null,
       },
     });
 
@@ -225,7 +227,11 @@ export class AgentGraphService {
         - Don't be cringy
         - Use simple english
         - Make sure you add "\n" between the lines
-        - Don't take the hook from "request of the user"
+        - Don't take the hook from "request of the user"${
+          state.brandVoice
+            ? '\n        - Follow the brand voice below\n\n        <!-- BEGIN brand voice -->\n        {brandVoice}\n        <!-- END brand voice -->'
+            : ''
+        }
 
         <!-- BEGIN request of the user -->
         {request}
@@ -246,6 +252,8 @@ export class AgentGraphService {
         request: state.messages[0].content,
         hooks: state.popularPosts!.map((p) => p.hook).join('\n'),
         text: state.fresearch,
+        // only read by the prompt when a brand voice is set
+        brandVoice: state.brandVoice || '',
       });
 
     return {
@@ -280,7 +288,11 @@ export class AgentGraphService {
         - The Content should not contain the hook
         - Try to put some call to action at the end of the post
         - Make sure you add "\n" between the lines
-        - Add "\n" after every "."
+        - Add "\n" after every "."${
+          state.brandVoice
+            ? '\n        - Follow this brand voice, the rules above still come first:\n        {brandVoice}'
+            : ''
+        }
         
         Hook:
         {hook}
@@ -297,6 +309,8 @@ export class AgentGraphService {
         hook: state.hook,
         request: state.messages[0].content,
         information: state.fresearch,
+        // only read by the prompt when a brand voice is set
+        brandVoice: state.brandVoice || '',
       });
 
     return {
@@ -375,7 +389,7 @@ export class AgentGraphService {
     return { date: await this._postsService.findFreeDateTime(state.orgId) };
   }
 
-  start(orgId: string, body: GeneratorDto) {
+  start(orgId: string, body: GeneratorDto, brandVoice = '') {
     const state = AgentGraphService.state();
     const workflow = state
       .addNode('agent', this.startCall.bind(this))
@@ -416,6 +430,7 @@ export class AgentGraphService {
         format: body.format,
         tone: body.tone,
         orgId,
+        brandVoice,
       },
       {
         streamMode: 'values',

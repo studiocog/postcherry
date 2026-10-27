@@ -2,17 +2,17 @@ import { internalFetch } from '@gitroom/helpers/utils/internal.fetch';
 import { sanitizePostContent } from '@gitroom/helpers/utils/sanitize.post.content';
 export const dynamic = 'force-dynamic';
 import { Metadata } from 'next';
-import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.component';
 import { CommentsComponents } from '@gitroom/frontend/components/preview/comments.components';
 import { PreviewCommentsProvider } from '@gitroom/frontend/components/preview/preview.comments.context';
 import { PostContentClient } from '@gitroom/frontend/components/preview/post.content.client';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
 import { CopyClient } from '@gitroom/frontend/components/preview/copy.client';
 import { getT } from '@gitroom/react/translation/get.translation.service.backend';
 import { RenderPreviewDateClient } from '@gitroom/frontend/components/preview/render.preview.date.client';
 import { CreationMethodBadge } from '@gitroom/frontend/components/launches/creation.method.badge';
+import { PreviewLogo } from '@gitroom/frontend/components/preview/preview.logo';
+import { PreviewPostCard } from '@gitroom/frontend/components/preview/preview.post.card';
 
 dayjs.extend(utc);
 export const metadata: Metadata = {
@@ -60,13 +60,7 @@ export default async function Auth(
     >
       <div className="mx-auto w-full max-w-[1346px] p-[12px] flex flex-col gap-[8px] text-newTextColor">
         <div className="flex bg-newBgColorInner rounded-[12px] min-h-[80px] px-[20px] py-[12px] items-center gap-[20px] flex-wrap">
-          <a
-            href={websiteUrl}
-            aria-label="PostCherry home"
-            className="flex items-center text-textColor"
-          >
-            <LogoTextComponent />
-          </a>
+          <PreviewLogo href={websiteUrl} />
           <div className="flex-1" />
           <div className="flex items-center gap-[20px] text-[14px] text-textItemBlur">
             <div>
@@ -87,69 +81,24 @@ export default async function Auth(
         <div className="flex flex-col lg:flex-row gap-[8px]">
           <div className="flex-1 flex flex-col gap-[8px]">
             {post.map((p: any, index: number) => (
-              <div
+              <PreviewPostCard
                 key={String(p.id)}
-                className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px]"
+                integration={post[0].integration}
+                media={JSON.parse(p?.image || '[]')}
+                badge={
+                  index === 0 && (
+                    <CreationMethodBadge
+                      creationMethod={p.creationMethod}
+                      size="md"
+                    />
+                  )
+                }
               >
-                <div className="flex gap-[12px]">
-                  <div>
-                    <div className="flex shrink-0 rounded-full relative">
-                      <div className="w-[50px] h-[50px] z-[20]">
-                        <img
-                          className="w-full h-full relative z-[20] bg-newBgColor aspect-square rounded-full"
-                          alt={post[0].integration.name}
-                          src={post[0].integration.picture}
-                        />
-                      </div>
-                      <div className="absolute -end-[5px] -bottom-[5px] w-[24px] h-[24px] z-[20]">
-                        <img
-                          className="w-full h-full bg-newBgColor aspect-square rounded-full"
-                          alt={post[0].integration.providerIdentifier}
-                          src={`/icons/platforms/${post[0].integration.providerIdentifier}.png`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 flex flex-col gap-[8px] min-w-0">
-                    <div className="flex items-center gap-[8px]">
-                      <h2 className="text-[14px] font-[600]">
-                        {post[0].integration.name}
-                      </h2>
-                      <span className="text-[14px] text-textItemBlur">
-                        @{post[0].integration.profile}
-                      </span>
-                      {index === 0 && (
-                        <CreationMethodBadge
-                          creationMethod={p.creationMethod}
-                          size="md"
-                        />
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-[16px]">
-                      <PostContentClient
-                        postId={p.id}
-                        html={sanitizePostContent(p.content)}
-                      />
-                      {!!JSON.parse(p?.image || '[]').length && (
-                        <div className="flex w-full gap-[10px]">
-                          {JSON.parse(p?.image || '[]').map((p: any) => (
-                            <div
-                              key={p.name}
-                              className="flex-1 rounded-[10px] max-h-[500px] overflow-hidden"
-                            >
-                              <VideoOrImage
-                                isContain={true}
-                                src={p.path}
-                                autoplay={true}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                <PostContentClient
+                  postId={p.id}
+                  html={sanitizePostContent(p.content)}
+                />
+              </PreviewPostCard>
             ))}
           </div>
           <div className="w-full lg:w-[380px] lg:flex-shrink-0">

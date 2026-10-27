@@ -5,6 +5,7 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { OAuthService } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { setSentryUserContext } from '@gitroom/nestjs-libraries/sentry/initialize.sentry';
+import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 @Injectable()
 export class PublicAuthMiddleware implements NestMiddleware {
@@ -61,6 +62,21 @@ export class PublicAuthMiddleware implements NestMiddleware {
         res
           .status(HttpStatus.UNAUTHORIZED)
           .json({ msg: 'No subscription found' });
+        return;
+      }
+
+      // the REST API (and the CLI and agent skills built on it) is a plan
+      // feature, MCP connectors don't go through here and stay on every plan
+      const tier = (org.subscription as { subscriptionTier?: string })
+        ?.subscriptionTier;
+      if (
+        !!process.env.STRIPE_SECRET_KEY &&
+        tier &&
+        pricing[tier]?.developer_api === false
+      ) {
+        res.status(HttpStatus.PAYMENT_REQUIRED).json({
+          msg: 'The PostCherry public API, CLI and agent skills are included in the Agency Pro plan. Upgrade your subscription to use them.',
+        });
         return;
       }
 
