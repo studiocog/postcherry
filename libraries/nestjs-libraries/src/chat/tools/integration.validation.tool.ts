@@ -24,7 +24,7 @@ export class IntegrationValidationTool implements AgentToolInterface {
         `,
       mcp: {
         annotations: {
-          title: 'Get Integration Schema',
+          title: 'Get Channel Posting Rules',
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,

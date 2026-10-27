@@ -40,7 +40,7 @@ export class IntegrationSchedulePostTool implements AgentToolInterface {
       id: 'schedulePostTool',
       mcp: {
         annotations: {
-          title: 'Schedule Social Media Post',
+          title: 'Create, Schedule or Publish Post',
           readOnlyHint: false,
           destructiveHint: true,
           idempotentHint: false,
@@ -59,6 +59,8 @@ A single LinkedIn post with one comment
 - socialPost array length will be 20
 - postsAndComments array length will be one
 
+Before calling this tool, always show the user the full details (channel and account, text, media, date and time, and whether it is a draft, scheduled or published now) and wait for their explicit confirmation.
+A post with type "now" is published right away on the user's public social account and cannot be undone from here, and a scheduled post will be published automatically at its date - never call this tool without the user's confirmation.
 Do not use this to update or delete existing posts.
 On success, each item in output contains a previewUrl the user can open to see the post.
 If validation fails, the result contains output.errors describing what to fix; the call can be retried with corrected parameters.

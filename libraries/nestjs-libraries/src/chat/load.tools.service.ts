@@ -76,7 +76,8 @@ export class LoadToolsService {
         - Generate pictures for posts
         - Generate videos for posts
         - Generate text for posts
-        - Show global analytics about socials
+        - Show global analytics about socials (analyticsSummaryTool)
+        - Suggest the best time to post from the engagement of past posts (bestTimeToPostTool, its hours are in UTC: convert them to the user's timezone)
         - List integrations (channels)
         - List groups (customers) and filter the channels by a group
 

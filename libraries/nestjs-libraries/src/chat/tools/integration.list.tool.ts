@@ -26,7 +26,7 @@ export class IntegrationListTool implements AgentToolInterface {
       }),
       mcp: {
         annotations: {
-          title: 'List Integrations',
+          title: 'List Channels',
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,

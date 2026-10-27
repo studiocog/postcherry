@@ -27,7 +27,7 @@ export class GenerateVideoOptionsTool implements AgentToolInterface {
       }),
       mcp: {
         annotations: {
-          title: 'List Video Generation Options',
+          title: 'List AI Video Options',
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,

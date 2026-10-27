@@ -62,10 +62,11 @@ export const startMcp = async (app: INestApplication) => {
     ...(await loadToolsService.loadTools(true)),
   };
 
-  // The Claude connector directory does not accept AI media generation tools,
-  // so the directory-facing endpoint hides them. Direct connections
-  // (/mcp, /mcp/:id, /sse/:id) and the ChatGPT app keep the full toolset.
-  const claudeHiddenTools = [
+  // The Claude connector directory and the ChatGPT app directory don't accept
+  // AI media generation tools, so the directory-facing endpoints
+  // (/mcp-oauth-claude, /mcp-oauth-chatgpt) hide them. Direct connections
+  // (/mcp, /mcp/:id, /sse/:id) and DCR clients keep the full toolset.
+  const directoryHiddenTools = [
     'generateImageTool',
     'generateVideoTool',
     'videoStatusTool',
@@ -76,11 +77,11 @@ export const startMcp = async (app: INestApplication) => {
     'clippingStatusTool',
     'clippingWidgetTicketTool',
   ];
-  const withoutClaudeHidden = <T extends Record<string, unknown>>(source: T) =>
+  const withoutDirectoryHidden = <T extends Record<string, unknown>>(source: T) =>
     Object.fromEntries(
-      Object.entries(source).filter(([name]) => !claudeHiddenTools.includes(name))
+      Object.entries(source).filter(([name]) => !directoryHiddenTools.includes(name))
     ) as T;
-  const claudeTools = withoutClaudeHidden(tools);
+  const directoryTools = withoutDirectoryHidden(tools);
 
   const backendUrl = process.env.NEXT_PUBLIC_OVERRIDE_BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
   // this runs before the backend listens: a bucket url that doesn't parse only
@@ -125,9 +126,20 @@ export const startMcp = async (app: INestApplication) => {
       : {}),
   };
 
-  const serverConfig = {
+  // Shared by every server. The MCP SDK of @mastra/mcp only sends name and
+  // version as serverInfo (no websiteUrl / icons); the instructions are sent
+  // to the client on initialize
+  const serverMetadata = {
     name: 'PostCherry',
     version: '1.0.0',
+    description:
+      'Schedule, publish and analyze social media posts across your connected channels with PostCherry.',
+    instructions:
+      'PostCherry schedules and publishes social media posts. Always show the user the full post (channel, text, media, date and time) and get their explicit confirmation before creating, scheduling or publishing a post, or changing its settings. Posts cannot be deleted from here: the user deletes them in the PostCherry app.',
+  };
+
+  const serverConfig = {
+    ...serverMetadata,
     tools,
     agents: { postcherry: agent },
     appResources,
@@ -139,37 +151,33 @@ export const startMcp = async (app: INestApplication) => {
   // exposed as an annotation-less catch-all ask_postcherry tool, which the
   // ChatGPT and Claude directory reviews reject
   const oauthServer = new MCPServer({
-    name: 'PostCherry',
-    version: '1.0.0',
+    ...serverMetadata,
     tools,
     appResources,
   });
 
   // a widget of a hidden tool is hidden with it
-  const { [CLIPPING_WIDGET_URI]: hiddenWidget, ...claudeAppResources } = appResources as Record<string, (typeof appResources)[typeof UPLOAD_WIDGET_URI]>;
+  const { [CLIPPING_WIDGET_URI]: hiddenWidget, ...directoryAppResources } = appResources as Record<string, (typeof appResources)[typeof UPLOAD_WIDGET_URI]>;
 
-  const claudeOauthServer = new MCPServer({
-    name: 'PostCherry',
-    version: '1.0.0',
-    tools: claudeTools,
-    appResources: claudeAppResources,
+  const directoryOauthServer = new MCPServer({
+    ...serverMetadata,
+    tools: directoryTools,
+    appResources: directoryAppResources,
   });
 
   // Self-hosted connections, built from the agent tools so the ui:// widgets
   // (which upload to this server) are left out
   let selfHostedServer: MCPServer | undefined;
-  let claudeSelfHostedServer: MCPServer | undefined;
+  let directorySelfHostedServer: MCPServer | undefined;
   if (selfHostedRelayEnabled()) {
     const selfHostedTools = mcpRelayService.tools(agentTools);
     selfHostedServer = new MCPServer({
-      name: 'PostCherry',
-      version: '1.0.0',
+      ...serverMetadata,
       tools: selfHostedTools,
     });
-    claudeSelfHostedServer = new MCPServer({
-      name: 'PostCherry',
-      version: '1.0.0',
-      tools: withoutClaudeHidden(selfHostedTools),
+    directorySelfHostedServer = new MCPServer({
+      ...serverMetadata,
+      tools: withoutDirectoryHidden(selfHostedTools),
     });
   }
 
@@ -241,11 +249,11 @@ export const startMcp = async (app: INestApplication) => {
     }
   > = {
     // ChatGPT app submission (pre-defined client credentials, no DCR)
-    '/mcp-oauth-chatgpt': { middleware: createResourceMiddleware('/mcp-oauth-chatgpt', '/mcp-oauth-chatgpt'), mcpServer: oauthServer, selfHostedServer },
+    '/mcp-oauth-chatgpt': { middleware: createResourceMiddleware('/mcp-oauth-chatgpt', '/mcp-oauth-chatgpt'), mcpServer: directoryOauthServer, selfHostedServer: directorySelfHostedServer },
     // Former ChatGPT path, kept for connectors that were created against it
     '/mcp-oauth': { middleware: createResourceMiddleware('/mcp-oauth', '/mcp-oauth-dynamic'), mcpServer: oauthServer, selfHostedServer },
     // Claude connector directory submission
-    '/mcp-oauth-claude': { middleware: createResourceMiddleware('/mcp-oauth-claude', '/mcp-oauth-dynamic'), mcpServer: claudeOauthServer, selfHostedServer: claudeSelfHostedServer },
+    '/mcp-oauth-claude': { middleware: createResourceMiddleware('/mcp-oauth-claude', '/mcp-oauth-dynamic'), mcpServer: directoryOauthServer, selfHostedServer: directorySelfHostedServer },
     // Clients that register themselves through DCR (/oauth/register) - not
     // directory-reviewed, so they get the full toolset (media generation included)
     '/mcp-oauth-dynamic': { middleware: createResourceMiddleware('/mcp-oauth-dynamic', '/mcp-oauth-dynamic'), mcpServer: oauthServer, selfHostedServer },
