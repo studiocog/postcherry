@@ -98,6 +98,11 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`onboarding:${body.state}`);
     }
 
+    const customer = await ioRedis.get(`customer:${body.state}`);
+    if (customer) {
+      await ioRedis.del(`customer:${body.state}`);
+    }
+
     const {
       error,
       accessToken,
@@ -269,6 +274,14 @@ export class NoAuthIntegrationsController {
             )
           : undefined
       );
+
+    if (customer && !refresh) {
+      await this._integrationService.assignConnectedChannelToCustomer(
+        org.id,
+        createUpdate,
+        customer
+      );
+    }
 
     this._refreshIntegrationService
       .startRefreshWorkflow(org.id, createUpdate.id, integrationProvider)

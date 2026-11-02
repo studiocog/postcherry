@@ -35,6 +35,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Input } from '@gitroom/react/form/input';
 import { Button } from '@gitroom/react/form/button';
 import { ChannelHealthComponent } from '@gitroom/frontend/components/launches/channel.health.component';
+import { useBrands } from '@gitroom/frontend/components/brands/brand.context';
 
 export const SVGLine = () => {
   return (
@@ -116,7 +117,7 @@ export const OpenClose: FC<{
     </svg>
   );
 };
-const EditGroupNameModal: FC<{
+export const EditGroupNameModal: FC<{
   name: string;
   id: string;
   close: () => void;
@@ -136,7 +137,7 @@ const EditGroupNameModal: FC<{
       const { message } = await response.json().catch(() => ({} as any));
       toaster.show(
         (Array.isArray(message) ? message[0] : message) ||
-          t('could_not_save_group', 'Could not save the group.'),
+          t('could_not_save_group', 'Could not save the brand.'),
         'warning'
       );
       return;
@@ -209,6 +210,8 @@ export const MenuGroupComponent: FC<
   const t = useT();
   const modals = useModals();
   const toaster = useToaster();
+  // the brand names (switcher) and the channels' brand
+  const { reload: reloadBrands } = useBrands();
   const [isOpen, setIsOpen] = useState(
     !!+(localStorage.getItem(group.name + '_isOpen') || '1')
   );
@@ -217,7 +220,7 @@ export const MenuGroupComponent: FC<
       e.stopPropagation();
       const val: string | undefined = await new Promise((resolve) => {
         modals.openModal({
-          title: t('edit_group_name', 'Edit group name'),
+          title: t('edit_group_name', 'Rename brand'),
           onClose: () => resolve(undefined),
           children: (close) => (
             <EditGroupNameModal
@@ -232,10 +235,10 @@ export const MenuGroupComponent: FC<
       if (!val) {
         return;
       }
-      await mutate();
-      toaster.show(t('group_updated', 'Group Updated'), 'success');
+      await reloadBrands();
+      toaster.show(t('group_updated', 'Brand updated'), 'success');
     },
-    [group.name, group.id, mutate, modals, t]
+    [group.name, group.id, reloadBrands, modals, t]
   );
   const changeOpenClose = useCallback(
     (e: any) => {
@@ -521,13 +524,17 @@ export const LaunchesComponent = () => {
     },
     [integrations]
   );
+  // the channels of the brand picked in the brand switcher ('' = every channel)
+  const { current: brand } = useBrands();
   const sortedIntegrations = useMemo(() => {
     return orderBy(
-      integrations,
+      (integrations || []).filter(
+        (integration: any) => !brand || integration?.customer?.id === brand
+      ),
       ['type', 'disabled', 'identifier'],
       ['desc', 'asc', 'asc']
     );
-  }, [integrations]);
+  }, [integrations, brand]);
   const menuIntegrations = useMemo(() => {
     return orderBy(
       Object.values(
@@ -861,8 +868,9 @@ export const LaunchesComponent = () => {
               </div>
             )}
           </div>
+          {/* a disconnected channel of any brand needs attention */}
           <ChannelHealthComponent
-            integrations={sortedIntegrations}
+            integrations={integrations}
             refreshChannel={refreshChannel}
             continueIntegration={continueIntegration}
           />

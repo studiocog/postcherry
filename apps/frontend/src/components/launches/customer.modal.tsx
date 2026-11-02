@@ -3,8 +3,12 @@
 import React, { FC, useCallback, useEffect, useState } from 'react';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Integration } from '@prisma/client';
-import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useToaster } from '@gitroom/react/toaster/toaster';
+import {
+  useBrands,
+  useCustomerList,
+} from '@gitroom/frontend/components/brands/brand.context';
 import { Button } from '@gitroom/react/form/button';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 export const CustomerModal: FC<{
@@ -24,9 +28,8 @@ export const CustomerModal: FC<{
     integration.customer?.name || undefined
   );
   const modal = useModals();
-  const loadCustomers = useCallback(async () => {
-    return (await fetch('/integrations/customers')).json();
-  }, []);
+  const { reload } = useBrands();
+  const toaster = useToaster();
   const removeFromCustomer = useCallback(async () => {
     saveCustomer(true);
   }, []);
@@ -35,23 +38,40 @@ export const CustomerModal: FC<{
       if (!customer) {
         return;
       }
-      await fetch(`/integrations/${integration.id}/customer-name`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          name: removeCustomer ? '' : customer,
-        }),
-      });
+      const response = await fetch(
+        `/integrations/${integration.id}/customer-name`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: removeCustomer ? '' : customer,
+          }),
+        }
+      );
+      // a new name is a new brand, the plan limit (402) shows its own dialog
+      if (response.status === 402) {
+        return;
+      }
+      if (!response.ok) {
+        const { message } = await response.json().catch(() => ({} as any));
+        toaster.show(
+          (Array.isArray(message) ? message[0] : message) ||
+            t('could_not_save_group', 'Could not save the brand.'),
+          'warning'
+        );
+        return;
+      }
+      await reload();
       modal.closeAll();
       onClose();
     },
-    [customer]
+    [customer, reload]
   );
-  const { data } = useSWR('/customers', loadCustomers);
+  const { data } = useCustomerList();
   return (
     <div className="relative w-full">
       <div className="mb-[80px] flex flex-col gap-[6px]">
         <label htmlFor="customer-name" className="text-[14px] text-white">
-          {t('select_customer_label', 'Select Customer')}
+          {t('select_customer_label', 'Brand')}
         </label>
         <input
           id="customer-name"
@@ -73,7 +93,7 @@ export const CustomerModal: FC<{
         <Button onClick={() => saveCustomer()}>{t('save', 'Save')}</Button>
         {!!integration?.customer?.name && (
           <Button className="bg-red-700" onClick={removeFromCustomer}>
-            {t('remove_from_customer', 'Remove from customer')}
+            {t('remove_from_customer', 'Remove from brand')}
           </Button>
         )}
       </div>

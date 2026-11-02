@@ -19,6 +19,7 @@ import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { getTimezone } from '@gitroom/frontend/components/layout/set.timezone';
 import { useBrandKit } from '@gitroom/frontend/components/settings/brand-kit.component';
+import { useOrganizationList } from '@gitroom/frontend/components/brands/brand.context';
 import {
   EmailReportResult,
   reportLimits,
@@ -53,22 +54,6 @@ interface ReportBody {
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const useOrganizations = () => {
-  const fetch = useFetch();
-
-  const load = useCallback(async () => {
-    return (await fetch('/user/organizations')).json();
-  }, []);
-
-  return useSWR<{ id: string; name: string }[]>('organizations', load, {
-    revalidateIfStale: false,
-    revalidateOnFocus: false,
-    refreshWhenOffline: false,
-    refreshWhenHidden: false,
-    revalidateOnReconnect: false,
-  });
-};
 
 // Its own key (like the Analytics page) so a failed load is an error, not an empty list
 const useReportChannels = () => {
@@ -179,7 +164,7 @@ export const ReportsComponent: FC = () => {
     mutate: reloadChannels,
   } = useReportChannels();
   const { data: brandKit } = useBrandKit();
-  const { data: organizations } = useOrganizations();
+  const { data: organizations } = useOrganizationList();
   const { downloadPdf, emailReport } = useReportActions();
 
   const [preset, setPreset] = useState<Preset>('last_30_days');
@@ -213,7 +198,7 @@ export const ReportsComponent: FC = () => {
         id: list[0].customer?.id || '',
         name:
           list[0].customer?.name ||
-          t('reports_no_customer', 'Without a customer'),
+          t('reports_no_customer', 'Without a brand'),
         channels: list,
       })),
       [(group) => !group.id, (group) => group.name.toLowerCase()]

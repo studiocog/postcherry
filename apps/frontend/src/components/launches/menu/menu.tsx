@@ -344,7 +344,7 @@ export const Menu: FC<{
       classNames: {
         modal: 'md',
       },
-      title: t('move_add_to_group', 'Move / Add to group'),
+      title: t('move_add_to_group', 'Move to brand'),
       withCloseButton: false,
       closeOnEscape: true,
       closeOnClickOutside: true,
@@ -354,7 +354,7 @@ export const Menu: FC<{
           integration={findIntegration}
           onClose={() => {
             mutate();
-            toast.show(t('customer_updated', 'Customer Updated'), 'success');
+            toast.show(t('customer_updated', 'Brand updated'), 'success');
           }}
         />
       ),
@@ -657,7 +657,7 @@ export const Menu: FC<{
               </svg>
             </div>
             <div className="text-[14px]">
-              {t('move_add_to_group', 'Move / add to group')}
+              {t('move_add_to_group', 'Move to brand')}
             </div>
           </div>
           <div

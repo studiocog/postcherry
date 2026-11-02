@@ -28,6 +28,12 @@ import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { TemporalService } from 'nestjs-temporal-core';
+import { CreateCustomerDto } from '@gitroom/nestjs-libraries/dtos/integrations/create.customer.dto';
+import {
+  AuthorizationActions,
+  Sections,
+  SubscriptionException,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
 dayjs.extend(utc);
 
@@ -169,12 +175,121 @@ export class IntegrationService {
     return integration;
   }
 
-  updateIntegrationGroup(org: string, id: string, group: string) {
+  async updateIntegrationGroup(org: string, id: string, group: string) {
+    // a channel can only join a brand of its own workspace
+    if (
+      group &&
+      !(await this._integrationRepository.getCustomerById(org, group))
+    ) {
+      throw new HttpException('Brand not found', HttpStatus.NOT_FOUND);
+    }
     return this._integrationRepository.updateIntegrationGroup(org, id, group);
   }
 
-  updateOnCustomerName(org: string, id: string, name: string) {
+  // brandLimit is SubscriptionService.brandLimit, a new name creates a brand
+  async updateOnCustomerName(
+    org: string,
+    id: string,
+    name: string,
+    brandLimit: number | null
+  ) {
+    if (
+      name &&
+      !(await this._integrationRepository.getCustomerByName(org, name))
+    ) {
+      await this.assertBrandSlot(org, brandLimit);
+    }
     return this._integrationRepository.updateOnCustomerName(org, id, name);
+  }
+
+  // returns the number of brands the organization has
+  private async assertBrandSlot(orgId: string, brandLimit: number | null) {
+    const total = await this._integrationRepository.countCustomers(orgId);
+    if (brandLimit !== null && total >= brandLimit) {
+      throw new SubscriptionException({
+        action: AuthorizationActions.Create,
+        section: Sections.BRANDS,
+      });
+    }
+
+    return total;
+  }
+
+  async createCustomer(
+    orgId: string,
+    body: CreateCustomerDto,
+    brandLimit: number | null
+  ) {
+    const name = body.name.trim();
+    if (!name) {
+      throw new HttpException(
+        'Please enter a brand name',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const isFirst = (await this.assertBrandSlot(orgId, brandLimit)) === 0;
+
+    if (await this._integrationRepository.getCustomerByName(orgId, name)) {
+      throw new HttpException(
+        'A brand with this name already exists',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const customer = await this._integrationRepository.createCustomer(
+      orgId,
+      name
+    );
+
+    if (body.assignAllChannels && isFirst) {
+      await this._integrationRepository.assignChannelsWithoutCustomer(
+        orgId,
+        customer.id
+      );
+    }
+
+    return customer;
+  }
+
+  async deleteCustomer(orgId: string, id: string) {
+    const { count } = await this._integrationRepository.deleteCustomer(
+      orgId,
+      id
+    );
+    if (!count) {
+      throw new HttpException('Brand not found', HttpStatus.NOT_FOUND);
+    }
+  }
+
+  // A channel connected while a brand is selected joins that brand, unless it
+  // already belongs to one (a channel connected again keeps its brand)
+  async assignConnectedChannelToCustomer(
+    orgId: string,
+    integration: { id: string; customerId: string | null },
+    customerId: string
+  ) {
+    if (integration.customerId) {
+      return;
+    }
+
+    try {
+      if (!(await this._integrationRepository.getCustomerById(orgId, customerId))) {
+        return;
+      }
+      await this._integrationRepository.updateIntegrationGroup(
+        orgId,
+        integration.id,
+        customerId
+      );
+    } catch (err) {
+      // the channel is connected, only its brand is missing
+      console.error('assign_connected_channel_to_brand_failed', {
+        orgId,
+        integrationId: integration.id,
+        err,
+      });
+    }
   }
 
   getIntegrationsList(org: string) {
@@ -684,6 +799,10 @@ ${this._notificationService.emailButton(reconnectUrl, 'Reconnect channel')}`,
     return this._integrationRepository.customers(orgId);
   }
 
+  getCustomerById(orgId: string, id: string) {
+    return this._integrationRepository.getCustomerById(orgId, id);
+  }
+
   async updateCustomerName(orgId: string, id: string, name: string) {
     const exists = await this._integrationRepository.getCustomerByName(
       orgId,
@@ -691,7 +810,7 @@ ${this._notificationService.emailButton(reconnectUrl, 'Reconnect channel')}`,
     );
     if (exists && exists.id !== id) {
       throw new HttpException(
-        'A group with this name already exists',
+        'A brand with this name already exists',
         HttpStatus.BAD_REQUEST
       );
     }

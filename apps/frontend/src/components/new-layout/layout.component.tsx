@@ -45,6 +45,9 @@ import { FirstBillingComponent } from '@gitroom/frontend/components/billing/firs
 import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component';
 import { setSentryUser } from '@gitroom/react/sentry/initialize.sentry.client';
 import { BrandVoiceCopilotContext } from '@gitroom/frontend/components/settings/brand-voice.copilot';
+import { BrandProvider } from '@gitroom/frontend/components/brands/brand.context';
+import { BrandSwitcher } from '@gitroom/frontend/components/brands/brand.switcher';
+import { PlanBadge } from '@gitroom/frontend/components/billing/current.plan.component';
 
 const jakartaSans = Plus_Jakarta_Sans({
   weight: ['600', '500', '700'],
@@ -85,135 +88,142 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
 
   return (
     <ContextWrapper user={user}>
-      <CopilotKit
-        credentials="include"
-        runtimeUrl={backendUrl + '/copilot/chat'}
-        useSingleEndpoint={true}
-        showDevConsole={false}
-      >
-        <BrandVoiceCopilotContext />
-        <MantineWrapper>
-          <ToolTip />
-          <Toaster />
-          <TrialTracker />
-          <CheckPayment check={searchParams.get('check') || ''} mutate={mutate}>
-            <ShowMediaBoxModal />
-            <ShowLinkedinCompany />
-            <MediaSettingsLayout />
-            <ShowPostSelector />
-            <PreConditionComponent />
-            <NewSubscription />
-            <ContinueProvider />
-            <div
-              className={clsx(
-                'flex flex-col min-h-screen min-w-screen text-newTextColor p-[12px] mobile:p-[8px] mobile:pb-[80px]',
-                jakartaSans.className
-              )}
-            >
-              <div>{user?.admin ? <Impersonate /> : <div />}</div>
-              {user.tier === 'FREE' && isGeneral && billingEnabled ? (
-                <FirstBillingComponent />
-              ) : (
-                <>
-                  <AnnouncementBanner />
-                  {/* Desktop: dark top bar with the main sections and the workspace switcher */}
-                  <header className="mobile:hidden relative flex items-center gap-[20px] h-[68px] px-[20px] mb-[8px] rounded-[12px] bg-[#2A0E14] text-white blurMe">
-                    <Link
-                      href="/launches"
-                      aria-label="PostCherry"
-                      className="flex items-center shrink-0 text-white"
-                    >
-                      <LogoTextComponent />
-                    </Link>
-                    <TopMenu variant="bar" />
-                    <div className="w-[1px] h-[24px] bg-white/20" />
-                    <div className="flex items-center gap-[16px] text-white/80">
-                      <StreakComponent />
-                      <OrganizationSelector />
-                      <div className="hover:text-white">
-                        <ModeComponent />
-                      </div>
-                      <LanguageComponent />
-                      <AttachToFeedbackIcon />
-                      <NotificationComponent />
-                    </div>
-                    <div className="absolute start-[12px] end-[12px] bottom-0 h-[3px] rounded-full bg-gradient-to-r from-[#D21F3C] via-[#FF7A90] to-[#FFB36B]" />
-                  </header>
-                  <div className="flex-1 flex gap-[8px] mobile:gap-0">
-                    <Support />
-                    {menuOpen && (
-                      <div
-                        className="hidden mobile:block fixed inset-0 bg-newBackdrop opacity-60 z-[490]"
-                        onClick={() => setMenuOpen(false)}
-                      />
-                    )}
-                    {/* Mobile: slide-out menu */}
-                    <div
-                      className={clsx(
-                        'hidden flex-col bg-newBgColorInner w-[80px] mobile:fixed mobile:top-0 mobile:bottom-0 mobile:start-0 mobile:z-[491] mobile:rounded-none mobile:overflow-y-auto mobile:overflow-x-hidden',
-                        menuOpen && 'mobile:flex'
-                      )}
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      <div
-                        id="left-menu"
-                        className="flex flex-1 static h-auto min-h-full mx-auto w-[64px]"
+      <BrandProvider>
+        <CopilotKit
+          credentials="include"
+          runtimeUrl={backendUrl + '/copilot/chat'}
+          useSingleEndpoint={true}
+          showDevConsole={false}
+        >
+          <BrandVoiceCopilotContext />
+          <MantineWrapper>
+            <ToolTip />
+            <Toaster />
+            <TrialTracker />
+            <CheckPayment check={searchParams.get('check') || ''} mutate={mutate}>
+              <ShowMediaBoxModal />
+              <ShowLinkedinCompany />
+              <MediaSettingsLayout />
+              <ShowPostSelector />
+              <PreConditionComponent />
+              <NewSubscription />
+              <ContinueProvider />
+              <div
+                className={clsx(
+                  'flex flex-col min-h-screen min-w-screen text-newTextColor p-[12px] mobile:p-[8px] mobile:pb-[80px]',
+                  jakartaSans.className
+                )}
+              >
+                <div className={clsx(user?.admin && 'mb-[8px]')}>
+                  {user?.admin ? <Impersonate /> : <div />}
+                </div>
+                {user.tier === 'FREE' && isGeneral && billingEnabled ? (
+                  <FirstBillingComponent />
+                ) : (
+                  <>
+                    <AnnouncementBanner />
+                    {/* Desktop: dark top bar with the brand switcher, the main sections, the plan and the workspace switcher */}
+                    <header className="mobile:hidden relative z-[120] flex items-center gap-[16px] iconBreak:gap-[12px] h-[68px] px-[20px] iconBreak:px-[16px] mb-[8px] rounded-[12px] bg-[#2A0E14] text-white blurMe">
+                      <Link
+                        href="/launches"
+                        aria-label="PostCherry"
+                        className="flex items-center shrink-0 text-white"
                       >
-                        <div className="flex flex-col h-full gap-[16px] flex-1 pt-[12px] pb-[12px]">
-                          <div className="flex justify-center">
-                            <Logo />
-                          </div>
-                          <TopMenu />
+                        <LogoTextComponent />
+                      </Link>
+                      <BrandSwitcher />
+                      <TopMenu variant="bar" />
+                      <PlanBadge />
+                      <div className="w-[1px] h-[24px] bg-white/20" />
+                      <div className="flex items-center gap-[16px] text-white/80">
+                        <StreakComponent />
+                        <OrganizationSelector />
+                        <div className="hover:text-white">
+                          <ModeComponent />
                         </div>
+                        <LanguageComponent />
+                        <AttachToFeedbackIcon />
+                        <NotificationComponent />
                       </div>
-                    </div>
-                    <div className="flex-1 min-w-0 bg-newBgLineColor rounded-[12px] overflow-hidden flex flex-col gap-[1px] blurMe">
-                      <div className="flex bg-newBgColorInner h-[64px] px-[20px] mobile:px-[12px] gap-[12px] items-center">
-                        <button
-                          className="hidden mobile:flex items-center justify-center w-[36px] h-[36px] -ms-[6px] rounded-[8px] text-textItemBlur hover:text-newTextColor hover:bg-boxFocused"
-                          onClick={() => setMenuOpen(true)}
-                          aria-label="Open menu"
+                      <div className="absolute start-[12px] end-[12px] bottom-0 h-[3px] rounded-full bg-gradient-to-r from-[#D21F3C] via-[#FF7A90] to-[#FFB36B]" />
+                    </header>
+                    <div className="flex-1 flex gap-[8px] mobile:gap-0">
+                      <Support />
+                      {menuOpen && (
+                        <div
+                          className="hidden mobile:block fixed inset-0 bg-newBackdrop opacity-60 z-[490]"
+                          onClick={() => setMenuOpen(false)}
+                        />
+                      )}
+                      {/* Mobile: slide-out menu */}
+                      <div
+                        className={clsx(
+                          'hidden flex-col bg-newBgColorInner w-[80px] mobile:fixed mobile:top-0 mobile:bottom-0 mobile:start-0 mobile:z-[491] mobile:rounded-none mobile:overflow-y-auto mobile:overflow-x-hidden',
+                          menuOpen && 'mobile:flex'
+                        )}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        <div
+                          id="left-menu"
+                          className="flex flex-1 static h-auto min-h-full mx-auto w-[64px]"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="22"
-                            height="22"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                          >
-                            <path
-                              d="M3 6H21M3 12H21M3 18H21"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </button>
-                        <div className="text-[22px] mobile:text-[20px] font-[600] flex flex-1 min-w-0">
-                          <Title />
-                        </div>
-                        {/* On desktop these live in the top bar */}
-                        <div className="hidden mobile:flex gap-[14px] items-center text-textItemBlur">
-                          <StreakComponent />
-                          <OrganizationSelector />
-                          <div className="hover:text-newTextColor">
-                            <ModeComponent />
+                          <div className="flex flex-col h-full gap-[16px] flex-1 pt-[12px] pb-[12px]">
+                            <div className="flex justify-center">
+                              <Logo />
+                            </div>
+                            <TopMenu />
                           </div>
-                          <LanguageComponent />
-                          <NotificationComponent />
                         </div>
                       </div>
-                      <div className="flex flex-1 min-w-0 gap-[1px] mobile:flex-col">
-                        {children}
+                      <div className="flex-1 min-w-0 bg-newBgLineColor rounded-[12px] overflow-hidden flex flex-col gap-[1px] blurMe">
+                        <div className="flex bg-newBgColorInner h-[64px] px-[20px] mobile:px-[12px] gap-[12px] items-center">
+                          <button
+                            className="hidden mobile:flex items-center justify-center w-[36px] h-[36px] -ms-[6px] rounded-[8px] text-textItemBlur hover:text-newTextColor hover:bg-boxFocused"
+                            onClick={() => setMenuOpen(true)}
+                            aria-label="Open menu"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="22"
+                              height="22"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                            >
+                              <path
+                                d="M3 6H21M3 12H21M3 18H21"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </button>
+                          <div className="text-[22px] mobile:text-[20px] font-[600] flex flex-1 min-w-0">
+                            <Title />
+                          </div>
+                          {/* On desktop these live in the top bar */}
+                          <div className="hidden mobile:flex gap-[14px] items-center text-textItemBlur">
+                            <BrandSwitcher variant="mobile" />
+                            <StreakComponent />
+                            <OrganizationSelector />
+                            <div className="hover:text-newTextColor">
+                              <ModeComponent />
+                            </div>
+                            <LanguageComponent />
+                            <NotificationComponent />
+                          </div>
+                        </div>
+                        <div className="flex flex-1 min-w-0 gap-[1px] mobile:flex-col">
+                          {children}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </CheckPayment>
-        </MantineWrapper>
-      </CopilotKit>
+                  </>
+                )}
+              </div>
+            </CheckPayment>
+          </MantineWrapper>
+        </CopilotKit>
+      </BrandProvider>
     </ContextWrapper>
   );
 };

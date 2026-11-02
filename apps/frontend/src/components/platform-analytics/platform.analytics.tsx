@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { capitalize, orderBy } from 'lodash';
 import clsx from 'clsx';
 import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
@@ -18,6 +18,7 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import useCookie from 'react-use-cookie';
 import { SVGLine } from '@gitroom/frontend/components/launches/launches.component';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
+import { useBrands } from '@gitroom/frontend/components/brands/brand.context';
 const allowedIntegrations = [
   'facebook',
   'instagram',
@@ -62,13 +63,20 @@ export const PlatformAnalytics = () => {
     refreshWhenOffline: false,
     fallbackData: [],
   });
+  // the channels of the brand picked in the brand switcher ('' = every channel)
+  const { current: brand } = useBrands();
   const sortedIntegrations = useMemo(() => {
     return orderBy(
-      data,
+      (data || []).filter(
+        (integration: any) => !brand || integration?.customer?.id === brand
+      ),
       ['type', 'disabled', 'identifier'],
       ['desc', 'asc', 'asc']
     );
-  }, [data]);
+  }, [data, brand]);
+  useEffect(() => {
+    setCurrent(0);
+  }, [brand]);
   const currentIntegration = useMemo(() => {
     return sortedIntegrations[current];
   }, [current, sortedIntegrations]);

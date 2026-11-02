@@ -400,7 +400,8 @@ export const TopMenu: FC<{ variant?: 'rail' | 'bar' }> = ({
     if (f.requireBilling && !billingEnabled) {
       return false;
     }
-    if (f.name === 'Billing' && user?.isLifetime) {
+    // the name is translated, the path is not
+    if (f.path === '/billing' && user?.isLifetime) {
       return false;
     }
     if (f.role) {
@@ -432,7 +433,10 @@ export const TopMenu: FC<{ variant?: 'rail' | 'bar' }> = ({
             ))}
         </nav>
         <div className="flex items-center gap-[2px] ms-auto">
-          {secondMenu.filter(visible).map((item) => (
+          {/* Billing is the labeled plan badge next to these icons (PlanBadge) */}
+          {secondMenu
+            .filter((item) => visible(item) && item.path !== '/billing')
+            .map((item) => (
             <MenuItem
               variant="icon"
               path={item.path}

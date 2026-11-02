@@ -15,6 +15,7 @@ export enum Sections {
   AUTOPOST = 'autopost',
   RECURRING_POSTS = 'recurring_posts',
   DEVELOPER_API = 'developer_api',
+  BRANDS = 'brands',
 }
 
 export enum AuthorizationActions {

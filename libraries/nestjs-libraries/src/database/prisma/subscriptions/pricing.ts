@@ -32,10 +32,14 @@ export interface PricingInterface {
   [key: string]: PricingInnerInterface;
 }
 
-// A "brand" is not a stored entity, it is sold as a bundle of connected social
-// accounts: the plan's channel limit (Subscription.totalChannels, enforced by
-// Sections.CHANNEL) is brands * CHANNELS_PER_BRAND. The billing page always
-// shows both numbers, e.g. "Up to 5 brands (50 social accounts)".
+// A "brand" is a Customer row (a group of channels, picked in the brand
+// switcher). A plan limits how many brands a workspace can create (`brands`,
+// SubscriptionService.brandLimit) and, separately, the total of connected
+// social accounts: the plan's channel limit (Subscription.totalChannels,
+// enforced by Sections.CHANNEL) is brands * CHANNELS_PER_BRAND. There is no
+// per-brand channel limit. The legacy plans have no brand count, so their
+// brands are not limited. The billing page always shows both numbers, e.g.
+// "Up to 5 brands (50 social accounts)".
 export const CHANNELS_PER_BRAND = 10;
 
 // Tiers sold before the PostCherry plans, kept as-is for existing subscribers

@@ -22,7 +22,7 @@ export const MenuItem: FC<{
     variant === 'rail' &&
       (isActive ? 'text-textItemFocused bg-boxFocused' : 'text-textItemBlur'),
     variant === 'bar' &&
-      'group h-[44px] px-[16px] gap-[8px] flex items-center font-[600] text-[15px] whitespace-nowrap rounded-[10px] transition-colors',
+      'group h-[44px] px-[16px] iconBreak:px-[10px] gap-[8px] flex items-center font-[600] text-[15px] whitespace-nowrap rounded-[10px] transition-colors',
     variant === 'icon' &&
       'group w-[38px] h-[38px] flex items-center justify-center rounded-[10px] transition-colors',
     variant !== 'rail' &&
@@ -42,7 +42,8 @@ export const MenuItem: FC<{
     ) : variant === 'bar' ? (
       <>
         <div className="scale-[0.8] flex">{icon}</div>
-        <span>{label}</span>
+        {/* narrow desktops keep the icon, the label is in the tooltip */}
+        <span className="maxMedia:hidden">{label}</span>
       </>
     ) : (
       <div className="scale-[0.75] flex">{icon}</div>

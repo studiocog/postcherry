@@ -70,5 +70,10 @@ const getErrorMessage = (error: {
         default:
           return 'The PostCherry public API, CLI and agent skills are included in the Agency Pro plan. Please upgrade your subscription to use them.';
       }
+    case Sections.BRANDS:
+      switch (error.action) {
+        default:
+          return 'You have reached the maximum number of brands for your subscription. Please upgrade your subscription to add more brands.';
+      }
   }
 };

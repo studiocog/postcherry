@@ -1,4 +1,7 @@
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import {
+  PrismaRepository,
+  PrismaTransaction,
+} from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import dayjs from 'dayjs';
@@ -17,7 +20,8 @@ export class IntegrationRepository {
     private _plugs: PrismaRepository<'plugs'>,
     private _exisingPlugData: PrismaRepository<'exisingPlugData'>,
     private _customers: PrismaRepository<'customer'>,
-    private _mentions: PrismaRepository<'mentions'>
+    private _mentions: PrismaRepository<'mentions'>,
+    private _transaction: PrismaTransaction
   ) {}
 
   getMentions(platform: string, q: string) {
@@ -503,18 +507,8 @@ export class IntegrationRepository {
   async updateOnCustomerName(org: string, id: string, name: string) {
     const customer = !name
       ? undefined
-      : (await this._customers.model.customer.findFirst({
-          where: {
-            orgId: org,
-            name,
-          },
-        })) ||
-        (await this._customers.model.customer.create({
-          data: {
-            name,
-            orgId: org,
-          },
-        }));
+      : (await this.getCustomerByName(org, name)) ||
+        (await this.createCustomer(org, name));
 
     return this._integration.model.integration.update({
       where: {
@@ -529,6 +523,9 @@ export class IntegrationRepository {
                 id: customer.id,
               },
             },
+      },
+      select: {
+        id: true,
       },
     });
   }
@@ -552,7 +549,87 @@ export class IntegrationRepository {
               },
             },
           },
+      select: {
+        id: true,
+      },
     });
+  }
+
+  getCustomerById(orgId: string, id: string) {
+    return this._customers.model.customer.findFirst({
+      where: {
+        id,
+        orgId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+  }
+
+  countCustomers(orgId: string) {
+    return this._customers.model.customer.count({
+      where: {
+        orgId,
+        deletedAt: null,
+      },
+    });
+  }
+
+  createCustomer(orgId: string, name: string) {
+    return this._customers.model.customer.create({
+      data: {
+        name,
+        orgId,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+  }
+
+  // puts the channels that have no brand yet into this one (the first brand)
+  assignChannelsWithoutCustomer(orgId: string, customerId: string) {
+    return this._integration.model.integration.updateMany({
+      where: {
+        organizationId: orgId,
+        customerId: null,
+        deletedAt: null,
+      },
+      data: {
+        customerId,
+      },
+    });
+  }
+
+  // a deleted brand keeps its channels, they just have no brand anymore
+  async deleteCustomer(orgId: string, id: string) {
+    const [, deleted] = await this._transaction.model.$transaction([
+      this._integration.model.integration.updateMany({
+        where: {
+          organizationId: orgId,
+          customerId: id,
+        },
+        data: {
+          customerId: null,
+        },
+      }),
+      this._customers.model.customer.updateMany({
+        where: {
+          id,
+          orgId,
+          deletedAt: null,
+        },
+        data: {
+          deletedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return deleted;
   }
 
   getCustomerByName(orgId: string, name: string) {

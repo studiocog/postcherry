@@ -39,6 +39,7 @@ import { ThirdPartyComponent } from '@gitroom/frontend/components/third-parties/
 import { Plugs } from '@gitroom/frontend/components/plugs/plugs';
 import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
 import { BrandKitComponent } from '@gitroom/frontend/components/settings/brand-kit.component';
+import { BrandsSettings } from '@gitroom/frontend/components/brands/brands.settings';
 import { isNewTier } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
@@ -115,6 +116,8 @@ export const SettingsPopup: FC<{
     arr.push({ tab: 'global_settings', label: t('global_settings', 'Global Settings') });
     // every account type has a brand
     arr.push({ tab: 'brand_kit', label: t('brand_kit', 'Brand kit') });
+    // the brands of the brand switcher (Customer rows)
+    arr.push({ tab: 'brands', label: t('brands', 'Brands') });
     // Populate tabs based on user permissions, individuals and businesses only see the basics
     // (everyone keeps Agents and Apps: connecting an AI app over MCP is for all account types)
     if (user?.tier?.public_api && isGeneral && showLogout) {
@@ -161,6 +164,13 @@ export const SettingsPopup: FC<{
   const tab = list.some((p) => p.tab === selectedTab)
     ? selectedTab
     : 'global_settings';
+  // a link to another tab while Settings is open (e.g. Manage brands)
+  const tabParam = url.get('tab');
+  useEffect(() => {
+    if (tabParam) {
+      setTab(tabParam);
+    }
+  }, [tabParam]);
 
   useEffect(() => {
     loadProfile();
@@ -219,6 +229,11 @@ export const SettingsPopup: FC<{
               {tab === 'brand_kit' && (
                 <div>
                   <BrandKitComponent />
+                </div>
+              )}
+              {tab === 'brands' && (
+                <div>
+                  <BrandsSettings />
                 </div>
               )}
               {tab === 'teams' && showTeams && (

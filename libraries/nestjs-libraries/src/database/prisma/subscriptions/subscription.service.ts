@@ -81,6 +81,14 @@ export class SubscriptionService {
     return !plan || !!plan[feature];
   }
 
+  // How many brands (Customer rows) the organization's plan includes, null
+  // when they are not limited (nothing gated, or a legacy plan without a
+  // brand count)
+  async brandLimit(organizationId: string) {
+    const plan = await this.gatingPlan(organizationId);
+    return plan?.brands ?? null;
+  }
+
   // Whether the organization's plan includes AI images (it has image credits,
   // the same rule that shows the AI image button in the media library)
   async hasAiImages(organizationId: string) {

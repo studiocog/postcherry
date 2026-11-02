@@ -9,6 +9,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import dayjs from 'dayjs';
@@ -25,6 +26,7 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { expandPostsList, expandPosts } from '@gitroom/helpers/utils/posts.list.minify';
 import { uniq } from 'lodash';
 import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
+import { useBrands } from '@gitroom/frontend/components/brands/brand.context';
 import {
   PostApprovalBadgeData,
   usePostApprovalStatuses,
@@ -212,12 +214,22 @@ export const CalendarWeekProvider: FC<{
     setListPage(0);
   }, []);
 
+  // the brand picked in the brand switcher is the calendar's customer filter
+  const { current: brand, setCurrent: setBrand } = useBrands();
+
   const [filters, setFilters] = useState({
     startDate: initialRange.startDate,
     endDate: initialRange.endDate,
-    customer: initCustomer || null,
+    customer: initCustomer || brand || null,
     display,
   });
+
+  // a link with ?customer= selects that brand
+  useEffect(() => {
+    if (initCustomer && initCustomer !== brand) {
+      setBrand(initCustomer);
+    }
+  }, []);
 
   useEffect(() => {
     setSelectedChannels(null);
@@ -344,6 +356,24 @@ export const CalendarWeekProvider: FC<{
     },
     []
   );
+
+  // switching the brand reloads the calendar with its posts
+  const brandRef = useRef(brand);
+  useEffect(() => {
+    if (brandRef.current === brand) {
+      return;
+    }
+    brandRef.current = brand;
+    if ((filters.customer || '') === brand) {
+      return;
+    }
+    setFiltersWrapper({
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      display: filters.display as 'week' | 'month' | 'day' | 'list',
+      customer: brand || null,
+    });
+  }, [brand]);
 
   const filterByChannels = useCallback(
     (list: any[]) =>

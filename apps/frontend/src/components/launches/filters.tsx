@@ -4,7 +4,6 @@ import { useCalendar, ListStateFilter } from '@gitroom/frontend/components/launc
 import clsx from 'clsx';
 import dayjs from 'dayjs';
 import { useCallback, useState } from 'react';
-import { SelectCustomer } from '@gitroom/frontend/components/launches/select.customer';
 import { SelectChannels } from '@gitroom/frontend/components/launches/select.channels';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import i18next from 'i18next';
@@ -172,21 +171,6 @@ export const Filters = () => {
       customer: calendar.customer,
     });
   }, [calendar]);
-
-  const setCustomer = useCallback(
-    (customer: string) => {
-      if (calendar.customer === customer) {
-        return; // No need to set the same customer
-      }
-      calendar.setFilters({
-        startDate: calendar.startDate,
-        endDate: calendar.endDate,
-        display: calendar.display as 'day' | 'week' | 'month',
-        customer: customer,
-      });
-    },
-    [calendar]
-  );
 
   const next = useCallback(() => {
     const currentStart = newDayjs(calendar.startDate);
@@ -440,12 +424,8 @@ export const Filters = () => {
         </div>
       )}
       {/* phones get a single filter button that opens the filters sheet */}
+      {/* the brand is picked in the brand switcher of the top bar */}
       <div className="contents mobile:hidden">
-        <SelectCustomer
-          customer={calendar.customer as string}
-          onChange={(customer: string) => setCustomer(customer)}
-          integrations={calendar.integrations}
-        />
         <SelectChannels />
       </div>
       {calendar.integrations.length > 1 && (
@@ -567,12 +547,6 @@ export const Filters = () => {
             onClick: () => setFiltersOpen(false),
           }}
         >
-          <SelectCustomer
-            list={true}
-            customer={calendar.customer as string}
-            onChange={(customer: string) => setCustomer(customer)}
-            integrations={calendar.integrations}
-          />
           <SelectChannels list={true} />
         </BottomSheet>
       )}

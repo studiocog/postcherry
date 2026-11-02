@@ -186,6 +186,16 @@ export class BillingController {
     return (await this.provider(org)).getInvoices(org.id);
   }
 
+  // trial end and next renewal of the current plan (the current plan card)
+  @Get('/renewal')
+  async getRenewal(@GetOrgFromRequest() org: Organization) {
+    try {
+      return await (await this.provider(org)).getRenewal(org.id);
+    } catch (err) {
+      return { trialEnd: null, renewsAt: null };
+    }
+  }
+
   @Get('/')
   getCurrentBilling(@GetOrgFromRequest() org: Organization) {
     return this._paymentService.getSubscription(org.id);

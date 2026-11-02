@@ -21,6 +21,7 @@ import {
   PaymentPlatform,
   PaymentProvider,
   PaymentProviderAbstract,
+  PaymentRenewal,
 } from '@gitroom/nestjs-libraries/services/payment/payment.provider.interface';
 
 import { STRIPE_PROVIDER } from '@gitroom/nestjs-libraries/services/payment/payment.providers';
@@ -808,6 +809,27 @@ export class StripeService extends PaymentProviderAbstract {
   async portalLink(organizationId: string) {
     const customer = await this.getCustomerByOrganizationId(organizationId);
     return this.createBillingPortalLink(customer);
+  }
+
+  async getRenewal(organizationId: string): Promise<PaymentRenewal> {
+    try {
+      const subscription = await this.getActiveStripeSubscription(
+        await this.getCustomerByOrganizationId(organizationId)
+      );
+      if (!subscription) {
+        return { trialEnd: null, renewsAt: null };
+      }
+
+      return {
+        trialEnd:
+          subscription.status === 'trialing' ? subscription.trial_end : null,
+        // the period end lives on the subscription items
+        renewsAt: subscription.items?.data?.[0]?.current_period_end || null,
+      };
+    } catch (err) {
+      console.error('stripe_get_renewal_failed', { organizationId, err });
+      return { trialEnd: null, renewsAt: null };
+    }
   }
 
   async getInvoices(organizationId: string): Promise<PaymentInvoice[]> {

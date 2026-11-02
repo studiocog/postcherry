@@ -22,6 +22,8 @@ import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/po
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { IntegrationNameDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.name.dto';
 import { CustomerNameDto } from '@gitroom/nestjs-libraries/dtos/integrations/customer.name.dto';
+import { CreateCustomerDto } from '@gitroom/nestjs-libraries/dtos/integrations/create.customer.dto';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import {
   Disconnect,
@@ -45,7 +47,8 @@ export class IntegrationsController {
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
     private _postService: PostsService,
-    private _refreshIntegrationService: RefreshIntegrationService
+    private _refreshIntegrationService: RefreshIntegrationService,
+    private _subscriptionService: SubscriptionService
   ) {}
 
   @Post('/provider/:id/connect')
@@ -68,6 +71,19 @@ export class IntegrationsController {
     return this._integrationService.customers(org.id);
   }
 
+  // a brand, limited by the plan's brand count when billing is on
+  @Post('/customers')
+  async createCustomer(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: CreateCustomerDto
+  ) {
+    return this._integrationService.createCustomer(
+      org.id,
+      body,
+      await this._subscriptionService.brandLimit(org.id)
+    );
+  }
+
   @Put('/customers/:id')
   async updateCustomerName(
     @GetOrgFromRequest() org: Organization,
@@ -75,6 +91,15 @@ export class IntegrationsController {
     @Body() body: CustomerNameDto
   ) {
     return this._integrationService.updateCustomerName(org.id, id, body.name);
+  }
+
+  // soft-deletes the brand, its channels stay connected without a brand
+  @Delete('/customers/:id')
+  async deleteCustomer(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    await this._integrationService.deleteCustomer(org.id, id);
   }
 
   @Put('/:id/group')
@@ -96,7 +121,12 @@ export class IntegrationsController {
     @Param('id') id: string,
     @Body() body: { name: string }
   ) {
-    return this._integrationService.updateOnCustomerName(org.id, id, body.name);
+    return this._integrationService.updateOnCustomerName(
+      org.id,
+      id,
+      body.name,
+      await this._subscriptionService.brandLimit(org.id)
+    );
   }
 
   @Put('/:id/custom-name')
@@ -222,6 +252,7 @@ export class IntegrationsController {
     @Query('externalUrl') externalUrl: string,
     @Query('redirectUrl') redirectUrl: string,
     @Query('onboarding') onboarding: string,
+    @Query('customer') customer: string,
     @GetOrgFromRequest() org: Organization
   ) {
     if (
@@ -268,6 +299,15 @@ export class IntegrationsController {
 
       if (redirectUrl) {
         await ioRedis.set(`redirect:${state}`, redirectUrl, 'EX', 3600);
+      }
+
+      // the brand selected in the brand switcher, a new channel joins it
+      if (
+        customer &&
+        !refresh &&
+        (await this._integrationService.getCustomerById(org.id, customer))
+      ) {
+        await ioRedis.set(`customer:${state}`, customer, 'EX', 3600);
       }
 
       await ioRedis.set(`organization:${state}`, org.id, 'EX', 3600);

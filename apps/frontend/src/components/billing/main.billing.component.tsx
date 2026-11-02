@@ -31,7 +31,6 @@ import { useTrack } from '@gitroom/react/helpers/use.track';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { FinishTrial } from '@gitroom/frontend/components/billing/finish.trial';
-import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
 import {
@@ -42,6 +41,7 @@ import {
 } from '@gitroom/frontend/components/billing/use.plans';
 import { PlanAudienceTabs } from '@gitroom/frontend/components/billing/plan.audience.tabs';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
+import { CurrentPlanCard } from '@gitroom/frontend/components/billing/current.plan.component';
 
 type SubscriptionWithPlatform = Subscription & {
   platform?: 'web' | 'mobile';
@@ -437,8 +437,15 @@ export const MainBillingComponent: FC<{
     return subscription?.subscriptionTier;
   }, [subscription, initialChannels, monthlyOrYearly, period]);
   const moveToCheckout = useCallback(
-    (billing: BillingTier, reactivate = false) =>
+    (
+        billing: BillingTier,
+        reactivate = false,
+        // the current plan card switches the period without the toggle
+        periodOverride?: 'MONTHLY' | 'YEARLY'
+      ) =>
       async () => {
+        const chosenPeriod =
+          periodOverride || (monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY');
         if (reactivate) {
           setLoading(true);
           const { cancel_at } = await (
@@ -646,7 +653,7 @@ export const MainBillingComponent: FC<{
           await fetch('/billing/subscribe', {
             method: 'POST',
             body: JSON.stringify({
-              period: monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY',
+              period: chosenPeriod,
               utm,
               billing,
               ...(dub ? { dub } : {}),
@@ -669,7 +676,7 @@ export const MainBillingComponent: FC<{
           await track(TrackEnum.InitiateCheckout, {
             value:
               pricing[billing][
-                monthlyOrYearly === 'on' ? 'year_price' : 'month_price'
+                chosenPeriod === 'YEARLY' ? 'year_price' : 'month_price'
               ],
           });
           window.location.href = url;
@@ -686,10 +693,12 @@ export const MainBillingComponent: FC<{
             window.open(portal);
           }
         } else {
-          setPeriod(monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY');
+          setPeriod(chosenPeriod);
+          setMonthlyOrYearly(chosenPeriod === 'YEARLY' ? 'on' : 'off');
           setSubscription((subs) => ({
             ...subs!,
             subscriptionTier: billing,
+            period: chosenPeriod,
             cancelAt: null,
           }));
           mutate(
@@ -709,6 +718,40 @@ export const MainBillingComponent: FC<{
       },
     [monthlyOrYearly, subscription, user, utm, integrations]
   );
+  // monthly <-> yearly on the same plan, from the current plan card
+  const switchPeriod = useCallback(async () => {
+    if (!subscription) {
+      return;
+    }
+    const next = subscription.period === 'YEARLY' ? 'MONTHLY' : 'YEARLY';
+    const plan = pricing[subscription.subscriptionTier];
+    if (
+      !(await deleteDialog(
+        next === 'YEARLY'
+          ? t(
+              'billing_switch_to_yearly_confirm',
+              'Switch to yearly billing for ${{price}} per year (2 months free)?',
+              { price: plan?.year_price }
+            )
+          : t(
+              'billing_switch_to_monthly_confirm',
+              'Switch to monthly billing for ${{price}} per month?',
+              { price: plan?.month_price }
+            ),
+        t('billing_yes_continue', 'Yes, continue'),
+        t('billing_switch_period_title', 'Change your billing period?')
+      ))
+    ) {
+      return;
+    }
+    setClicked('PERIOD');
+    await moveToCheckout(subscription.subscriptionTier, false, next)();
+  }, [subscription, moveToCheckout]);
+  const showPlans = useCallback(() => {
+    document
+      .getElementById('billing-plans')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
   if (user?.isLifetime) {
     router.replace('/');
     return null;
@@ -808,6 +851,35 @@ export const MainBillingComponent: FC<{
             )}
           </div>
         </div>
+      </div>
+      <CurrentPlanCard
+        subscription={subscription}
+        loading={
+          loading && ['PERIOD', 'CANCEL', 'REACTIVATE'].includes(clicked)
+            ? clicked
+            : ''
+        }
+        onChangePlan={showPlans}
+        onSwitchPeriod={switchPeriod}
+        onCancel={() => {
+          setClicked('CANCEL');
+          moveToCheckout('FREE')();
+        }}
+        onReactivate={() => {
+          setClicked('REACTIVATE');
+          moveToCheckout('FREE', true)();
+        }}
+      />
+      <div
+        id="billing-plans"
+        className="flex items-center gap-[16px] scroll-mt-[20px] mobile:flex-col mobile:items-stretch"
+      >
+        <PlanAudienceTabs
+          value={view}
+          onChange={setView}
+          className="self-start mobile:self-stretch"
+        />
+        <div className="flex-1 mobile:hidden" />
         <div className="flex p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500] select-none">
           <div
             onClick={() => setMonthlyOrYearly('off')}
@@ -832,30 +904,6 @@ export const MainBillingComponent: FC<{
           </div>
         </div>
       </div>
-      {subscription?.cancelAt && isGeneral && (
-        <div className="flex items-center gap-[12px] rounded-[12px] border border-[#FFAC30]/30 bg-[#FFAC30]/10 px-[16px] py-[12px] text-[14px]">
-          <div className="w-[8px] h-[8px] rounded-full bg-[#FFAC30] shrink-0" />
-          <div>
-            {t(
-              'your_subscription_will_be_canceled_at',
-              'Your subscription will be canceled at'
-            )}{' '}
-            <bdi className="font-[600]">
-              {newDayjs(subscription.cancelAt).local().format('D MMM, YYYY')}
-            </bdi>
-            {'. '}
-            {t(
-              'you_will_never_be_charged_again',
-              'You will never be charged again'
-            )}
-          </div>
-        </div>
-      )}
-      <PlanAudienceTabs
-        value={view}
-        onChange={setView}
-        className="self-start mobile:self-stretch"
-      />
       <div
         className={clsx(
           'grid gap-[16px] tablet:grid-cols-2 mobile:!grid-cols-1',
@@ -927,28 +975,6 @@ export const MainBillingComponent: FC<{
             </div>
           </div>
           <div className="flex items-center gap-[8px] mobile:flex-col-reverse mobile:items-stretch">
-            {isGeneral && !subscription?.cancelAt && (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  setClicked('CANCEL');
-                  moveToCheckout('FREE')();
-                }}
-                className="h-[44px] px-[16px] rounded-[8px] border border-red-500/40 text-red-500 text-[14px] font-[500] flex items-center justify-center hover:bg-red-500/10 transition-colors disabled:opacity-50"
-              >
-                {loading && clicked === 'CANCEL' ? (
-                  <ReactLoading
-                    type="spin"
-                    color="currentColor"
-                    width={18}
-                    height={18}
-                  />
-                ) : (
-                  t('cancel_subscription_1', 'Cancel subscription')
-                )}
-              </button>
-            )}
             <button
               type="button"
               onClick={updatePayment}

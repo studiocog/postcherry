@@ -24,6 +24,12 @@ export interface PaymentInvoice {
   viewUrl: string | null;
 }
 
+// The dates of the current subscription period, unix seconds
+export interface PaymentRenewal {
+  trialEnd: number | null;
+  renewsAt: number | null;
+}
+
 // Every billing use-case goes through this contract. Webhooks and `platform`
 // are mandatory; everything else has a default that says "not supported on
 // this platform" so a provider only implements what its platform offers
@@ -106,6 +112,12 @@ export abstract class PaymentProviderAbstract {
   // Billing history (invoices) of the organization
   async getInvoices(organizationId: string): Promise<PaymentInvoice[]> {
     return this.notSupported();
+  }
+
+  // When the trial ends and the next renewal happens (unix seconds), for the
+  // current plan card. Must not throw: null when the provider doesn't know
+  async getRenewal(organizationId: string): Promise<PaymentRenewal> {
+    return { trialEnd: null, renewsAt: null };
   }
 
   // Post-checkout poll: is this subscription id active for the org

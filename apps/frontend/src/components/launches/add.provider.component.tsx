@@ -20,6 +20,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
 import { capitalize } from 'lodash';
+import { useConnectQuery } from '@gitroom/frontend/components/brands/brand.context';
 const resolver = classValidatorResolver(ApiKeyDto);
 
 export const useAddProvider = (update?: () => void, invite?: boolean) => {
@@ -176,6 +177,7 @@ export const CustomVariables: FC<{
   const { close, gotoUrl, identifier, variables, onboarding } = props;
   const fetch = useFetch();
   const modals = useModals();
+  const connectQuery = useConnectQuery(onboarding);
   const schema = useMemo(() => {
     return object({
       ...variables.reduce((aIcc, item) => {
@@ -211,9 +213,7 @@ export const CustomVariables: FC<{
   const submit = useCallback(
     async (data: FieldValues) => {
       const response = await fetch(
-        `/integrations/social/${identifier}${
-          onboarding ? '?onboarding=true' : ''
-        }`
+        `/integrations/social/${identifier}${connectQuery()}`
       );
       if (response.status === 402) {
         return;
@@ -226,7 +226,7 @@ export const CustomVariables: FC<{
         ).toString('base64')}${onboarding ? '&onboarding=true' : ''}`
       );
     },
-    [variables, onboarding]
+    [variables, onboarding, connectQuery]
   );
 
   const t = useT();
@@ -419,6 +419,7 @@ export const AddProviderComponent: FC<{
   const router = useRouter();
   const fetch = useFetch();
   const modal = useModals();
+  const connectQuery = useConnectQuery(onboarding);
   const getSocialLink = useCallback(
     (
         invite: boolean,
@@ -436,15 +437,12 @@ export const AddProviderComponent: FC<{
         }>
       ) =>
       async () => {
-        const onboardingParam = onboarding ? 'onboarding=true' : '';
         const openWeb3 = async () => {
           const { component: Web3Providers } = web3List.find(
             (item) => item.identifier === identifier
           )!;
           const response = await fetch(
-            `/integrations/social/${identifier}${
-              onboarding ? '?onboarding=true' : ''
-            }`
+            `/integrations/social/${identifier}${connectQuery()}`
           );
           if (response.status === 402) {
             return;
@@ -479,17 +477,13 @@ export const AddProviderComponent: FC<{
           // carry the `postiz://` deep link so the backend redirects
           // back to the iOS/Android app after OAuth completes, instead
           // of the default web redirect.
-          const params = [
-            `externalUrl=${encodeURIComponent(externalUrl)}`,
-            onboardingParam,
-            isMobile
-              ? `redirectUrl=${encodeURIComponent('postiz://integrations')}`
-              : '',
-          ]
-            .filter(Boolean)
-            .join('&');
           const response = await fetch(
-            `/integrations/social/${identifier}${params ? `?${params}` : ''}`
+            `/integrations/social/${identifier}${connectQuery(
+              `externalUrl=${encodeURIComponent(externalUrl)}`,
+              isMobile
+                ? `redirectUrl=${encodeURIComponent('postiz://integrations')}`
+                : ''
+            )}`
           );
           if (response.status === 402) {
             return;
@@ -622,9 +616,7 @@ export const AddProviderComponent: FC<{
               return;
             }
             const response = await fetch(
-              `/integrations/social/${identifier}${
-                onboarding ? '?onboarding=true' : ''
-              }`
+              `/integrations/social/${identifier}${connectQuery()}`
             );
             if (response.status === 402) {
               return;
@@ -682,7 +674,7 @@ export const AddProviderComponent: FC<{
         }
         await gotoIntegration();
       },
-    [onboarding]
+    [onboarding, connectQuery]
   );
 
   const t = useT();
