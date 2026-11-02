@@ -386,63 +386,72 @@ export const useMenuItem = () => {
   };
 };
 
-export const TopMenu: FC = () => {
+export const TopMenu: FC<{ variant?: 'rail' | 'bar' }> = ({
+  variant = 'rail',
+}) => {
   const user = useUser();
   const { firstMenu, secondMenu } = useMenuItem();
   const { isGeneral, billingEnabled } = useVariables();
+
+  const visible = (f: MenuItemInterface) => {
+    if (f.hide) {
+      return false;
+    }
+    if (f.requireBilling && !billingEnabled) {
+      return false;
+    }
+    if (f.name === 'Billing' && user?.isLifetime) {
+      return false;
+    }
+    if (f.role) {
+      return f.role.includes(user?.role!);
+    }
+    return true;
+  };
+
+  const showFirstMenu =
+    // @ts-ignore
+    user?.orgId &&
+    // @ts-ignore
+    (user.tier !== 'FREE' || !isGeneral || !billingEnabled);
+
+  if (variant === 'bar') {
+    return (
+      <>
+        <nav className="flex items-center gap-[4px] min-w-0 overflow-x-auto scrollbar-none">
+          {showFirstMenu &&
+            firstMenu.filter(visible).map((item) => (
+              <MenuItem
+                variant="bar"
+                path={item.path}
+                label={item.name}
+                icon={item.icon}
+                key={item.name}
+                onClick={item.onClick}
+              />
+            ))}
+        </nav>
+        <div className="flex items-center gap-[2px] ms-auto">
+          {secondMenu.filter(visible).map((item) => (
+            <MenuItem
+              variant="icon"
+              path={item.path}
+              label={item.name}
+              icon={item.icon}
+              key={item.name}
+              onClick={item.onClick}
+            />
+          ))}
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="flex flex-1 flex-col minCustom:gap-[20px] custom:gap-[8px] blurMe">
-        {
-          // @ts-ignore
-          user?.orgId &&
-            // @ts-ignore
-            (user.tier !== 'FREE' || !isGeneral || !billingEnabled) &&
-            firstMenu
-              .filter((f) => {
-                if (f.hide) {
-                  return false;
-                }
-                if (f.requireBilling && !billingEnabled) {
-                  return false;
-                }
-                if (f.name === 'Billing' && user?.isLifetime) {
-                  return false;
-                }
-                if (f.role) {
-                  return f.role.includes(user?.role!);
-                }
-                return true;
-              })
-              .map((item, index) => (
-                <MenuItem
-                  path={item.path}
-                  label={item.name}
-                  icon={item.icon}
-                  key={item.name}
-                  onClick={item.onClick}
-                />
-              ))
-        }
-      </div>
-      <div className="flex flex-col minCustom:gap-[20px] custom:gap-[8px] blurMe">
-        {secondMenu
-          .filter((f) => {
-            if (f.hide) {
-              return false;
-            }
-            if (f.requireBilling && !billingEnabled) {
-              return false;
-            }
-            if (f.name === 'Billing' && user?.isLifetime) {
-              return false;
-            }
-            if (f.role) {
-              return f.role.includes(user?.role!);
-            }
-            return true;
-          })
-          .map((item, index) => (
+        {showFirstMenu &&
+          firstMenu.filter(visible).map((item) => (
             <MenuItem
               path={item.path}
               label={item.name}
@@ -451,6 +460,17 @@ export const TopMenu: FC = () => {
               onClick={item.onClick}
             />
           ))}
+      </div>
+      <div className="flex flex-col minCustom:gap-[20px] custom:gap-[8px] blurMe">
+        {secondMenu.filter(visible).map((item) => (
+          <MenuItem
+            path={item.path}
+            label={item.name}
+            icon={item.icon}
+            key={item.name}
+            onClick={item.onClick}
+          />
+        ))}
       </div>
     </>
   );
