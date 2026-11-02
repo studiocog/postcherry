@@ -18,6 +18,8 @@ export const UserContext = createContext<
       isLifetime?: boolean;
       impersonate: boolean;
       allowTrial: boolean;
+      // on the Free plan (chosen on the checkout page)
+      freePlan?: boolean;
       isTrailing: boolean;
       accountType: 'INDIVIDUAL' | 'BUSINESS' | 'AGENCY' | null;
       streakSince: string | null;

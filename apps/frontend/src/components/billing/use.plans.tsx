@@ -23,6 +23,8 @@ export const usePlanName = () => {
   return useCallback(
     (tier: string) => {
       switch (tier) {
+        case 'FREE':
+          return t('plan_free', 'Free');
         case 'PERSONAL':
           return t('plan_personal', 'Personal');
         case 'CREATOR':

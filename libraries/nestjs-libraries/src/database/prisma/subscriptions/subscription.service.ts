@@ -42,9 +42,9 @@ export class SubscriptionService {
   }
 
   // The plan that gates the organization's features, null when nothing is
-  // gated. It never locks a workspace out by mistake: billing disabled
-  // (self-hosted), no subscription (a lapsed workspace is already stopped by
-  // the billing wall), an unknown tier or a failed lookup all give null
+  // gated. A workspace without a subscription is on the Free plan. It never
+  // locks a workspace out by mistake: billing disabled (self-hosted), an
+  // unknown tier or a failed lookup all give null
   private async gatingPlan(organizationId: string) {
     if (!process.env.STRIPE_PUBLISHABLE_KEY) {
       return null;
@@ -56,7 +56,7 @@ export class SubscriptionService {
           organizationId
         );
       if (!subscription) {
-        return null;
+        return pricing.FREE;
       }
 
       const plan = pricing[subscription.subscriptionTier];
@@ -491,6 +491,26 @@ export class SubscriptionService {
 
   async getSubscription(organizationId: string) {
     return this._subscriptionRepository.getSubscription(organizationId);
+  }
+
+  // Posts publish with a subscription or on the Free plan
+  async canPublish(organizationId: string) {
+    if (await this._subscriptionRepository.getSubscription(organizationId)) {
+      return true;
+    }
+
+    return !!(await this._organizationService.getFreePlanSince(organizationId))
+      ?.freePlanSince;
+  }
+
+  // Choosing the Free plan on the checkout page, a subscribed workspace keeps its plan
+  async startFreePlan(organizationId: string) {
+    if (await this._subscriptionRepository.getSubscription(organizationId)) {
+      return { freePlan: false };
+    }
+
+    await this._organizationService.startFreePlan(organizationId);
+    return { freePlan: true };
   }
 
   private currentPeriodStart(subscriptionCreatedAt: Date) {

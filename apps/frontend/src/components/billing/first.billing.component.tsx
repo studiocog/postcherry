@@ -28,6 +28,7 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics';
 import useCookie from 'react-use-cookie';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
+import { Button } from '@gitroom/react/form/button';
 import { DeveloperIconComponent } from '@gitroom/frontend/components/developer/developer.icon.component';
 import { TermsLinks } from '@gitroom/frontend/components/auth/terms.notice';
 import {
@@ -60,7 +61,11 @@ const EmbeddedBilling = dynamic(
   }
 );
 
-export const FirstBillingComponent = () => {
+// The plans and checkout: the wall before a workspace picks a plan, and the
+// billing page of a workspace on the Free plan (`embedded`, inside the app)
+export const FirstBillingComponent: FC<{ embedded?: boolean }> = ({
+  embedded = false,
+}) => {
   const { stripeClient } = useVariables();
   const user = useUser();
   const dub = useDubClickId();
@@ -81,8 +86,10 @@ export const FirstBillingComponent = () => {
   // shown and the checkout loaded are the ones made for it (a team member
   // can't set it, they get the default view)
   const [askAccountType, setAskAccountType] = useState(
-    () => !accountType && !!user?.role && user.role !== 'USER'
+    () => !embedded && !accountType && !!user?.role && user.role !== 'USER'
   );
+  const [startingFree, setStartingFree] = useState(false);
+  const isFree = tier === 'FREE';
   const [datafast_visitor_id] = useCookie('datafast_visitor_id', '');
   const [datafast_session_id] = useCookie('datafast_session_id', '');
 
@@ -109,7 +116,7 @@ export const FirstBillingComponent = () => {
   }, [tier, period]);
 
   const { data, isLoading } = useSWR(
-    askAccountType ? null : `/billing-${tier}-${period}`,
+    askAccountType || isFree ? null : `/billing-${tier}-${period}`,
     loadCheckout,
     {
       revalidateOnFocus: false,
@@ -131,6 +138,7 @@ export const FirstBillingComponent = () => {
     (value: PlanView) => {
       setView(value);
       if (
+        tier !== 'FREE' &&
         value !== 'ALL' &&
         !(PLAN_GROUPS[value] as string[]).includes(tier)
       ) {
@@ -139,6 +147,17 @@ export const FirstBillingComponent = () => {
     },
     [tier]
   );
+
+  // the Free plan needs no card, the app opens once it's saved
+  const startFreePlan = useCallback(async () => {
+    setStartingFree(true);
+    try {
+      await fetch('/billing/free', { method: 'POST' });
+      await mutate('/user/self');
+    } finally {
+      setStartingFree(false);
+    }
+  }, [mutate]);
 
   // the plans of the chosen account type show right away, saving it can't block the checkout
   const chooseAccountType = useCallback(
@@ -183,7 +202,13 @@ export const FirstBillingComponent = () => {
   };
 
   return (
-    <div className="blurMe flex flex-1 flex-col bg-newBgColorInner pb-[40px]">
+    <div
+      className={clsx(
+        'flex flex-1 flex-col pb-[40px]',
+        !embedded && 'blurMe bg-newBgColorInner'
+      )}
+    >
+      {!embedded && (
       <div className="h-[72px] px-[40px] tablet:px-[32px] mobile:!px-[16px] flex border-b border-newColColor">
         <div className="flex-1 flex items-center text-textColor">
           <LogoTextComponent />
@@ -208,6 +233,7 @@ export const FirstBillingComponent = () => {
           </div>
         </div>
       </div>
+      )}
       {askAccountType ? (
         <div className="flex flex-col items-center gap-[40px] px-[80px] tablet:px-[32px] mobile:!px-[16px] py-[60px] mobile:py-[32px]">
           <div className="flex flex-col items-center text-center">
@@ -230,7 +256,13 @@ export const FirstBillingComponent = () => {
         </div>
       ) : (
         // plans on the left, the payment card on the right (stacked on small screens)
-        <div className="w-full max-w-[1320px] mx-auto px-[40px] tablet:px-[32px] mobile:!px-[16px] pt-[40px] mobile:pt-[24px] flex items-start gap-[48px] tablet:gap-[32px] tablet:flex-col">
+        <div
+          className={clsx(
+            'w-full max-w-[1320px] mx-auto flex items-start gap-[48px] tablet:gap-[32px] tablet:flex-col',
+            !embedded &&
+              'px-[40px] tablet:px-[32px] mobile:!px-[16px] pt-[40px] mobile:pt-[24px]'
+          )}
+        >
           <div className="flex-1 min-w-0 w-full flex flex-col gap-[32px]">
             <JoinOver />
 
@@ -275,7 +307,7 @@ export const FirstBillingComponent = () => {
                 className="w-fit mobile:w-full"
               />
               <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] mobile:!grid-cols-2 gap-[12px] pt-[8px]">
-                {plans.map((key) => (
+                {['FREE', ...plans].map((key) => (
                   <button
                     type="button"
                     onClick={() => setTier(key)}
@@ -314,7 +346,9 @@ export const FirstBillingComponent = () => {
                           ]
                         }
                       </span>{' '}
-                      {period === 'MONTHLY'
+                      {key === 'FREE'
+                        ? t('billing_free_forever', 'free forever')
+                        : period === 'MONTHLY'
                         ? t('billing_per_month', '/ month')
                         : t('billing_per_year', '/ year')}
                     </div>
@@ -343,7 +377,54 @@ export const FirstBillingComponent = () => {
 
           <div className="w-[460px] tablet:w-full shrink-0 sticky top-[24px] tablet:static">
             <div className="rounded-[20px] border border-newColColor bg-newBgColor p-[28px] mobile:p-[18px] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
-              {data?.blocked ? (
+              {isFree ? (
+                <div className="flex flex-col gap-[16px]">
+                  <div className="text-[18px] font-[700]">
+                    {t('billing_free_plan', 'Free plan')}
+                  </div>
+                  <div className="text-[14px] text-textItemBlur">
+                    {t(
+                      'billing_free_plan_description',
+                      'Schedule up to {{posts}} posts a month on {{channels}} social accounts. No credit card needed, upgrade any time.',
+                      {
+                        posts: pricing.FREE.posts_per_month,
+                        channels: pricing.FREE.channel,
+                      }
+                    )}
+                  </div>
+                  <div className="rounded-[12px] border border-newColColor p-[16px] flex justify-between items-center text-[14px]">
+                    <span className="font-[600]">
+                      {t('billing_due_today', 'Due today')}
+                    </span>
+                    <span className="font-[700] text-[18px]">$0.00</span>
+                  </div>
+                  {user?.freePlan ? (
+                    <div className="h-[48px] rounded-[10px] border border-newColColor flex items-center justify-center text-[15px] font-[600] text-textItemBlur">
+                      {t('billing_your_current_plan', 'Your current plan')}
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="h-[48px] rounded-[10px] w-full text-[15px] font-[600]"
+                      loading={startingFree}
+                      onClick={startFreePlan}
+                    >
+                      {t('billing_start_free', 'Start for free')}
+                    </Button>
+                  )}
+                  <div className="text-[13px] text-textItemBlur text-center">
+                    {user?.allowTrial
+                      ? t(
+                          'billing_free_or_trial',
+                          'Want more? Pick a paid plan to start a 7-day free trial.'
+                        )
+                      : t(
+                          'billing_free_or_upgrade',
+                          'Want more? Pick a paid plan to upgrade.'
+                        )}
+                  </div>
+                </div>
+              ) : data?.blocked ? (
                 <div className="text-[16px] font-[500]">
                   {t(
                     'billing_other_account_subscribed',
@@ -417,9 +498,9 @@ export const useBillingFeatures = (tier: string) => {
     const channelsOr = currentPricing.channel;
     const list: FeatureItem[] = [];
 
-    // the PostCherry plans list what the website sells, every line is
-    // enforced by the plan limits
-    if (isNewTier(tier)) {
+    // the PostCherry plans (and Free) list what the website sells, every
+    // line is enforced by the plan limits
+    if (isNewTier(tier) || tier === 'FREE') {
       list.push(
         currentPricing.brands === 1
           ? {
@@ -446,6 +527,13 @@ export const useBillingFeatures = (tier: string) => {
             }
           : { key: 'billing_single_user', defaultValue: 'Single user' }
       );
+      if (currentPricing.posts_per_month <= 10000) {
+        list.push({
+          key: 'billing_posts_per_month',
+          defaultValue: 'posts per month',
+          prefix: currentPricing.posts_per_month,
+        });
+      }
       if (currentPricing.ai) {
         list.push({
           key: 'billing_ai_writing_assistant',
@@ -494,6 +582,11 @@ export const useBillingFeatures = (tier: string) => {
         });
       }
       list.push({ key: 'billing_analytics', defaultValue: 'Analytics' });
+      // MCP connectors work on every plan
+      list.push({
+        key: 'billing_mcp_connectors',
+        defaultValue: 'Post from Claude and ChatGPT (MCP)',
+      });
       return list;
     }
 

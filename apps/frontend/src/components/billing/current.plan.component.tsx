@@ -62,7 +62,9 @@ export const PlanBadge: FC = () => {
   const tier = user?.tier?.current || 'FREE';
   const label =
     tier === 'FREE'
-      ? t('choose_a_plan', 'Choose a plan')
+      ? user?.freePlan
+        ? t('free_plan_upgrade', 'Free · Upgrade')
+        : t('choose_a_plan', 'Choose a plan')
       : user?.isTrailing
       ? data?.trialEnd
         ? t('trial_days_left', 'Trial · {{count}} days left', {

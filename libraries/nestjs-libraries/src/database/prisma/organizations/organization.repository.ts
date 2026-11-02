@@ -665,6 +665,31 @@ export class OrganizationRepository {
     });
   }
 
+  startFreePlan(orgId: string) {
+    return this._organization.model.organization.update({
+      where: {
+        id: orgId,
+      },
+      data: {
+        freePlanSince: new Date(),
+      },
+      select: {
+        freePlanSince: true,
+      },
+    });
+  }
+
+  getFreePlanSince(orgId: string) {
+    return this._organization.model.organization.findUnique({
+      where: {
+        id: orgId,
+      },
+      select: {
+        freePlanSince: true,
+      },
+    });
+  }
+
   updateAccountType(orgId: string, accountType: AccountType) {
     return this._organization.model.organization.update({
       where: {

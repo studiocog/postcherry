@@ -159,10 +159,7 @@ export class PostActivity {
   @ActivityMethod()
   async getPost(orgId: string, postId: string) {
     if (process.env.STRIPE_SECRET_KEY) {
-      const subscription = await this._subscriptionService.getSubscription(
-        orgId
-      );
-      if (!subscription) {
+      if (!(await this._subscriptionService.canPublish(orgId))) {
         return false;
       }
     }
@@ -177,10 +174,7 @@ export class PostActivity {
   @ActivityMethod()
   async getPostsList(orgId: string, postId: string) {
     if (process.env.STRIPE_SECRET_KEY) {
-      const subscription = await this._subscriptionService.getSubscription(
-        orgId
-      );
-      if (!subscription) {
+      if (!(await this._subscriptionService.canPublish(orgId))) {
         return [];
       }
     }
@@ -337,11 +331,11 @@ export class PostActivity {
     // narrowed down to the step they hung on.
     setHeartbeatDetails('subscription lookup');
     if (process.env.STRIPE_SECRET_KEY) {
-      const subscription = await this._subscriptionService.getSubscription(
-        integration.organizationId
-      );
-
-      if (!subscription) {
+      if (
+        !(await this._subscriptionService.canPublish(
+          integration.organizationId
+        ))
+      ) {
         throw new Error('No active subscription found for this organization.');
       }
     }

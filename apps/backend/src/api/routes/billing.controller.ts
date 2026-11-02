@@ -186,6 +186,13 @@ export class BillingController {
     return (await this.provider(org)).getInvoices(org.id);
   }
 
+  // the Free plan, chosen on the checkout page instead of a paid plan
+  @Post('/free')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  startFreePlan(@GetOrgFromRequest() org: Organization) {
+    return this._subscriptionService.startFreePlan(org.id);
+  }
+
   // trial end and next renewal of the current plan (the current plan card)
   @Get('/renewal')
   async getRenewal(@GetOrgFromRequest() org: Organization) {

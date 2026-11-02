@@ -22,6 +22,9 @@ model Organization {
   isTrailing          Boolean              @default(false)
   shortlink           ShortLinkPreference  @default(ASK)
   accountType         AccountType?
+  // set when the workspace chose the Free plan (no subscription needed to
+  // use the app and publish, within the pricing.FREE limits)
+  freePlanSince       DateTime?
   autoPost            AutoPost[]
   Comments            Comments[]
   credits             Credits[]

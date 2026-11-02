@@ -218,6 +218,14 @@ export class OrganizationService {
     );
   }
 
+  startFreePlan(orgId: string) {
+    return this._organizationRepository.startFreePlan(orgId);
+  }
+
+  getFreePlanSince(orgId: string) {
+    return this._organizationRepository.getFreePlanSince(orgId);
+  }
+
   updateAccountType(orgId: string, accountType: AccountType) {
     return this._organizationRepository.updateAccountType(orgId, accountType);
   }

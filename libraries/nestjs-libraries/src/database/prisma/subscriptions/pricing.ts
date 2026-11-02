@@ -137,13 +137,17 @@ export const allowsAutoPost = (plan?: PricingInnerInterface) =>
 //   dialog says how many).
 
 export const pricing: PricingInterface = {
+  // The Free plan: a workspace without a subscription that chose it
+  // (Organization.freePlanSince). Like Metricool's free plan: one brand, a few
+  // social accounts and a monthly post limit, no AI credits
   FREE: {
     current: 'FREE',
     month_price: 0,
     year_price: 0,
-    channel: 0,
+    brands: 1,
+    channel: 3,
     image_generation_count: 0,
-    posts_per_month: 0,
+    posts_per_month: 30,
     team_members: false,
     community_features: false,
     featured_by_gitroom: false,

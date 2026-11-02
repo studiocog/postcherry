@@ -129,6 +129,7 @@ export class UsersController {
         ? false
         : organization?.isTrailing,
       allowTrial: organization?.allowTrial,
+      freePlan: !!organization?.freePlanSince,
       accountType: organization?.accountType || null,
       streakSince: organization?.streakSince || null,
       publicApi:

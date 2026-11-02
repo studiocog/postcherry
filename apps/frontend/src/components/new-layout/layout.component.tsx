@@ -117,7 +117,10 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                 <div className={clsx(user?.admin && 'mb-[8px]')}>
                   {user?.admin ? <Impersonate /> : <div />}
                 </div>
-                {user.tier === 'FREE' && isGeneral && billingEnabled ? (
+                {user.tier === 'FREE' &&
+                !user.freePlan &&
+                isGeneral &&
+                billingEnabled ? (
                   <FirstBillingComponent />
                 ) : (
                   <>
