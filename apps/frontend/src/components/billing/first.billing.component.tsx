@@ -19,7 +19,6 @@ import {
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import clsx from 'clsx';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
-import { CheckIconComponent } from '@gitroom/frontend/components/ui/check.icon.component';
 import {
   FAQComponent,
   FAQSection,
@@ -157,50 +156,35 @@ export const FirstBillingComponent = () => {
 
   const JoinOver = () => {
     return (
-      <>
-        <div className="text-[46px] font-[600] leading-[110%] tablet:text-[36px] mobile:!text-[30px] whitespace-pre-line text-balance">
+      <div className="flex flex-col gap-[16px]">
+        <div className="text-[34px] font-[700] leading-[115%] tracking-[-0.01em] tablet:text-[30px] mobile:!text-[26px] text-balance">
           {t('billing_postcherry_headline', 'The cherry on top of your')}{' '}
-          <span className="text-[#FF7A90]">
+          <span className="text-[#D21F3C]">
             {t('billing_postcherry_headline_accent', 'social media')}
           </span>
         </div>
 
         {!!user?.allowTrial && (
-          <div className="flex mt-[32px] mb-[10px] gap-[15px] tablet:mt-[32px] tablet:mb-[32px] text-[16px] font-[500] mobile:flex-col">
-            <div className="flex gap-[8px]">
-              <div>
-                <CheckIconComponent />
+          <div className="flex flex-wrap gap-x-[24px] gap-y-[8px] text-[14px] font-[500] text-textItemBlur">
+            {[
+              t('billing_no_risk_trial', '100% No-Risk Free Trial'),
+              t('billing_pay_nothing_7_days', 'Pay nothing for 7 days'),
+              t('billing_cancel_anytime', 'Cancel anytime, from settings'),
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-[6px]">
+                <TickIcon />
+                <span>{item}</span>
               </div>
-              <div>{t('billing_no_risk_trial', '100% No-Risk Free Trial')}</div>
-            </div>
-            <div className="flex-1 flex gap-[8px] justify-center mobile:justify-start">
-              <div>
-                <CheckIconComponent />
-              </div>
-              <div>
-                {t(
-                  'billing_pay_nothing_7_days',
-                  'Pay NOTHING for the first 7-days'
-                )}
-              </div>
-            </div>
-            <div className="flex gap-[8px]">
-              <div>
-                <CheckIconComponent />
-              </div>
-              <div>
-                {t('billing_cancel_anytime', 'Cancel anytime, from settings')}
-              </div>
-            </div>
+            ))}
           </div>
         )}
-      </>
+      </div>
     );
   };
 
   return (
-    <div className="blurMe flex flex-1 flex-col bg-newBgColorInner pb-[60px] mobile:pb-[100px]">
-      <div className="h-[92px] px-[80px] tablet:px-[32px] mobile:!px-[16px] py-[20px] flex border-b border-newColColor">
+    <div className="blurMe flex flex-1 flex-col bg-newBgColorInner pb-[40px]">
+      <div className="h-[72px] px-[40px] tablet:px-[32px] mobile:!px-[16px] flex border-b border-newColColor">
         <div className="flex-1 flex items-center text-textColor">
           <LogoTextComponent />
         </div>
@@ -245,109 +229,84 @@ export const FirstBillingComponent = () => {
           </div>
         </div>
       ) : (
-        <div className="flex px-[80px] tablet:px-[32px] mobile:!px-[16px] flex-1 flex-row tablet:flex-none tablet:flex-col-reverse">
-          <div className="flex-1 py-[40px] tablet:pt-[80px] flex flex-col pe-[40px] tablet:pe-0">
-            <div className="block tablet:hidden">
-              <JoinOver />
-            </div>
-            {data?.blocked ? (
-              <div className="mt-[24px] p-[24px] rounded-[20px] border-[1.5px] border-newColColor text-[16px] font-[500]">
-                {t(
-                  'billing_other_account_subscribed',
-                  'Another account with this email already has an active subscription. Please log off and sign in to that account to manage your subscription.'
-                )}
-              </div>
-            ) : stripeFailed ? (
-              <div className="mt-[24px] p-[24px] rounded-[20px] border-[1.5px] border-newColColor text-[16px] font-[500]">
-                {t(
-                  'billing_stripe_load_failed',
-                  'The payment form could not be loaded. Please disable ad blockers or privacy extensions for this page and reload.'
-                )}
-              </div>
-            ) : !isLoading && data && stripe ? (
-              <>
-                <EmbeddedBilling
-                  stripe={stripe}
-                  secret={data.client_secret}
-                  showCoupon={period === 'MONTHLY'}
-                  autoApplyCoupon={data.auto_apply_coupon}
-                />
-                <div className="text-[12px] mt-[12px] text-textItemBlur">
-                  {t('by_subscribing_you_agree_to_the', 'By subscribing you agree to the')}
-                  &nbsp;
-                  <TermsLinks />
-                </div>
-              </>
-            ) : (
-              <LoadingComponent />
-            )}
-          </div>
-          <div className="flex flex-col ps-[40px] tablet:!ps-[0] border-l border-newColColor py-[40px] mobile:!pt-[24px] tablet:border-none tablet:pb-0">
-            <div className="top-[20px] sticky">
-              <div className="hidden tablet:block">
-                <JoinOver />
-              </div>
-              <div className="flex mb-[16px] mobile:flex-col">
-                <div className="flex-1 text-[24px] font-[700]">
+        // plans on the left, the payment card on the right (stacked on small screens)
+        <div className="w-full max-w-[1320px] mx-auto px-[40px] tablet:px-[32px] mobile:!px-[16px] pt-[40px] mobile:pt-[24px] flex items-start gap-[48px] tablet:gap-[32px] tablet:flex-col">
+          <div className="flex-1 min-w-0 w-full flex flex-col gap-[32px]">
+            <JoinOver />
+
+            <div className="flex flex-col gap-[16px]">
+              <div className="flex flex-wrap items-center justify-between gap-[12px]">
+                <div className="text-[22px] font-[700]">
                   {t('billing_choose_plan', 'Choose a Plan')}
                 </div>
-                <div className="h-[44px] px-[6px] mobile:px-0 flex items-center justify-center mobile:justify-start gap-[12px] border border-newColColor rounded-[12px] select-none">
-                  <div
-                    className={clsx(
-                      'h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
-                      period === 'MONTHLY'
-                        ? 'bg-boxFocused text-textItemFocused'
-                        : 'cursor-pointer'
-                    )}
-                    onClick={() => setPeriod('MONTHLY')}
-                  >
-                    {t('billing_monthly', 'Monthly')}
-                  </div>
-                  <div
-                    className={clsx(
-                      'gap-[10px] h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
-                      period === 'YEARLY'
-                        ? 'bg-boxFocused text-textItemFocused'
-                        : 'cursor-pointer'
-                    )}
-                    onClick={() => setPeriod('YEARLY')}
-                  >
-                    <div>{t('billing_yearly', 'Yearly')}</div>
-                    <div className="bg-[#AA0FA4] text-[white] px-[8px] rounded-[4px] mobile:hidden">
-                      {t('billing_two_months_free', '2 months free')}
-                    </div>
-                  </div>
+                <div
+                  role="group"
+                  aria-label={t('billing_period', 'Billing period')}
+                  className="flex p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500] select-none"
+                >
+                  {(['MONTHLY', 'YEARLY'] as const).map((value) => (
+                    <button
+                      type="button"
+                      key={value}
+                      aria-pressed={period === value}
+                      onClick={() => setPeriod(value)}
+                      className={clsx(
+                        'h-[34px] px-[16px] rounded-[6px] flex items-center gap-[8px] whitespace-nowrap',
+                        period === value
+                          ? 'bg-boxFocused text-textItemFocused'
+                          : 'cursor-pointer'
+                      )}
+                    >
+                      {value === 'MONTHLY'
+                        ? t('billing_monthly', 'Monthly')
+                        : t('billing_yearly', 'Yearly')}
+                      {value === 'YEARLY' && (
+                        <span className="text-[11px] font-[600] px-[6px] py-[1px] rounded-[4px] bg-[#16A34A]/[0.12] text-[#16A34A]">
+                          {t('billing_two_months_free', '2 months free')}
+                        </span>
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
               <PlanAudienceTabs
                 value={view}
                 onChange={changeView}
-                className="mb-[16px] w-fit mobile:w-full"
+                className="w-fit mobile:w-full"
               />
-              <div className="grid grid-cols-2 gap-[8px] mobile:!grid-cols-2 tablet:grid-cols-4">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] mobile:!grid-cols-2 gap-[12px] pt-[8px]">
                 {plans.map((key) => (
-                  <div
+                  <button
+                    type="button"
                     onClick={() => setTier(key)}
                     key={key}
+                    aria-pressed={key === tier}
                     className={clsx(
-                      'cursor-pointer select-none w-[266px] h-[138px] tablet:w-full tablet:h-[124px] p-[24px] tablet:p-[15px] rounded-[20px] flex flex-col',
+                      'relative text-start select-none p-[18px] mobile:p-[14px] rounded-[16px] border-[1.5px] flex flex-col gap-[10px] transition-colors',
                       key === tier
-                        ? 'border-[1.5px] border-[#618DFF]'
-                        : 'border-[1.5px] border-newColColor'
+                        ? 'border-[#D21F3C] bg-[#D21F3C]/[0.04]'
+                        : 'border-newColColor hover:border-textItemBlur'
                     )}
                   >
-                    <div className="flex items-center justify-between gap-[8px]">
-                      <div className="text-[20px] mobile:text-[18px] font-[500] truncate">
+                    <div className="flex items-center justify-between gap-[8px] w-full">
+                      <div className="text-[16px] font-[600] truncate">
                         {planName(key)}
                       </div>
-                      {popular.includes(key) && (
-                        <div className="bg-[#AA0FA4] text-white text-[12px] px-[6px] rounded-[4px] whitespace-nowrap mobile:hidden">
-                          {t('billing_most_popular', 'Most popular')}
-                        </div>
-                      )}
+                      <div
+                        className={clsx(
+                          'w-[18px] h-[18px] shrink-0 rounded-full border-[1.5px] flex items-center justify-center',
+                          key === tier
+                            ? 'border-[#D21F3C]'
+                            : 'border-newColColor'
+                        )}
+                      >
+                        {key === tier && (
+                          <div className="w-[8px] h-[8px] rounded-full bg-[#D21F3C]" />
+                        )}
+                      </div>
                     </div>
-                    <div className="text-[24px] mobile:text-[18px] font-[400]">
-                      <span className="text-[44px] mobile:text-[30px] font-[600]">
+                    <div className="text-[14px] text-textItemBlur">
+                      <span className="text-[30px] mobile:text-[24px] font-[700] text-textColor">
                         $
                         {
                           pricing[key][
@@ -359,19 +318,67 @@ export const FirstBillingComponent = () => {
                         ? t('billing_per_month', '/ month')
                         : t('billing_per_year', '/ year')}
                     </div>
-                  </div>
+                    {popular.includes(key) && (
+                      <div className="absolute -top-[10px] start-[16px] bg-[#D21F3C] text-white text-[11px] font-[600] px-[8px] py-[2px] rounded-full whitespace-nowrap">
+                        {t('billing_most_popular', 'Most popular')}
+                      </div>
+                    )}
+                  </button>
                 ))}
               </div>
-              <div className="flex flex-col mt-[54px] gap-[24px] tablet:mt-[40px]">
-                <div className="text-[24px] font-[700]">
-                  {t('billing_features', 'Features')}
+            </div>
+
+            <div className="rounded-[16px] border border-newColColor p-[24px] mobile:p-[18px] flex flex-col gap-[16px]">
+              <div className="text-[18px] font-[700]">
+                {t('billing_whats_included', "What's included in")}{' '}
+                {planName(tier)}
+              </div>
+              <BillingFeatures tier={tier} />
+            </div>
+
+            <div className="flex flex-col tablet:hidden">
+              <FAQComponent />
+            </div>
+          </div>
+
+          <div className="w-[460px] tablet:w-full shrink-0 sticky top-[24px] tablet:static">
+            <div className="rounded-[20px] border border-newColColor bg-newBgColor p-[28px] mobile:p-[18px] shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+              {data?.blocked ? (
+                <div className="text-[16px] font-[500]">
+                  {t(
+                    'billing_other_account_subscribed',
+                    'Another account with this email already has an active subscription. Please log off and sign in to that account to manage your subscription.'
+                  )}
                 </div>
-                <BillingFeatures tier={tier} />
-              </div>
-              <div className="flex flex-col mobile:hidden tablet:hidden">
-                {/*<div>asd</div>*/}
-                <FAQComponent />
-              </div>
+              ) : stripeFailed ? (
+                <div className="text-[16px] font-[500]">
+                  {t(
+                    'billing_stripe_load_failed',
+                    'The payment form could not be loaded. Please disable ad blockers or privacy extensions for this page and reload.'
+                  )}
+                </div>
+              ) : !isLoading && data && stripe ? (
+                <>
+                  <EmbeddedBilling
+                    stripe={stripe}
+                    secret={data.client_secret}
+                    showCoupon={period === 'MONTHLY'}
+                    autoApplyCoupon={data.auto_apply_coupon}
+                  />
+                  <div className="text-[12px] mt-[16px] text-textItemBlur text-center">
+                    {t(
+                      'by_subscribing_you_agree_to_the',
+                      'By subscribing you agree to the'
+                    )}
+                    &nbsp;
+                    <TermsLinks />
+                  </div>
+                </>
+              ) : (
+                <div className="min-h-[320px] flex">
+                  <LoadingComponent />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -379,6 +386,22 @@ export const FirstBillingComponent = () => {
     </div>
   );
 };
+
+const TickIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#16A34A"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
 
 type FeatureItem = {
   key: string;
@@ -559,10 +582,10 @@ export const BillingFeatures: FC<{ tier: string }> = ({ tier }) => {
   const features = useBillingFeatures(tier);
 
   return (
-    <div className="grid grid-cols-2 mobile:grid-cols-1 gap-y-[8px] gap-x-[32px]">
+    <div className="grid grid-cols-2 mobile:grid-cols-1 gap-y-[10px] gap-x-[32px] text-[14px]">
       {features.map((feature) => (
         <div key={feature.key} className="flex items-center gap-[8px]">
-          <div>
+          <div className="text-[#D21F3C] shrink-0">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="17"

@@ -54,7 +54,7 @@ export const EmbeddedBilling: FC<{
   }
 
   return (
-    <div className="flex flex-col w-full pt-[48px] billing-form flex-1 tablet:pt-0">
+    <div className="flex flex-col w-full billing-form flex-1">
       <CheckoutProvider
         stripe={stripe}
         options={{
@@ -147,7 +147,7 @@ const StripeInputs: FC<{
       {/*  <BillingAddressElement />*/}
       {/*</div>*/}
       <div>
-        <h4 className="mb-[32px] text-[24px] font-[700]">
+        <h4 className="mb-[16px] text-[18px] font-[700]">
           {checkout.type === 'loading' ? '' : t('billing_payment', 'Payment')}
         </h4>
         <PaymentElement
@@ -164,7 +164,7 @@ const StripeInputs: FC<{
         )}
         {ready && <SubmitBar loading={loading} />}
         {checkout.type === 'loading' ? null : (
-          <div className="mt-[24px] text-[16px] font-[600] flex gap-[4px] items-center">
+          <div className="mt-[16px] text-[13px] font-[500] text-textItemBlur flex gap-[4px] items-center justify-center">
             <div>
               {t('billing_powered_by_stripe', 'Secure payments processed by')}
             </div>
@@ -219,11 +219,11 @@ const PriceBreakdown: FC = () => {
       : t('billing_yearly', 'Yearly');
 
   return (
-    <div className="mt-[40px]">
-      <h4 className="mb-[16px] text-[24px] font-[700]">
+    <div className="mt-[24px]">
+      <h4 className="mb-[12px] text-[18px] font-[700]">
         {t('billing_order_summary', 'Order Summary')}
       </h4>
-      <div className="rounded-[12px] border border-newColColor p-[20px] flex flex-col gap-[12px]">
+      <div className="rounded-[12px] border border-newColColor p-[16px] flex flex-col gap-[10px] text-[14px]">
         {/* Plan */}
         <div className="flex justify-between items-center">
           <div className="flex flex-col">
@@ -507,7 +507,7 @@ export const CouponInput: FC<{ autoApplyCoupon?: string }> = ({
   // Show applied coupon (either manually applied or pre-applied from backend)
   if (effectiveAppliedCode) {
     return (
-      <div className="mt-[40px]">
+      <div className="mt-[16px]">
         <AppliedCouponDisplay
           appliedCode={effectiveAppliedCode}
           checkout={checkout}
@@ -521,11 +521,11 @@ export const CouponInput: FC<{ autoApplyCoupon?: string }> = ({
   // Show "Have a promo code?" link
   if (!showInput) {
     return (
-      <div className="mt-[40px]">
+      <div className="mt-[16px]">
         <button
           type="button"
           onClick={() => setShowInput(true)}
-          className="text-[16px] text-textColor/60 hover:text-textColor font-[500] flex items-center gap-[8px] transition-colors"
+          className="text-[14px] text-textColor/60 hover:text-textColor font-[500] flex items-center gap-[8px] transition-colors"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -548,7 +548,7 @@ export const CouponInput: FC<{ autoApplyCoupon?: string }> = ({
 
   // Show input field
   return (
-    <div className="mt-[40px]">
+    <div className="mt-[16px]">
       <div className="flex items-center gap-[12px] mb-[12px]">
         <h4 className="text-[18px] font-[600] text-textColor">
           {t('billing_discount_coupon', 'Discount Coupon')}
@@ -606,46 +606,36 @@ const SubmitBar: FC<{ loading: boolean }> = ({ loading }) => {
     return null;
   }
 
+  const trialEnd = checkout.checkout.recurring?.trial?.trialEnd;
+
+  // sits inside the payment card, under the order summary
   return (
-    <div className="animate-fadeIn h-[92px] mobile:h-auto fixed bottom-0 w-full px-[12px] pb-[12px] left-0 bg-newBgColor z-[100]">
-      <div className="w-full h-full border-t border-newColColor bg-newBgColorInner px-[80px] tablet:px-[33px] mobile:!px-[16px] flex mobile:flex-col gap-[32px] mobile:gap-[16px] justify-end items-center font-[400] text-[14px] text-[#A3A3A3] mobile:py-[16px]">
-        {checkout.checkout.recurring?.trial?.trialEnd ? (
-          <div>
-            {t('billing_your_7_day_trial_is', 'Your 7-day trial is')}{' '}
-            <span className="text-textColor font-[600]">
-              {t('billing_100_percent_free', '100% free')}
-            </span>{' '}
-            {t('billing_ending', 'ending')}{' '}
-            <br className="hidden mobile:block" />
-            <span className="text-textColor font-[600]">
-              {dayjs(
-                checkout.checkout.recurring?.trial?.trialEnd * 1000
-              ).format('MMMM D, YYYY')}{' '}
-              —{' '}
-            </span>
-            <span className="text-textColor font-[600]">
-              {t(
-                'billing_cancel_anytime_short',
-                'Cancel anytime from settings'
-              )}
-            </span>
-          </div>
-        ) : null}
-        <div>
-          <Button
-            className="h-[42px] rounded-[10px] mobile:w-full"
-            type="submit"
-            loading={loading}
-          >
-            {checkout.checkout.recurring?.trial?.trialEnd
-              ? t(
-                  'billing_pay_0_start_trial',
-                  'Pay $0 Today - Start your free trial!'
-                )
-              : t('billing_pay_now', 'Pay Now')}
-          </Button>
+    <div className="animate-fadeIn mt-[24px] flex flex-col gap-[12px]">
+      <Button
+        className="h-[48px] rounded-[10px] w-full text-[15px] font-[600]"
+        type="submit"
+        loading={loading}
+      >
+        {trialEnd
+          ? t(
+              'billing_pay_0_start_trial',
+              'Pay $0 Today - Start your free trial!'
+            )
+          : t('billing_pay_now', 'Pay Now')}
+      </Button>
+      {trialEnd ? (
+        <div className="text-[13px] text-textItemBlur text-center">
+          {t('billing_your_7_day_trial_is', 'Your 7-day trial is')}{' '}
+          <span className="text-textColor font-[600]">
+            {t('billing_100_percent_free', '100% free')}
+          </span>{' '}
+          {t('billing_ending', 'ending')}{' '}
+          <span className="text-textColor font-[600]">
+            {dayjs(trialEnd * 1000).format('MMMM D, YYYY')}
+          </span>
+          . {t('billing_cancel_anytime_short', 'Cancel anytime from settings')}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 };
