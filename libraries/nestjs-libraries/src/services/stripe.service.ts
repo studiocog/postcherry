@@ -714,6 +714,9 @@ export class StripeService extends PaymentProviderAbstract {
     const isUtm = body.utm ? `&utm_source=${body.utm}` : '';
     const { client_secret } = await stripe.checkout.sessions.create({
       ui_mode: 'custom',
+      // New Stripe accounts enable Managed Payments by default, which rejects
+      // ui_mode 'custom' (the in-app card form)
+      ...({ managed_payments: { enabled: false } } as Record<string, unknown>),
       customer,
       return_url:
         process.env['FRONTEND_URL'] +
