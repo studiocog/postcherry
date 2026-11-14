@@ -23,6 +23,7 @@ export const UserContext = createContext<
       isTrailing: boolean;
       accountType: 'INDIVIDUAL' | 'BUSINESS' | 'AGENCY' | null;
       streakSince: string | null;
+      aiImages?: boolean;
     })
 >(undefined);
 export const ContextWrapper: FC<{

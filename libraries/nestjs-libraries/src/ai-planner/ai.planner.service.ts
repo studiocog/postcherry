@@ -12,6 +12,7 @@ import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integ
 import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 import { generationError } from '@gitroom/nestjs-libraries/openai/generation.error';
+import { aiEnabled } from '@gitroom/nestjs-libraries/openai/ai.provider';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import {
@@ -129,7 +130,7 @@ export class AiPlannerService {
   ) {}
 
   isConfigured() {
-    return !!process.env.OPENAI_API_KEY;
+    return aiEnabled();
   }
 
   // Everything that can be wrong with the request, checked before the stream starts

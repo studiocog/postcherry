@@ -23,6 +23,13 @@ import { RequestContext } from '@mastra/core/di';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
+import {
+  aiEnabled,
+  aiLanguageModel,
+  aiModel,
+  createAiClient,
+  isOpenAiProvider,
+} from '@gitroom/nestjs-libraries/openai/ai.provider';
 
 export type ChannelsContext = {
   integrations: string;
@@ -30,6 +37,20 @@ export type ChannelsContext = {
   ui: string;
   brandVoice: string;
 };
+
+// The runtime turns the adapter into the AI SDK default model, the Responses
+// API that only OpenAI serves, the other providers get chat completions
+class AiProviderAdapter extends OpenAIAdapter {
+  override getLanguageModel() {
+    return isOpenAiProvider() ? super.getLanguageModel() : aiLanguageModel();
+  }
+}
+
+const copilotAdapter = () =>
+  new AiProviderAdapter({
+    openai: createAiClient(),
+    model: aiModel(),
+  });
 
 // the copilot runtime writes its own CORS headers on the response, keep them aligned with main.ts
 const copilotCors = () => ({
@@ -50,11 +71,8 @@ export class CopilotController {
   ) {}
   @Post('/chat')
   chatAgent(@Req() req: Request, @Res() res: Response) {
-    if (
-      process.env.OPENAI_API_KEY === undefined ||
-      process.env.OPENAI_API_KEY === ''
-    ) {
-      Logger.warn('OpenAI API key not set, chat functionality will not work');
+    if (!aiEnabled()) {
+      Logger.warn('AI API key not set, chat functionality will not work');
       return;
     }
 
@@ -62,9 +80,7 @@ export class CopilotController {
       endpoint: '/copilot/chat',
       cors: copilotCors(),
       runtime: new CopilotRuntime(),
-      serviceAdapter: new OpenAIAdapter({
-        model: 'gpt-4.1',
-      }),
+      serviceAdapter: copilotAdapter(),
     });
 
     return copilotRuntimeHandler(req, res);
@@ -77,11 +93,8 @@ export class CopilotController {
     @Res() res: Response,
     @GetOrgFromRequest() organization: Organization
   ) {
-    if (
-      process.env.OPENAI_API_KEY === undefined ||
-      process.env.OPENAI_API_KEY === ''
-    ) {
-      Logger.warn('OpenAI API key not set, chat functionality will not work');
+    if (!aiEnabled()) {
+      Logger.warn('AI API key not set, chat functionality will not work');
       return;
     }
     const mastra = await this._mastraService.mastra();
@@ -113,9 +126,7 @@ export class CopilotController {
       endpoint: '/copilot/agent',
       cors: copilotCors(),
       runtime,
-      serviceAdapter: new OpenAIAdapter({
-        model: 'gpt-4.1',
-      }),
+      serviceAdapter: copilotAdapter(),
     });
 
     return copilotRuntimeHandler(req, res);

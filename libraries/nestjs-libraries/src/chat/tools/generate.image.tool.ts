@@ -6,6 +6,7 @@ import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/me
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { aiImagesEnabled } from '@gitroom/nestjs-libraries/openai/ai.provider';
 
 @Injectable()
 export class GenerateImageTool implements AgentToolInterface {
@@ -16,6 +17,10 @@ export class GenerateImageTool implements AgentToolInterface {
     private _subscriptionService: SubscriptionService
   ) {}
   name = 'generateImageTool';
+
+  available() {
+    return aiImagesEnabled();
+  }
 
   run() {
     return createTool({

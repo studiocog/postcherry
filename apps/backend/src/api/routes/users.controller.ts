@@ -28,6 +28,7 @@ import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/emai
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { RealIP } from 'nestjs-real-ip';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
+import { aiImagesEnabled } from '@gitroom/nestjs-libraries/openai/ai.provider';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -132,6 +133,8 @@ export class UsersController {
       freePlan: !!organization?.freePlanSince,
       accountType: organization?.accountType || null,
       streakSince: organization?.streakSince || null,
+      // AI images need an OpenAI key, whatever the text provider is
+      aiImages: aiImagesEnabled(),
       publicApi:
         // @ts-ignore
         organization?.users[0]?.role === 'SUPERADMIN' ||

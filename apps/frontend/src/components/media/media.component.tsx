@@ -992,10 +992,12 @@ export const MultiMediaComponent: FC<{
 
                 {!!user?.tier?.ai && (
                   <>
-                    {/* plans without AI media credits have no generator */}
-                    {!!user.tier.image_generation_count && (
-                      <AiImage value={text} onChange={changeMedia} />
-                    )}
+                    {/* plans without AI media credits, or installs without
+                    an OpenAI key, have no generator */}
+                    {!!user.tier.image_generation_count &&
+                      user.aiImages !== false && (
+                        <AiImage value={text} onChange={changeMedia} />
+                      )}
                     {!insertInContent && !!user.tier.generate_videos && (
                       <AiVideo value={text} onChange={changeMedia} />
                     )}

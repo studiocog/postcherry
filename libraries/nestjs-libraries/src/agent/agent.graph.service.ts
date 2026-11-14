@@ -16,6 +16,14 @@ import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/me
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
 import { generationError } from '@gitroom/nestjs-libraries/openai/generation.error';
+import {
+  aiApiKey,
+  aiBaseUrl,
+  aiModel,
+  aiStructuredOutput,
+  aiTemperature,
+  openAiImagesKey,
+} from '@gitroom/nestjs-libraries/openai/ai.provider';
 
 const tools = !process.env.TAVILY_API_KEY
   ? []
@@ -23,13 +31,15 @@ const tools = !process.env.TAVILY_API_KEY
 const toolNode = new ToolNode(tools);
 
 const model = new ChatOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
-  model: 'gpt-4.1',
-  temperature: 0.7,
+  apiKey: aiApiKey() || 'sk-proj-',
+  configuration: { baseURL: aiBaseUrl() },
+  model: aiModel(),
+  temperature: aiTemperature(0.7),
 });
 
+// images stay on OpenAI whatever the text provider is
 const dalle = new DallEAPIWrapper({
-  apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
+  apiKey: openAiImagesKey() || 'sk-proj-',
   model: 'chatgpt-image-latest',
 });
 
@@ -159,7 +169,7 @@ export class AgentGraphService {
 
   async findCategories(state: WorkflowChannelsState) {
     const allCategories = await this._postsService.findAllExistingCategories();
-    const structuredOutput = model.withStructuredOutput(category);
+    const structuredOutput = aiStructuredOutput(model, category, 'category');
     const { category: outputCategory } = await ChatPromptTemplate.fromTemplate(
       `
         You are an assistant that gets a text that will be later summarized into a social media post
@@ -186,7 +196,7 @@ export class AgentGraphService {
       return { topic: null };
     }
 
-    const structuredOutput = model.withStructuredOutput(topic);
+    const structuredOutput = aiStructuredOutput(model, topic, 'topic');
     const { topic: outputTopic } = await ChatPromptTemplate.fromTemplate(
       `
         You are an assistant that gets a text that will be later summarized into a social media post
@@ -214,7 +224,7 @@ export class AgentGraphService {
   }
 
   async generateHook(state: WorkflowChannelsState) {
-    const structuredOutput = model.withStructuredOutput(hook);
+    const structuredOutput = aiStructuredOutput(model, hook, 'hook');
     const { hook: outputHook } = await ChatPromptTemplate.fromTemplate(
       `
         You are an assistant that gets content for a social media post, and generate only the hook.
@@ -262,8 +272,10 @@ export class AgentGraphService {
   }
 
   async generateContent(state: WorkflowChannelsState) {
-    const structuredOutput = model.withStructuredOutput(
-      contentZod(!!state.isPicture, state.format)
+    const structuredOutput = aiStructuredOutput(
+      model,
+      contentZod(!!state.isPicture, state.format),
+      'content'
     );
     const { content: outputContent } = await ChatPromptTemplate.fromTemplate(
       `

@@ -102,7 +102,14 @@ services:
       # SENTRY_SPOTLIGHT: '1'
 
       # === Misc Settings
+      # AI images always need OPENAI_API_KEY
       OPENAI_API_KEY: ''
+      # Text AI on another provider (see .env.example): anthropic, deepseek,
+      # openrouter, gemini, groq, mistral, xai or custom
+      # AI_PROVIDER: 'anthropic'
+      # AI_API_KEY: ''
+      # AI_BASE_URL: ''
+      # AI_MODEL: ''
       # Only this OAuth client can receive verified user email claims via OIDC.
       OPENAI_OAUTH_CLIENT_ID: ''
       NEXT_PUBLIC_DISCORD_SUPPORT: ''

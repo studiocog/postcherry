@@ -37,6 +37,7 @@ import {
 import { RealIP } from 'nestjs-real-ip';
 import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { aiImagesEnabled } from '@gitroom/nestjs-libraries/openai/ai.provider';
 
 @ApiTags('Posts')
 @Controller('/posts')
@@ -282,10 +283,11 @@ export class PostsController {
     @Body() body: GeneratorDto,
     @Res({ passthrough: false }) res: Response
   ) {
-    // the pictures are AI images, a plan without AI image credits gets the
-    // posts without them
+    // the pictures are AI images, a plan without AI image credits (or an
+    // install without an OpenAI key) gets the posts without them
     const isPicture =
       !!body.isPicture &&
+      aiImagesEnabled() &&
       (await this._subscriptionService.hasAiImages(org.id));
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');

@@ -10,6 +10,7 @@ import {
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { generationError } from '@gitroom/nestjs-libraries/openai/generation.error';
+import { aiEnabled } from '@gitroom/nestjs-libraries/openai/ai.provider';
 
 const LEARN_VOICE_POSTS = 30;
 const LEARN_VOICE_POST_LENGTH = 1500;
@@ -114,7 +115,7 @@ export class BrandKitService {
 
   // Suggests a voice from the last published posts, the user reviews it and saves it
   async learnVoice(orgId: string): Promise<LearnVoiceResult> {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!aiEnabled()) {
       return { status: 'not_configured' };
     }
 

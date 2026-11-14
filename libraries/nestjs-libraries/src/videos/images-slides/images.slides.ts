@@ -14,6 +14,7 @@ import { stringifySync } from 'subtitle';
 
 import pLimit from 'p-limit';
 import { FalService } from '@gitroom/nestjs-libraries/openai/fal.service';
+import { aiEnabled } from '@gitroom/nestjs-libraries/openai/ai.provider';
 import { IsString } from 'class-validator';
 import { JSONSchema } from 'class-validator-jsonschema';
 const limit = pLimit(2);
@@ -65,7 +66,8 @@ class ImagesSlidesParams {
     !!process.env.ELEVENSLABS_API_KEY &&
     !!process.env.TRANSLOADIT_AUTH &&
     !!process.env.TRANSLOADIT_SECRET &&
-    !!process.env.OPENAI_API_KEY &&
+    // the slides are written by the text model, the pictures come from Fal
+    aiEnabled() &&
     !!process.env.FAL_KEY,
 })
 export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Agent } from '@mastra/core/agent';
-import { openai } from '@ai-sdk/openai';
+import { aiLanguageModel } from '@gitroom/nestjs-libraries/openai/ai.provider';
 import { Memory } from '@mastra/memory';
 import { pStore } from '@gitroom/nestjs-libraries/chat/mastra.store';
 import { array, object, string } from 'zod';
@@ -121,7 +121,7 @@ ${brandVoice}`
       }
 `;
       },
-      model: openai('gpt-5.2'),
+      model: aiLanguageModel('gpt-5.2'),
       tools,
       memory: new Memory({
         storage: pStore,

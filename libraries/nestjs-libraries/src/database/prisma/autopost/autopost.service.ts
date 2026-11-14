@@ -20,6 +20,15 @@ import {
   organizationId,
 } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
 import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
+import {
+  aiApiKey,
+  aiBaseUrl,
+  aiModel,
+  aiStructuredOutput,
+  aiTemperature,
+  aiImagesEnabled,
+  openAiImagesKey,
+} from '@gitroom/nestjs-libraries/openai/ai.provider';
 const parser = new Parser();
 
 interface WorkflowChannelsState {
@@ -37,13 +46,15 @@ interface WorkflowChannelsState {
 }
 
 const model = new ChatOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
-  model: 'gpt-4.1',
-  temperature: 0.7,
+  apiKey: aiApiKey() || 'sk-proj-',
+  configuration: { baseURL: aiBaseUrl() },
+  model: aiModel(),
+  temperature: aiTemperature(0.7),
 });
 
+// images stay on OpenAI whatever the text provider is
 const dalle = new DallEAPIWrapper({
-  apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
+  apiKey: openAiImagesKey() || 'sk-proj-',
   model: 'chatgpt-image-latest',
 });
 
@@ -240,7 +251,11 @@ export class AutopostService {
     const brandVoice = await this._brandKitService.getAiContext(
       state.body.organizationId
     );
-    const structuredOutput = model.withStructuredOutput(generateContent);
+    const structuredOutput = aiStructuredOutput(
+      model,
+      generateContent,
+      'generateContent'
+    );
     const { socialMediaPostContent } = await ChatPromptTemplate.fromTemplate(
       `
         You are an assistant that gets raw 'description' of a content and generate a social media post content.
@@ -273,7 +288,11 @@ export class AutopostService {
   }
 
   async generatePicture(state: WorkflowChannelsState) {
-    const structuredOutput = model.withStructuredOutput(dallePrompt);
+    const structuredOutput = aiStructuredOutput(
+      model,
+      dallePrompt,
+      'dallePrompt'
+    );
     const { generatedTextToBeSentToDallE } =
       await ChatPromptTemplate.fromTemplate(
         `
@@ -380,7 +399,8 @@ export class AutopostService {
           if (!state.description) {
             return 'schedule-post';
           }
-          if (state.body.addPicture) {
+          // without an OpenAI key the post goes out without the picture
+          if (state.body.addPicture && aiImagesEnabled()) {
             return 'generate-picture';
           }
           return 'schedule-post';
