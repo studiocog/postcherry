@@ -28,7 +28,7 @@ export const Support = () => {
       <a
         id="support-email"
         href={`mailto:${supportEmail}`}
-        className="bg-customColor39 w-[194px] h-[58px] fixed end-[20px] bottom-[20px] z-[500] text-[16px] text-customColor40 rounded-[30px] !rounded-br-[0] cursor-pointer flex justify-center items-center gap-[10px]"
+        className="group bg-customColor39 h-[48px] min-w-[48px] px-[12px] fixed end-[20px] bottom-[20px] z-[500] text-[15px] font-[500] text-customColor40 rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.25)] cursor-pointer flex justify-center items-center gap-[8px]"
       >
         <svg
           width="24"
@@ -43,14 +43,14 @@ export const Support = () => {
           <rect x="2" y="4" width="20" height="16" rx="2" />
           <path d="m22 7-10 6L2 7" />
         </svg>
-        <div>{t('help_and_support', 'Help & Support')}</div>
+        <div className="hidden group-hover:block whitespace-nowrap">{t('help_and_support', 'Help & Support')}</div>
       </a>
     );
   }
   return (
     <div
       id="support-discord"
-      className="bg-customColor39 w-[194px] h-[58px] fixed end-[20px] bottom-[20px] z-[500] text-[16px] text-customColor40 rounded-[30px] !rounded-br-[0] cursor-pointer flex justify-center items-center gap-[10px]"
+      className="group bg-customColor39 h-[48px] min-w-[48px] px-[12px] fixed end-[20px] bottom-[20px] z-[500] text-[15px] font-[500] text-customColor40 rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.25)] cursor-pointer flex justify-center items-center gap-[8px]"
       onClick={() => window.open(discordUrl)}
     >
       <div>

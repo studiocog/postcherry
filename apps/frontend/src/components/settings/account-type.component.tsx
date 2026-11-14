@@ -88,7 +88,7 @@ export const AccountTypePicker: FC<{
           className={clsx(
             'flex flex-col items-center text-center gap-[8px] p-[24px] rounded-[16px] border-2 transition-colors hover:border-btnPrimary',
             value === option.type
-              ? 'border-btnPrimary bg-boxFocused'
+              ? 'border-btnPrimary bg-boxFocused text-textItemFocused'
               : 'border-newColColor bg-newTableHeader'
           )}
         >

@@ -1,6 +1,9 @@
 'use client';
 
-import { FC, ReactNode, useCallback } from 'react';
+import { FC, ReactNode, useCallback, useState } from 'react';
+import Link from 'next/link';
+import clsx from 'clsx';
+import { useClickOutside } from '@mantine/hooks';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
@@ -57,7 +60,7 @@ export const useMenuItem = () => {
       path: '/launches',
     },
     {
-      name: 'Agent',
+      name: t('ai_agent', 'AI Agent'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -432,20 +435,28 @@ export const TopMenu: FC<{ variant?: 'rail' | 'bar' }> = ({
               />
             ))}
         </nav>
-        <div className="flex items-center gap-[2px] ms-auto">
-          {/* Billing is the labeled plan badge next to these icons (PlanBadge) */}
+        <div className="flex items-center gap-[4px] ms-auto">
+          {/* Settings is a labeled link, Billing is the plan badge (PlanBadge),
+              the rest is in the More menu */}
           {secondMenu
-            .filter((item) => visible(item) && item.path !== '/billing')
+            .filter((item) => visible(item) && item.path === '/settings')
             .map((item) => (
-            <MenuItem
-              variant="icon"
-              path={item.path}
-              label={item.name}
-              icon={item.icon}
-              key={item.name}
-              onClick={item.onClick}
-            />
-          ))}
+              <MenuItem
+                variant="bar"
+                path={item.path}
+                label={item.name}
+                icon={item.icon}
+                key={item.name}
+              />
+            ))}
+          <MoreMenu
+            items={secondMenu.filter(
+              (item) =>
+                visible(item) &&
+                item.path !== '/billing' &&
+                item.path !== '/settings'
+            )}
+          />
         </div>
       </>
     );
@@ -477,5 +488,82 @@ export const TopMenu: FC<{ variant?: 'rail' | 'bar' }> = ({
         ))}
       </div>
     </>
+  );
+};
+
+// The links that are not part of the main navigation, with their names
+// (they used to be unlabeled icons in the top bar)
+const MoreMenu: FC<{ items: MenuItemInterface[] }> = ({ items }) => {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const ref = useClickOutside<HTMLDivElement>(() => setOpen(false));
+
+  if (!items.length) {
+    return null;
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className={clsx(
+          'h-[44px] px-[12px] gap-[6px] flex items-center font-[600] text-[15px] rounded-[10px] transition-colors',
+          open
+            ? 'text-white bg-white/[0.12]'
+            : 'text-white/70 hover:text-white hover:bg-white/[0.08]'
+        )}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="5" cy="12" r="2" />
+          <circle cx="12" cy="12" r="2" />
+          <circle cx="19" cy="12" r="2" />
+        </svg>
+        <span className="maxMedia:hidden">{t('more', 'More')}</span>
+      </button>
+      {open && (
+        <div className="absolute end-0 top-[calc(100%+8px)] z-[200] min-w-[220px] p-[6px] rounded-[12px] bg-newBgColorInner border border-newColColor text-newTextColor shadow-[0_8px_30px_rgba(0,0,0,0.3)] flex flex-col">
+          {items.map((item) => {
+            const className =
+              'h-[40px] px-[10px] rounded-[8px] flex items-center gap-[10px] text-[14px] font-[500] text-start hover:bg-boxHover transition-colors';
+            const inner = (
+              <>
+                <span className="scale-[0.8] flex w-[24px] justify-center">
+                  {item.icon}
+                </span>
+                {item.name}
+              </>
+            );
+            if (item.onClick) {
+              return (
+                <button
+                  type="button"
+                  key={item.name}
+                  className={className}
+                  onClick={() => {
+                    setOpen(false);
+                    item.onClick?.();
+                  }}
+                >
+                  {inner}
+                </button>
+              );
+            }
+            return (
+              <Link
+                key={item.name}
+                href={item.path}
+                className={className}
+                onClick={() => setOpen(false)}
+                {...(item.path.indexOf('http') === 0 && { target: '_blank' })}
+              >
+                {inner}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 };

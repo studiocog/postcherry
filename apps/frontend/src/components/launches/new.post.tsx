@@ -1,4 +1,5 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import dayjs from 'dayjs';
 import { useCalendar } from '@gitroom/frontend/components/launches/calendar.context';
@@ -8,8 +9,14 @@ import { SetSelectionModal } from '@gitroom/frontend/components/launches/calenda
 import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
 import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
 
-export const NewPost = () => {
+// openFromUrl: the top bar's Create post button links to /launches?create=post
+export const NewPost: React.FC<{ openFromUrl?: boolean }> = ({
+  openFromUrl = false,
+}) => {
   const fetch = useFetch();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const openedFromUrl = useRef(false);
   const modal = useModals();
   const { integrations, reloadCalendarView, sets } = useCalendar();
   const t = useT();
@@ -74,6 +81,22 @@ export const NewPost = () => {
       title: ``,
     });
   }, [integrations, sets]);
+
+  useEffect(() => {
+    if (
+      !openFromUrl ||
+      openedFromUrl.current ||
+      searchParams.get('create') !== 'post' ||
+      !integrations.length
+    ) {
+      return;
+    }
+
+    openedFromUrl.current = true;
+    router.replace('/launches');
+    createAPost();
+  }, [openFromUrl, searchParams, integrations, createAPost]);
+
   return (
     <button
       onClick={createAPost}
