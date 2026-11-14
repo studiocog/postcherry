@@ -654,17 +654,19 @@ export const MediaBox: FC<{
                       {media.originalName}
                     </div>
                     <div className="w-full h-full rounded-[6px] overflow-hidden relative">
-                      <div className="absolute z-[20] left-[50%] top-[50%] -translate-x-[50%] -translate-y-[50%]">
+                      {/* the preview button sits in a corner, so clicking the tile selects it */}
+                      <div className="absolute z-[20] top-[8px] start-[8px]">
                         <div
                           onClick={maximize(media)}
+                          title={t('preview', 'Preview')}
                           className={clsx(
-                            'cursor-pointer p-[4px] bg-black/40 hidden group-hover:block hover:scale-150 transition-all',
+                            'cursor-pointer p-[6px] rounded-[6px] bg-black/50 hover:bg-black/70 hidden group-hover:block transition-all',
                             !standalone && 'mobile:!hidden'
                           )}
                         >
                           <svg
-                            width="30"
-                            height="30"
+                            width="16"
+                            height="16"
                             viewBox="0 0 14 14"
                             fill="none"
                             xmlns="http://www.w3.org/2000/svg"

@@ -45,7 +45,6 @@ import {
   ChevronDownIcon,
   CloseIcon,
   TrashIcon,
-  DropdownArrowSmallIcon,
   PlusIcon,
   EyeIcon,
   TagIcon,
@@ -70,7 +69,6 @@ import {
 } from '@gitroom/frontend/components/post-approvals/request.approval.button';
 import dayjs from 'dayjs';
 import { Button } from '@gitroom/react/form/button';
-import { useClickOutside } from '@mantine/hooks';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
@@ -86,10 +84,6 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   const [mobileSheet, setMobileSheet] = useState<
     'channels' | 'settings' | 'tags' | 'repeat' | 'date' | null
   >(null);
-  const [showPostNow, setShowPostNow] = useState(false);
-  const postNowRef = useClickOutside<HTMLDivElement>(() => {
-    setShowPostNow(false);
-  });
   const { data: shortlinkPreferenceData } = useShortlinkPreference();
   const { isIndividual } = useAccountType();
   const user = useUser();
@@ -178,6 +172,32 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       setHide(false);
     }
   }, [hide]);
+
+  // a new post with a single channel to pick starts with it picked, once,
+  // so it can still be unselected
+  const autoPicked = useRef(false);
+  useEffect(() => {
+    if (
+      autoPicked.current ||
+      dummy ||
+      existingData.integration ||
+      selectedIntegrations.length
+    ) {
+      return;
+    }
+
+    const available = integrations.filter(
+      (p) => !p.inBetweenSteps && !p.disabled
+    );
+    if (available.length !== 1) {
+      return;
+    }
+
+    autoPicked.current = true;
+    setSelectedIntegrations([
+      { settings: {}, selectedIntegrations: available[0] },
+    ]);
+  }, [integrations, selectedIntegrations.length]);
 
   const currentIntegrationText = useMemo(() => {
     if (current === 'global') {
@@ -1212,14 +1232,28 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                 Save Set
               </button>
             )}
+            {/* Post now is its own button, next to scheduling */}
+            {!addEditSets && !dummy && (
+              <button
+                onClick={schedule('now')}
+                disabled={
+                  selectedIntegrations.length === 0 || loading || locked
+                }
+                className="relative cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 px-[20px] h-[44px] border border-[#D21F3C] text-[#D21F3C] hover:bg-[#D21F3C]/[0.06] justify-center items-center flex rounded-[8px] text-[15px] font-[600] transition-colors"
+              >
+                <div className={clsx(loading && 'invisible')}>
+                  {t('post_now', 'Post Now')}
+                </div>
+              </button>
+            )}
             {!addEditSets && (
-              <div ref={postNowRef} className="group cursor-pointer relative">
+              <div className="relative">
                 <button
                   disabled={
                     selectedIntegrations.length === 0 || loading || locked
                   }
                   onClick={schedule('schedule')}
-                  className="text-white relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#D21F3C] ps-[20px] pe-[16px]"
+                  className="text-white relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#D21F3C] px-[20px]"
                 >
                   {loading && (
                     <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
@@ -1233,43 +1267,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     )}
                   >
                     {selectedIntegrations.length === 0
-                      ? t('check_circles_above', 'Check the circles above')
+                      ? t('pick_a_channel_above', 'Pick a channel above')
                       : scheduleLabel}
                   </div>
-                  {!dummy && (
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowPostNow(!showPostNow);
-                      }}
-                      className="flex justify-center items-center h-[20px] w-[20px] pt-[4px] arrow-change"
-                    >
-                      <DropdownArrowSmallIcon
-                        className={clsx(
-                          'group-hover:rotate-180 text-white',
-                          showPostNow && 'rotate-180'
-                        )}
-                      />
-                    </div>
-                  )}
                 </button>
-
-                {!dummy && (
-                  <button
-                    onClick={schedule('now')}
-                    disabled={
-                      selectedIntegrations.length === 0 || loading || locked
-                    }
-                    className={clsx(
-                      'rounded-[8px] z-[300] disabled:cursor-not-allowed disabled:opacity-80 absolute bottom-[100%] -left-[12px] p-[12px] w-[206px] bg-newBgColorInner',
-                      showPostNow ? 'flex' : 'hidden group-hover:flex'
-                    )}
-                  >
-                    <div className="text-white rounded-[8px] bg-[#D82D7E] h-[44px] w-full flex justify-center items-center post-now">
-                      {t('post_now', 'Post Now')}
-                    </div>
-                  </button>
-                )}
               </div>
             )}
           </div>
