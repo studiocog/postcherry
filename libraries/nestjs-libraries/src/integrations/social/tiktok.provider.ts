@@ -48,7 +48,7 @@ export interface TikTokCreatorInfo {
 )
 export class TiktokProvider extends SocialAbstract implements SocialProvider {
   identifier = 'tiktok';
-  name = 'Tiktok';
+  name = 'TikTok';
   isBetweenSteps = false;
   // TikTok photo posts take JPEG / WebP only: PNG images are converted to
   // JPEG before the upload (posts.service updateMedia).
