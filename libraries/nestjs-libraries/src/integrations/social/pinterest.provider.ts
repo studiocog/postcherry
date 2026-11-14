@@ -56,9 +56,10 @@ export class PinterestProvider
   isBetweenSteps = false;
   // The single scope list (auth URL, refresh and the granted-scope check).
   // boards:write stays: Create Pin and delete Pin require it.
+  // only what the app uses (Pinterest review rejects unused scopes): boards
+  // are listed to pick one, never created
   scopes = [
     'boards:read',
-    'boards:write',
     'pins:read',
     'pins:write',
     'user_accounts:read',
