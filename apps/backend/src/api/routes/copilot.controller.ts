@@ -73,6 +73,7 @@ export class CopilotController {
   chatAgent(@Req() req: Request, @Res() res: Response) {
     if (!aiEnabled()) {
       Logger.warn('AI API key not set, chat functionality will not work');
+      res.status(503).json({ message: 'AI is not configured' });
       return;
     }
 
@@ -95,6 +96,7 @@ export class CopilotController {
   ) {
     if (!aiEnabled()) {
       Logger.warn('AI API key not set, chat functionality will not work');
+      res.status(503).json({ message: 'AI is not configured' });
       return;
     }
     const mastra = await this._mastraService.mastra();

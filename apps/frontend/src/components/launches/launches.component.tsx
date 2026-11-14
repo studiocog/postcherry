@@ -774,6 +774,7 @@ export const LaunchesComponent = () => {
                 {sortedIntegrations?.length > 0 && <NewPost openFromUrl={true} />}
                 {sortedIntegrations?.length > 0 &&
                   user?.tier?.ai &&
+                  user?.aiText !== false &&
                   billingEnabled && <GeneratorComponent />}
               </div>
               {sortedIntegrations?.length > 0 && (
@@ -854,7 +855,9 @@ export const LaunchesComponent = () => {
             {sortedIntegrations?.length > 0 ? (
               <>
                 <NewPost />
-                {user?.tier?.ai && billingEnabled && <GeneratorComponent />}
+                {user?.tier?.ai && user?.aiText !== false && billingEnabled && (
+                  <GeneratorComponent />
+                )}
                 <AiPlannerButton mobile={true} />
               </>
             ) : (

@@ -23,6 +23,8 @@ export const UserContext = createContext<
       isTrailing: boolean;
       accountType: 'INDIVIDUAL' | 'BUSINESS' | 'AGENCY' | null;
       streakSince: string | null;
+      // an AI key is set for the text features (the AI features show)
+      aiText?: boolean;
       aiImages?: boolean;
     })
 >(undefined);

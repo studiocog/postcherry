@@ -146,7 +146,12 @@ export const AiPlannerButton: FC<{ mobile?: boolean; collapsed?: boolean }> = ({
     t,
   ]);
 
-  const tooltip = notConfigured ? notConfiguredText : compact ? label : '';
+  // without an AI key the button is hidden, it shows once a key is added
+  if (notConfigured) {
+    return null;
+  }
+
+  const tooltip = compact ? label : '';
 
   return (
     <button

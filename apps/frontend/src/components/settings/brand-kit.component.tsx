@@ -197,7 +197,7 @@ const BrandKitFormComponent: FC<{
   const toaster = useToaster();
   const user = useUser();
   const readOnly = user?.role === 'USER';
-  const canLearn = !!user?.tier?.ai && !readOnly;
+  const canLearn = !!user?.tier?.ai && user?.aiText !== false && !readOnly;
   const [saving, setSaving] = useState(false);
   const [learning, setLearning] = useState(false);
 

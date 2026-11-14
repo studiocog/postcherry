@@ -1408,6 +1408,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           />
         </BottomSheet>
       )}
+      {/* the assistant needs an AI key, it shows once one is added */}
+      {user?.aiText !== false && (
       <CopilotPopup
         className="mobile:!z-[460] mobile:!bottom-[112px]"
         hitEscapeToClose={false}
@@ -1431,6 +1433,7 @@ After using the addPostFor{num} it will create a new addPostContentFor{num+ 1} f
           ),
         }}
       />
+      )}
     </div>
   );
 };

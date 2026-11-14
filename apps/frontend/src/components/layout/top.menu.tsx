@@ -25,6 +25,7 @@ interface MenuItemInterface {
 export const useMenuItem = () => {
   const { isGeneral, sourceCodeUrl } = useVariables();
   const { isIndividual } = useAccountType();
+  const user = useUser();
   const t = useT();
   const { openModal } = useModals();
 
@@ -76,6 +77,8 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '/agents',
+      // shown once an AI key is set
+      hide: user?.aiText === false,
     },
     {
       name: t('analytics', 'Analytics'),
