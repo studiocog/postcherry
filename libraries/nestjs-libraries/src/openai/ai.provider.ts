@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenAI, type OpenAIProvider } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import type { ChatOpenAI } from '@langchain/openai';
@@ -103,7 +103,9 @@ export const createAiClient = () =>
 
 // AI SDK model (Mastra, CopilotKit). Its default is the Responses API that
 // only OpenAI serves, the other providers use chat completions
-export const aiLanguageModel = (openAiModel?: string) => {
+export const aiLanguageModel = (
+  openAiModel?: string
+): ReturnType<OpenAIProvider['chat']> => {
   const provider = createOpenAI({
     apiKey: aiApiKey() || undefined,
     baseURL: aiBaseUrl(),
