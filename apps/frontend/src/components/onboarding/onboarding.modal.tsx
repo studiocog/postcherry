@@ -44,13 +44,19 @@ export const OnboardingModal: FC<OnboardingModalProps> = ({ onClose }) => {
     accountType
   );
 
+  // the account type is asked only once, a workspace that already chose it
+  // (on the plans page, in Settings) starts with the channels
+  const [askAccount] = useState(() => !accountType);
+
   // Individuals and businesses skip the technical AI agents step
   const stepKeys = useMemo<OnboardingStepKey[]>(
-    () =>
-      chosenType === 'INDIVIDUAL' || chosenType === 'BUSINESS'
-        ? ['account', 'channels', 'done']
-        : ['account', 'channels', 'agents', 'done'],
-    [chosenType]
+    () => [
+      ...(askAccount ? (['account'] as const) : []),
+      ...(chosenType === 'INDIVIDUAL' || chosenType === 'BUSINESS'
+        ? (['channels', 'done'] as const)
+        : (['channels', 'agents', 'done'] as const)),
+    ],
+    [chosenType, askAccount]
   );
 
   const labels: Record<OnboardingStepKey, string> = useMemo(
