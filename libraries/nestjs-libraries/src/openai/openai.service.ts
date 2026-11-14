@@ -11,11 +11,13 @@ import {
   isOpenAiProvider,
   openAiImagesKey,
   parseAiJson,
+  aiImageProvider,
+  higgsfieldImage,
 } from '@gitroom/nestjs-libraries/openai/ai.provider';
 
 const openai = createAiClient();
 
-// images stay on OpenAI whatever the text provider is
+// images are made by OpenAI or Higgsfield whatever the text provider is
 const openaiImages = new OpenAI({
   apiKey: openAiImagesKey() || 'sk-proj-',
 });
@@ -172,6 +174,13 @@ Answer in the language most of the posts are written in.`,
   }
 
   async generateImage(prompt: string, isVertical = false) {
+    if (aiImageProvider() === 'higgsfield') {
+      const url = await higgsfieldImage(prompt, isVertical);
+      return Buffer.from(await (await fetch(url)).arrayBuffer()).toString(
+        'base64'
+      );
+    }
+
     // gpt-image models always return base64 (b64_json) and do not accept the
     // `response_format` parameter, unlike the deprecated dall-e-3.
     const generate = (

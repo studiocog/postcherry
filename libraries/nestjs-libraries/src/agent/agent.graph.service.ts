@@ -23,6 +23,8 @@ import {
   aiStructuredOutput,
   aiTemperature,
   openAiImagesKey,
+  aiImageProvider,
+  higgsfieldImage,
 } from '@gitroom/nestjs-libraries/openai/ai.provider';
 
 const tools = !process.env.TAVILY_API_KEY
@@ -37,7 +39,7 @@ const model = new ChatOpenAI({
   temperature: aiTemperature(0.7),
 });
 
-// images stay on OpenAI whatever the text provider is
+// images are made by OpenAI, or by Higgsfield when it is the image provider
 const dalle = new DallEAPIWrapper({
   apiKey: openAiImagesKey() || 'sk-proj-',
   model: 'chatgpt-image-latest',
@@ -348,7 +350,10 @@ export class AgentGraphService {
     try {
       const newContent = await Promise.all(
         (state.content || []).map(async (p) => {
-          const image = await dalle.invoke(p.prompt!);
+          const image =
+            aiImageProvider() === 'higgsfield'
+              ? await higgsfieldImage(p.prompt!)
+              : await dalle.invoke(p.prompt!);
           return {
             ...p,
             image,

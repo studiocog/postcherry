@@ -28,6 +28,8 @@ import {
   aiTemperature,
   aiImagesEnabled,
   openAiImagesKey,
+  aiImageProvider,
+  higgsfieldImage,
 } from '@gitroom/nestjs-libraries/openai/ai.provider';
 const parser = new Parser();
 
@@ -52,7 +54,7 @@ const model = new ChatOpenAI({
   temperature: aiTemperature(0.7),
 });
 
-// images stay on OpenAI whatever the text provider is
+// images are made by OpenAI, or by Higgsfield when it is the image provider
 const dalle = new DallEAPIWrapper({
   apiKey: openAiImagesKey() || 'sk-proj-',
   model: 'chatgpt-image-latest',
@@ -307,7 +309,10 @@ export class AutopostService {
           content: state.load.description || state.description,
         });
 
-    const image = await dalle.invoke(generatedTextToBeSentToDallE);
+    const image =
+      aiImageProvider() === 'higgsfield'
+        ? await higgsfieldImage(generatedTextToBeSentToDallE)
+        : await dalle.invoke(generatedTextToBeSentToDallE);
 
     return { ...state, image };
   }
