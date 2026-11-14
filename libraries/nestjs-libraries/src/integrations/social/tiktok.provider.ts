@@ -265,7 +265,8 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     ) {
       return {
         type: 'bad-body' as const,
-        value: 'App not approved for public posting, contact support',
+        value:
+          'This TikTok app is still in review, so TikTok only accepts posts to private accounts: set your TikTok account to Private (TikTok app > Settings and privacy > Privacy) and try again',
       };
     }
 
