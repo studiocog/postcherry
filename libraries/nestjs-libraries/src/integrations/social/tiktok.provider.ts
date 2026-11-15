@@ -54,8 +54,9 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   // JPEG before the upload (posts.service updateMedia).
   convertToJPEG = true;
   scopes = [
-    // per-post stats (postAnalytics, missing, releaseUrl)
-    'video.list',
+    // video.list (per-post views/likes) is not requested until the app is
+    // approved: it only returns public videos, which a Sandbox demo cannot
+    // show. Without it the analytics calls below return nothing (caught).
     // avatar and display name of the connected account
     'user.info.basic',
     // Direct Post, creator_info and the publish status
