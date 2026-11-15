@@ -6,7 +6,7 @@ import {
 } from '@gitroom/frontend/components/launches/add.provider.component';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import SafeImage from '@gitroom/react/helpers/safe.image';
-import { capitalize, groupBy, orderBy } from 'lodash';
+import { groupBy, orderBy } from 'lodash';
 import { CalendarWeekProvider } from '@gitroom/frontend/components/launches/calendar.context';
 import { Filters } from '@gitroom/frontend/components/launches/filters';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
@@ -36,6 +36,7 @@ import { Input } from '@gitroom/react/form/input';
 import { Button } from '@gitroom/react/form/button';
 import { ChannelHealthComponent } from '@gitroom/frontend/components/launches/channel.health.component';
 import { useBrands } from '@gitroom/frontend/components/brands/brand.context';
+import { usePlanName } from '@gitroom/frontend/components/billing/use.plans';
 
 export const SVGLine = () => {
   return (
@@ -485,6 +486,7 @@ export const LaunchesComponent = () => {
   const toast = useToaster();
   const fireEvents = useFireEvents();
   const t = useT();
+  const planName = usePlanName();
   const modal = useModals();
   const [reload, setReload] = useState(false);
   const [collapseMenu, setCollapseMenu] = useCookie('collapseMenu', '0');
@@ -822,11 +824,20 @@ export const LaunchesComponent = () => {
                 />
               ))}
             </div>
-            <div className="mt-[5px] text-center flex flex-col mobile:hidden">
-              {billingEnabled && user?.isLifetime && (
-                <div>{capitalize(user?.tier?.current || '')} tier</div>
+            {billingEnabled &&
+              user?.isLifetime &&
+              (collapseMenu === '0' || channelsOpen) && (
+                <div className="mt-[5px] pt-[12px] border-t border-newBorder flex justify-center mobile:hidden">
+                  <div className="inline-flex items-center gap-[6px] h-[26px] px-[10px] rounded-full bg-btnSimple text-[12px] select-none">
+                    <span className="text-textItemBlur">
+                      {t('plan', 'Plan')}
+                    </span>
+                    <span className="font-[600]">
+                      {planName(user?.tier?.current || '')}
+                    </span>
+                  </div>
+                </div>
               )}
-            </div>
           </div>
         </div>
         <div className="bg-newBgColorInner flex-1 min-w-0 flex-col flex p-[20px] mobile:p-[12px] gap-[12px] mobile:min-h-[600px]">
