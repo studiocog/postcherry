@@ -60,6 +60,8 @@ export class PinterestProvider
   // are listed to pick one, never created
   scopes = [
     'boards:read',
+    // POST /v5/pins onto a board is rejected without it ("Missing: ['boards:write']")
+    'boards:write',
     'pins:read',
     'pins:write',
     'user_accounts:read',
