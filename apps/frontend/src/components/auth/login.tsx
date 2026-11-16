@@ -23,7 +23,9 @@ type Inputs = {
   providerToken: '';
   provider: 'LOCAL';
 };
-export function Login() {
+// adminHost: shown on the admin address (hq): email and password only, no
+// sign-up and no Google / Clerk / other providers (admin logins are made on the server)
+export function Login({ adminHost = false }: { adminHost?: boolean }) {
   const t = useT();
   const [loading, setLoading] = useState(false);
   const [notActivated, setNotActivated] = useState(false);
@@ -73,14 +75,16 @@ export function Login() {
         <div className="flex flex-col flex-1">
           <div>
             <h1 className="text-[40px] font-[500] -tracking-[0.8px] text-start cursor-pointer">
-              {t('sign_in', 'Sign In')}
+              {adminHost ? 'Sign in to HQ' : t('sign_in', 'Sign In')}
             </h1>
           </div>
-          <div className="text-[14px] mt-[32px] mb-[12px]">
-            {t('continue_with', 'Continue With')}
-          </div>
-          <div className="flex flex-col">
-            {isGeneral && genericOauth ? (
+          {!adminHost && (
+            <div className="text-[14px] mt-[32px] mb-[12px]">
+              {t('continue_with', 'Continue With')}
+            </div>
+          )}
+          <div className={adminHost ? 'flex flex-col mt-[32px]' : 'flex flex-col'}>
+            {adminHost ? null : isGeneral && genericOauth ? (
               <OauthProvider />
             ) : !isGeneral ? (
               <GithubProvider />
@@ -92,15 +96,19 @@ export function Login() {
                 {billingEnabled && <WalletProvider />}
               </div>
             )}
-            <TermsNotice />
-            <div className="h-[20px] mb-[24px] mt-[24px] relative">
-              <div className="absolute w-full h-[1px] bg-fifth top-[50%] -translate-y-[50%]" />
-              <div
-                className={`absolute z-[1] justify-center items-center w-full start-0 -top-[4px] flex`}
-              >
-                <div className="px-[16px]">{t('or', 'or')}</div>
-              </div>
-            </div>
+            {!adminHost && (
+              <>
+                <TermsNotice />
+                <div className="h-[20px] mb-[24px] mt-[24px] relative">
+                  <div className="absolute w-full h-[1px] bg-fifth top-[50%] -translate-y-[50%]" />
+                  <div
+                    className={`absolute z-[1] justify-center items-center w-full start-0 -top-[4px] flex`}
+                  >
+                    <div className="px-[16px]">{t('or', 'or')}</div>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="flex flex-col gap-[12px]">
               <div className="text-textColor">
                 <Input
@@ -145,12 +153,14 @@ export function Login() {
                     {t('sign_in_1', 'Sign in')}
                   </Button>
                 </div>
-                <p className="mt-4 text-sm">
-                  {t('don_t_have_an_account', "Don't Have An Account?")}&nbsp;
-                  <Link href="/auth" className="underline cursor-pointer">
-                    {t('sign_up', 'Sign Up')}
-                  </Link>
-                </p>
+                {!adminHost && (
+                  <p className="mt-4 text-sm">
+                    {t('don_t_have_an_account', "Don't Have An Account?")}&nbsp;
+                    <Link href="/auth" className="underline cursor-pointer">
+                      {t('sign_up', 'Sign Up')}
+                    </Link>
+                  </p>
+                )}
                 <p className="mt-4 text-sm">
                   <Link
                     href="/auth/forgot"

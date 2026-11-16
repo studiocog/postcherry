@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
+import {
+  ADMIN_HOST_HEADER,
+  getCookieUrlFromDomain,
+} from '@gitroom/helpers/subdomain/subdomain.management';
 import { internalFetch } from '@gitroom/helpers/utils/internal.fetch';
 import acceptLanguage from 'accept-language';
 import {
@@ -32,9 +35,29 @@ export async function proxy(request: NextRequest) {
           request.headers.get('accept-language')
       );
 
+  // The admin area can live on its own address (ADMIN_URL, e.g.
+  // https://hq.postcherry.com): there it is the only thing served, and the
+  // app's own /admin pages don't exist
+  const adminHost = getHost(process.env.ADMIN_URL);
+  const host = (
+    request.headers.get('x-forwarded-host') ||
+    request.headers.get('host') ||
+    ''
+  )
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  const onAdminHost = !!adminHost && host === adminHost;
+
   const requestHeaders = new Headers(request.headers);
   if (lng) {
     requestHeaders.set(headerName, lng);
+  }
+  // tells the pages (e.g. the login page: email and password only, no
+  // sign-up, no Google / Clerk) that they are shown on the admin address
+  requestHeaders.delete(ADMIN_HOST_HEADER);
+  if (onAdminHost) {
+    requestHeaders.set(ADMIN_HOST_HEADER, '1');
   }
 
   const topResponse = NextResponse.next({
@@ -47,25 +70,22 @@ export async function proxy(request: NextRequest) {
     topResponse.headers.set(cookieName, lng);
   }
 
-  // The admin area can live on its own address (ADMIN_URL, e.g.
-  // https://hq.postcherry.com): there it is the only thing served, and the
-  // app's own /admin pages don't exist
-  const adminHost = getHost(process.env.ADMIN_URL);
   if (adminHost) {
-    const host = (
-      request.headers.get('x-forwarded-host') ||
-      request.headers.get('host') ||
-      ''
-    )
-      .split(',')[0]
-      .trim()
-      .toLowerCase();
     const isAdminPath =
       nextUrl.pathname === '/admin' || nextUrl.pathname.startsWith('/admin/');
-    if (host === adminHost) {
+    if (onAdminHost) {
       topResponse.headers.set('X-Robots-Tag', 'noindex, nofollow');
       if (!isAdminPath && !nextUrl.pathname.startsWith('/auth')) {
         return NextResponse.redirect(new URL('/admin', nextUrl.href));
+      }
+      // admin logins are made on the server (set-admin-hq.ps1): only sign
+      // in, sign out and a forgotten password exist here
+      const adminAuthPath = ['/auth/login', '/auth/logout', '/auth/forgot'].some(
+        (path) =>
+          nextUrl.pathname === path || nextUrl.pathname.startsWith(`${path}/`)
+      );
+      if (nextUrl.pathname.startsWith('/auth') && !adminAuthPath) {
+        return NextResponse.redirect(new URL('/auth/login', nextUrl.href));
       }
     } else if (isAdminPath) {
       // a page that doesn't exist: the normal "not found" page
