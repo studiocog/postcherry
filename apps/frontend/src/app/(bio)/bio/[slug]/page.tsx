@@ -32,7 +32,8 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     return { title: 'Page not found | PostCherry' };
   }
 
-  const title = `${page.title || page.slug} | PostCherry`;
+  const name = page.title || page.slug;
+  const title = /postcherry/i.test(name) ? name : `${name} | PostCherry`;
   const description = page.description || '';
   return {
     title,
