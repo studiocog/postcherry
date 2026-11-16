@@ -282,21 +282,40 @@ export class PinterestProvider
 
   @Tool({ description: 'List of boards', dataSchema: [] })
   async boards(accessToken: string) {
-    const { items } = await (
-      await fetch(`${pinterestApi()}/v5/boards?page_size=250`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-    ).json();
+    // Follow the bookmark: accounts can have more than one page of boards,
+    // and the Sandbox returns empty pages before its own boards (production
+    // boards are filtered out of each page after it is fetched).
+    const all: { name: string; id: string }[] = [];
+    let bookmark = '';
+    for (let page = 0; page < 10; page++) {
+      const { items, bookmark: next } = await (
+        await fetch(
+          `${pinterestApi()}/v5/boards?page_size=250${
+            bookmark ? `&bookmark=${encodeURIComponent(bookmark)}` : ''
+          }`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        )
+      ).json();
 
-    return (
-      items?.map((item: any) => ({
-        name: item.name,
-        id: item.id,
-      })) || []
-    );
+      all.push(
+        ...(items?.map((item: any) => ({
+          name: item.name,
+          id: item.id,
+        })) || [])
+      );
+
+      if (!next) {
+        break;
+      }
+      bookmark = next;
+    }
+
+    return all;
   }
 
   async postPending(
