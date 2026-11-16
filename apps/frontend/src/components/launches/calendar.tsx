@@ -1519,9 +1519,11 @@ const DebugJsonModal: FC<{ post: any }> = ({ post }) => {
 
   const copyJson = useCallback(async () => {
     try {
-      const data = await (
-        await fetch(`/posts/group/${post.group}/debug-export`)
-      ).json();
+      const response = await fetch(`/posts/group/${post.group}/debug-export`);
+      if (!response.ok) {
+        throw new Error('debug_export_failed');
+      }
+      const data = await response.json();
       copy(JSON.stringify(data, null, 2));
       toaster.show(
         t('debug_json_copied', 'Debug JSON copied to clipboard'),

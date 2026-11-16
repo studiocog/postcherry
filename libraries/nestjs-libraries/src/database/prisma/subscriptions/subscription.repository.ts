@@ -344,6 +344,41 @@ export class SubscriptionRepository {
     });
   }
 
+  // a free plan given by a super admin: never billed, the workspace leaves
+  // its trial
+  async setManualPlan(
+    organizationId: string,
+    billing: PaidTier,
+    totalChannels: number
+  ) {
+    await this._subscription.model.subscription.upsert({
+      where: { organizationId },
+      create: {
+        organizationId,
+        subscriptionTier: billing,
+        provider: 'manual',
+        period: 'MONTHLY',
+        totalChannels,
+        isLifetime: true,
+      },
+      update: {
+        subscriptionTier: billing,
+        provider: 'manual',
+        period: 'MONTHLY',
+        totalChannels,
+        isLifetime: true,
+        cancelAt: null,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    await this._organization.model.organization.update({
+      where: { id: organizationId },
+      data: { isTrailing: false, allowTrial: false },
+      select: { id: true },
+    });
+  }
+
   setCustomerId(orgId: string, customerId: string) {
     return this._organization.model.organization.update({
       where: {

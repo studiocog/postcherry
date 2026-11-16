@@ -10,6 +10,8 @@ interface VariableContextInterface {
   oauthLogoUrl: string;
   oauthDisplayName: string;
   mcpUrl?: string;
+  // the admin area on its own address (hq.postcherry.com), '' = /admin of the app
+  adminUrl?: string;
   cloudflareUrl: string;
   mainUrl: string;
   frontEndUrl: string;
@@ -52,6 +54,7 @@ const VariableContext = createContext({
   googleAdsTrialTracking: '',
   oauthDisplayName: '',
   mcpUrl: '',
+  adminUrl: '',
   cloudflareUrl: '',
   mainUrl: '',
   frontEndUrl: '',

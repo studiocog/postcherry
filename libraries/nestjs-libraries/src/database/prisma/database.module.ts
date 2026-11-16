@@ -50,6 +50,8 @@ import { ErrorsRepository } from '@gitroom/nestjs-libraries/database/prisma/erro
 import { ErrorsService } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.service';
 import { AdminStatsRepository } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.repository';
 import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
+import { AdminRepository } from '@gitroom/nestjs-libraries/database/prisma/admin/admin.repository';
+import { AdminService } from '@gitroom/nestjs-libraries/database/prisma/admin/admin.service';
 import { MetaCallbacksRepository } from '@gitroom/nestjs-libraries/database/prisma/meta/meta.callbacks.repository';
 import { MetaCallbacksService } from '@gitroom/nestjs-libraries/database/prisma/meta/meta.callbacks.service';
 import { BrandKitRepository } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.repository';
@@ -120,6 +122,8 @@ import { ReportPdfService } from '@gitroom/nestjs-libraries/database/prisma/repo
     ErrorsService,
     AdminStatsRepository,
     AdminStatsService,
+    AdminRepository,
+    AdminService,
     MetaCallbacksRepository,
     MetaCallbacksService,
     BrandKitRepository,

@@ -6,7 +6,9 @@ import {
   HttpException,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
+import { AdminSessionGuard } from '@gitroom/backend/services/auth/admin.session.guard';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
@@ -23,6 +25,7 @@ export class AnnouncementsController {
     return this._announcementsService.getAnnouncements();
   }
 
+  @UseGuards(AdminSessionGuard)
   @Post('/')
   async createAnnouncement(
     @GetUserFromRequest() user: User,
@@ -34,6 +37,7 @@ export class AnnouncementsController {
     return this._announcementsService.createAnnouncement(body);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Delete('/:id')
   async deleteAnnouncement(
     @GetUserFromRequest() user: User,

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { FC, useCallback, useState } from 'react';
+import React, { FC, useCallback, useContext, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { Button } from '@gitroom/react/form/button';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
+import { AdminSessionContext } from '@gitroom/frontend/components/admin/admin.hooks';
 
 interface PerSocial {
   provider: string;
@@ -73,10 +74,14 @@ const useStats = (params: {
     ...(params.unknownOnly ? { unknownOnly: 'true' } : {}),
   });
   const key = `/admin/stats?${query.toString()}`;
+  const { expired } = useContext(AdminSessionContext);
   return useSWR<StatsResponse>(
     key,
     async (url: string) => {
       const res = await fetch(url);
+      if (res.status === 428) {
+        expired();
+      }
       if (!res.ok) {
         throw new Error('Failed to load stats');
       }

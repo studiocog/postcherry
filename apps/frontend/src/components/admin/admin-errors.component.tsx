@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useMemo, useState } from 'react';
+import React, { FC, useCallback, useContext, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import copy from 'copy-to-clipboard';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
@@ -9,6 +9,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
+import { AdminSessionContext } from '@gitroom/frontend/components/admin/admin.hooks';
 
 interface ErrorRow {
   id: string;
@@ -160,8 +161,12 @@ const useErrorsList = (params: {
     unknownFirst: params.unknownFirst ? 'true' : 'false',
   });
   const key = `/admin/errors?${query.toString()}`;
+  const { expired } = useContext(AdminSessionContext);
   return useSWR<ErrorsResponse>(key, async (url: string) => {
     const res = await fetch(url);
+    if (res.status === 428) {
+      expired();
+    }
     if (!res.ok) {
       throw new Error('Failed to load errors');
     }

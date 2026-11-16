@@ -6,7 +6,9 @@ import {
   Param,
   Post,
   Req,
+  UseGuards,
 } from '@nestjs/common';
+import { AdminSessionGuard } from '@gitroom/backend/services/auth/admin.session.guard';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization, User } from '@prisma/client';
@@ -242,6 +244,7 @@ export class BillingController {
     return (await this.provider(org)).prorate(org.id, body);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Get('/charges')
   async getCharges(
     @GetUserFromRequest() user: User,
@@ -254,6 +257,7 @@ export class BillingController {
     return (await this.provider(org)).getCharges(org.id);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Post('/refund-charges')
   async refundCharges(
     @GetUserFromRequest() user: User,
@@ -267,6 +271,7 @@ export class BillingController {
     return (await this.provider(org)).refundCharges(org.id, body.chargeIds);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Post('/cancel-subscription')
   async cancelSubscription(
     @GetUserFromRequest() user: User,
@@ -279,6 +284,7 @@ export class BillingController {
     return (await this.provider(org)).cancelSubscription(org.id);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Get('/coupon-info')
   async couponInfo(
     @GetUserFromRequest() user: User,
@@ -291,6 +297,7 @@ export class BillingController {
     return (await this.provider(org)).getCouponInfo(org.id);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Post('/apply-coupon')
   async applyCoupon(
     @GetUserFromRequest() user: User,
@@ -304,6 +311,7 @@ export class BillingController {
     return (await this.provider(org)).applyCoupon(org.id, body);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Post('/cancel-coupon')
   async cancelCoupon(
     @GetUserFromRequest() user: User,

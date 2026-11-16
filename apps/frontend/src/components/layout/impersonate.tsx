@@ -62,7 +62,11 @@ interface CouponInfo {
 const useCouponInfo = () => {
   const fetch = useFetch();
   return useSWR<CouponInfo>('/billing/coupon-info', async () => {
-    return (await fetch('/billing/coupon-info')).json();
+    const response = await fetch('/billing/coupon-info');
+    if (!response.ok) {
+      throw new Error('coupon_info_unavailable');
+    }
+    return response.json();
   }, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
@@ -616,6 +620,7 @@ const colorOptions = [
 
 const AddAnnouncementModal: FC<{ close: () => void }> = ({ close }) => {
   const fetch = useFetch();
+  const { adminUrl } = useVariables();
   const { mutate } = useSWRConfig();
   const t = useT();
   const [title, setTitle] = useState('');
@@ -627,16 +632,21 @@ const AddAnnouncementModal: FC<{ close: () => void }> = ({ close }) => {
     if (!title.trim() || !description.trim()) return;
     setSaving(true);
     try {
-      await fetch('/announcements', {
+      const response = await fetch('/announcements', {
         method: 'POST',
         body: JSON.stringify({ title, description, color }),
       });
+      // 428: the HQ code of the last 30 minutes is needed first
+      if (response.status === 428) {
+        window.open(`${adminUrl || ''}/admin`, '_blank');
+        return;
+      }
       await mutate('/announcements');
       close();
     } finally {
       setSaving(false);
     }
-  }, [title, description, color]);
+  }, [title, description, color, adminUrl]);
 
   return (
     <div className="flex flex-col gap-[16px] min-w-[500px]">
@@ -803,9 +813,10 @@ const AddTeamMember = () => {
 
 const ViewErrors = () => {
   const t = useT();
+  const { adminUrl } = useVariables();
   const handleClick = useCallback(() => {
-    window.location.href = '/admin/errors';
-  }, []);
+    window.location.href = `${adminUrl || ''}/admin/errors`;
+  }, [adminUrl]);
   return (
     <div
       className="px-[10px] rounded-[4px] bg-blue-700 text-white cursor-pointer whitespace-nowrap"
@@ -818,9 +829,10 @@ const ViewErrors = () => {
 
 const ViewStats = () => {
   const t = useT();
+  const { adminUrl } = useVariables();
   const handleClick = useCallback(() => {
-    window.location.href = '/admin/stats';
-  }, []);
+    window.location.href = `${adminUrl || ''}/admin/stats`;
+  }, [adminUrl]);
   return (
     <div
       className="px-[10px] rounded-[4px] bg-purple-700 text-white cursor-pointer whitespace-nowrap"
@@ -870,7 +882,12 @@ const SwitchUser = () => {
     if (!name) {
       return [];
     }
-    return await (await fetch(`/user/impersonate?name=${name}`)).json();
+    const response = await fetch(`/user/impersonate?name=${name}`);
+    // 428: the HQ code of the last 30 minutes is needed first
+    if (!response.ok) {
+      return [];
+    }
+    return response.json();
   }, [name]);
 
   const { data } = useSWR(`/switch-search-${name}`, load, {
@@ -1015,14 +1032,18 @@ const SwitchUser = () => {
 export const Impersonate = () => {
   const fetch = useFetch();
   const [name, setName] = useState('');
-  const { isSecured, billingEnabled } = useVariables();
+  const { isSecured, billingEnabled, adminUrl } = useVariables();
   const user = useUser();
   const load = useCallback(async () => {
     if (!name) {
       return [];
     }
-    const value = await (await fetch(`/user/impersonate?name=${name}`)).json();
-    return value;
+    const response = await fetch(`/user/impersonate?name=${name}`);
+    // 428: the HQ code of the last 30 minutes is needed first
+    if (!response.ok) {
+      return [];
+    }
+    return response.json();
   }, [name]);
   const stopImpersonating = useCallback(async () => {
     if (!isSecured) {
@@ -1041,15 +1062,20 @@ export const Impersonate = () => {
 
   const setUser = useCallback(
     (userId: string) => async () => {
-      await fetch(`/user/impersonate`, {
+      const response = await fetch(`/user/impersonate`, {
         method: 'POST',
         body: JSON.stringify({
           id: userId,
         }),
       });
+      // seeing the app as a customer needs the HQ code of the last 30 minutes
+      if (response.status === 428) {
+        window.open(`${adminUrl || ''}/admin`, '_blank');
+        return;
+      }
       window.location.reload();
     },
-    []
+    [adminUrl]
   );
   const { data } = useSWR(`/impersonate-${name}`, load, {
     refreshWhenHidden: false,

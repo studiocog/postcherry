@@ -7,6 +7,7 @@ import {
   Query,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { sign } from 'jsonwebtoken';
@@ -16,7 +17,13 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { PaymentService } from '@gitroom/nestjs-libraries/services/payment/payment.service';
 import { Response, Request } from 'express';
 import { AuthService } from '@gitroom/backend/services/auth/auth.service';
-import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
+import {
+  checkAdminSession,
+  requestUserId,
+  setImpersonateCookie,
+} from '@gitroom/backend/services/auth/admin.session';
+import { AdminSessionGuard } from '@gitroom/backend/services/auth/admin.session.guard';
+import { AdminService } from '@gitroom/nestjs-libraries/database/prisma/admin/admin.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
@@ -49,7 +56,8 @@ export class UsersController {
     private _authService: AuthService,
     private _orgService: OrganizationService,
     private _userService: UsersService,
-    private _trackService: TrackService
+    private _trackService: TrackService,
+    private _adminService: AdminService
   ) {}
 
   @Get('/chatbase-token')
@@ -110,7 +118,10 @@ export class UsersController {
       throw new HttpForbiddenException();
     }
 
-    const impersonate = req.cookies.impersonate || req.headers.impersonate;
+    // set by AuthMiddleware when the impersonate cookie is honoured (it
+    // needs a live HQ session), not just when the cookie exists
+    // @ts-ignore
+    const impersonate = !!req.impersonating;
     // @ts-ignore
     return {
       ...user,
@@ -155,6 +166,7 @@ export class UsersController {
     return this._userService.getPersonal(user.id);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Get('/impersonate')
   async getImpersonate(
     @GetUserFromRequest() user: User,
@@ -171,29 +183,22 @@ export class UsersController {
   async setImpersonate(
     @GetUserFromRequest() user: User,
     @Body('id') id: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) response: Response
   ) {
     if (!user.isSuperAdmin) {
       throw new HttpException('Unauthorized', 400);
     }
 
-    response.cookie('impersonate', id, {
-      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
-        ? {
-            secure: true,
-            httpOnly: true,
-            sameSite: 'none',
-          }
-        : {}),
-      expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
-    });
-
-    if (process.env.NOT_SECURED) {
-      response.header('impersonate', id);
+    // opening the app as someone else needs the admin second step (stopping doesn't)
+    if (id && !(await checkAdminSession(this._adminService, req))) {
+      throw new HttpException('admin_session_required', 428);
     }
+
+    setImpersonateCookie(response, id);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Post('/switch')
   async switchUser(
     @GetUserFromRequest() user: User,
@@ -207,7 +212,7 @@ export class UsersController {
     // `user` is the impersonated account, so the admin id comes from the token.
     // Require an active impersonation session and never allow the admin's own
     // account in the swap — either would trade away the admin's login.
-    const adminId = this.getRequestUserId(req);
+    const adminId = requestUserId(req);
     if (
       !id ||
       !adminId ||
@@ -227,16 +232,6 @@ export class UsersController {
     await this._paymentService.syncCustomerEmailsAfterSwitch([kept, switched]);
 
     return { success: true };
-  }
-
-  private getRequestUserId(req: Request): string | null {
-    try {
-      const auth = (req.headers.auth as string) || req.cookies?.auth;
-      const payload = AuthChecker.verifyJWT(auth) as { id?: string } | null;
-      return payload?.id || null;
-    } catch {
-      return null;
-    }
   }
 
   @Post('/personal')

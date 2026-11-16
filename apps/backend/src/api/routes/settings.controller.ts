@@ -6,7 +6,9 @@ import {
   HttpException,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
+import { AdminSessionGuard } from '@gitroom/backend/services/auth/admin.session.guard';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { Organization, User } from '@prisma/client';
@@ -48,6 +50,7 @@ export class SettingsController {
     return this._organizationService.inviteTeamMember(org, user, body);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Post('/team/add')
   async addTeamMember(
     @GetUserFromRequest() user: User,

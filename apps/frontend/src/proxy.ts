@@ -10,6 +10,14 @@ import {
 } from '@gitroom/react/translation/i18n.config';
 acceptLanguage.languages(languages);
 
+const getHost = (url?: string) => {
+  try {
+    return url ? new URL(url).host.toLowerCase() : '';
+  } catch (err) {
+    return '';
+  }
+};
+
 // This function can be marked `async` if using `await` inside
 export async function proxy(request: NextRequest) {
   const nextUrl = request.nextUrl;
@@ -37,6 +45,32 @@ export async function proxy(request: NextRequest) {
 
   if (lng) {
     topResponse.headers.set(cookieName, lng);
+  }
+
+  // The admin area can live on its own address (ADMIN_URL, e.g.
+  // https://hq.postcherry.com): there it is the only thing served, and the
+  // app's own /admin pages don't exist
+  const adminHost = getHost(process.env.ADMIN_URL);
+  if (adminHost) {
+    const host = (
+      request.headers.get('x-forwarded-host') ||
+      request.headers.get('host') ||
+      ''
+    )
+      .split(',')[0]
+      .trim()
+      .toLowerCase();
+    const isAdminPath =
+      nextUrl.pathname === '/admin' || nextUrl.pathname.startsWith('/admin/');
+    if (host === adminHost) {
+      topResponse.headers.set('X-Robots-Tag', 'noindex, nofollow');
+      if (!isAdminPath && !nextUrl.pathname.startsWith('/auth')) {
+        return NextResponse.redirect(new URL('/admin', nextUrl.href));
+      }
+    } else if (isAdminPath) {
+      // a page that doesn't exist: the normal "not found" page
+      return NextResponse.rewrite(new URL('/404', nextUrl.href));
+    }
   }
 
   if (nextUrl.pathname.startsWith('/modal/') && !authCookie) {

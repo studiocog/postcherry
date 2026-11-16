@@ -43,6 +43,10 @@ model Organization {
   signatures          Signatures[]
   brandKit            BrandKit?
   bioPage             BioPage?
+  // super admin only (the hq admin area), never shown to the workspace
+  adminNotes          AdminNote[]
+  adminTags           AdminTag[]
+  adminAuditLogs      AdminAuditLog[]
   subscription        Subscription?
   tags                Tags[]
   thirdParty          ThirdParty[]
@@ -125,6 +129,10 @@ model User {
   sendStreakEmails      Boolean              @default(true)
   oauthAuthorizations   OAuthAuthorization[]
   postApprovals         PostApproval[]
+  // super admin only (the hq admin area)
+  adminSecurity         AdminSecurity?
+  adminNotes            AdminNote[]          @relation("adminNoteAuthor")
+  adminAuditLogs        AdminAuditLog[]      @relation("adminAuditAdmin")
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -455,6 +463,72 @@ model BrandKit {
 }
 
 // The public "link in bio" page of a workspace, at /bio/<slug>
+// The second login step of the admin area (hq) for a super admin: an
+// authenticator app code (TOTP). The secret is stored encrypted.
+model AdminSecurity {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  // '' until the setup starts
+  totpSecret     String       @default("")
+  // sha256 of the one-time setup code printed by set-admin-hq.ps1, needed to
+  // show the QR code; cleared once the first code is entered
+  enrollCode     String?
+  // null until the first code is entered, a new setup can replace it until then
+  confirmedAt    DateTime?
+  // random, inside the admin_session cookie: changing it signs every HQ
+  // session of this admin out (new code entered, Lock, -Reset2FA)
+  sessionNonce   String?
+  // the 30 second step of the last accepted code, so a code works only once
+  lastStep       Int       @default(0)
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id])
+}
+
+// Notes the super admin keeps about a workspace (CRM)
+model AdminNote {
+  id             String       @id @default(uuid())
+  organizationId String
+  authorId       String
+  text           String
+  createdAt      DateTime     @default(now())
+  deletedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  author         User         @relation("adminNoteAuthor", fields: [authorId], references: [id])
+
+  @@index([organizationId])
+  @@index([deletedAt])
+}
+
+// Tags the super admin puts on a workspace (CRM), e.g. "vip", "agency lead"
+model AdminTag {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, name])
+  @@index([name])
+}
+
+// Every change made from the admin area, who made it and when
+model AdminAuditLog {
+  id             String        @id @default(uuid())
+  adminId        String
+  organizationId String?
+  action         String
+  details        Json?
+  createdAt      DateTime      @default(now())
+  admin          User          @relation("adminAuditAdmin", fields: [adminId], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([createdAt])
+}
+
 model BioPage {
   id             String       @id @default(uuid())
   organizationId String       @unique

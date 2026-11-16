@@ -178,6 +178,51 @@ export class SubscriptionService {
     );
   }
 
+  // A free plan given by a super admin from HQ: the top tier, lifetime,
+  // never billed. It never replaces a subscription someone pays for.
+  async giveManualPlan(organizationId: string) {
+    const current = await this._subscriptionRepository.getSubscriptionByOrgId(
+      organizationId
+    );
+    if (current && !current.deletedAt && current.provider !== 'manual') {
+      return false;
+    }
+    const totalChannels = Math.max(100, pricing.AGENCY_PRO.channel || 0);
+    await this.modifySubscriptionByOrg(
+      organizationId,
+      totalChannels,
+      'AGENCY_PRO'
+    );
+    await this._subscriptionRepository.setManualPlan(
+      organizationId,
+      'AGENCY_PRO',
+      totalChannels
+    );
+    return true;
+  }
+
+  async removeManualPlan(organizationId: string) {
+    const current = await this._subscriptionRepository.getSubscriptionByOrgId(
+      organizationId
+    );
+    if (!current || current.provider !== 'manual') {
+      return false;
+    }
+    // without billing there are no plan limits to go back to
+    if (process.env.STRIPE_PUBLISHABLE_KEY) {
+      await this.modifySubscriptionByOrg(
+        organizationId,
+        pricing.FREE.channel || 0,
+        'FREE'
+      );
+    }
+    await this._subscriptionRepository.deleteSubscriptionByOrgId(
+      organizationId,
+      'manual'
+    );
+    return true;
+  }
+
   updateCustomerId(organizationId: string, customerId: string) {
     return this._subscriptionRepository.updateCustomerId(
       organizationId,

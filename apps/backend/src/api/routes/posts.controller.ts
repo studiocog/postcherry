@@ -9,7 +9,9 @@ import {
   Put,
   Query,
   Res,
+  UseGuards,
 } from '@nestjs/common';
+import { AdminSessionGuard } from '@gitroom/backend/services/auth/admin.session.guard';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization, User } from '@prisma/client';
@@ -174,6 +176,7 @@ export class PostsController {
     return this._postsService.getOldPosts(org.id, date);
   }
 
+  @UseGuards(AdminSessionGuard)
   @Get('/group/:group/debug-export')
   async getPostGroupDebugExport(
     @GetOrgFromRequest() org: Organization,

@@ -8,6 +8,11 @@ import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.man
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { setSentryUserContext } from '@gitroom/nestjs-libraries/sentry/initialize.sentry';
+import { AdminService } from '@gitroom/nestjs-libraries/database/prisma/admin/admin.service';
+import {
+  checkAdminSession,
+  setAdminSession,
+} from '@gitroom/backend/services/auth/admin.session';
 
 export const removeAuth = (res: Response) => {
   res.cookie('auth', '', {
@@ -29,7 +34,8 @@ export const removeAuth = (res: Response) => {
 export class AuthMiddleware implements NestMiddleware {
   constructor(
     private _organizationService: OrganizationService,
-    private _userService: UsersService
+    private _userService: UsersService,
+    private _adminService: AdminService
   ) {}
   async use(req: Request, res: Response, next: NextFunction) {
     const auth = req.headers.auth || req.cookies.auth;
@@ -58,7 +64,18 @@ export class AuthMiddleware implements NestMiddleware {
       }
 
       const impersonate = req.cookies.impersonate || req.headers.impersonate;
-      if (user?.isSuperAdmin && impersonate) {
+      // seeing the app as a customer needs a live HQ session (the
+      // authenticator code); without one the admin is just themselves
+      const adminSession =
+        user?.isSuperAdmin && impersonate
+          ? await checkAdminSession(this._adminService, req)
+          : null;
+      if (adminSession) {
+        setAdminSession(res, adminSession.adminId, adminSession.nonce);
+        // the app shows the "viewing as" bar only when this really happens
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        req.impersonating = true;
         const loadImpersonate = await this._organizationService.getUserOrg(
           impersonate
         );
