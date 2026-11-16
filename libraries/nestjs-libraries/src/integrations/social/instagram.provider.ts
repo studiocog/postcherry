@@ -1276,4 +1276,11 @@ export class InstagramProvider
       return [];
     }
   }
+
+  profileUrl(profile: string) {
+    const handle = (profile || '').trim().replace(/^@/, '');
+    return handle
+      ? `https://www.instagram.com/${encodeURIComponent(handle)}/`
+      : undefined;
+  }
 }

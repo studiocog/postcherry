@@ -54,6 +54,8 @@ import { MetaCallbacksRepository } from '@gitroom/nestjs-libraries/database/pris
 import { MetaCallbacksService } from '@gitroom/nestjs-libraries/database/prisma/meta/meta.callbacks.service';
 import { BrandKitRepository } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.repository';
 import { BrandKitService } from '@gitroom/nestjs-libraries/database/prisma/brand-kit/brand-kit.service';
+import { BioPageRepository } from '@gitroom/nestjs-libraries/database/prisma/bio-page/bio-page.repository';
+import { BioPageService } from '@gitroom/nestjs-libraries/database/prisma/bio-page/bio-page.service';
 import { PostApprovalsRepository } from '@gitroom/nestjs-libraries/database/prisma/post-approvals/post.approvals.repository';
 import { PostApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/post-approvals/post.approvals.service';
 import { ReportsRepository } from '@gitroom/nestjs-libraries/database/prisma/reports/reports.repository';
@@ -122,6 +124,8 @@ import { ReportPdfService } from '@gitroom/nestjs-libraries/database/prisma/repo
     MetaCallbacksService,
     BrandKitRepository,
     BrandKitService,
+    BioPageRepository,
+    BioPageService,
     PostApprovalsRepository,
     PostApprovalsService,
     ReportsRepository,

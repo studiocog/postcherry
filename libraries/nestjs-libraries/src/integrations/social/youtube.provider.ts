@@ -1100,4 +1100,12 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
       return [];
     }
   }
+
+  // the stored profile is the custom url of the channel, like @handle
+  profileUrl(profile: string) {
+    const handle = (profile || '').trim().replace(/^@/, '');
+    return handle
+      ? `https://www.youtube.com/@${encodeURIComponent(handle)}`
+      : undefined;
+  }
 }

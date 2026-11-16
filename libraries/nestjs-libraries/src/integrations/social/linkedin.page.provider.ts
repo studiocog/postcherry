@@ -608,6 +608,14 @@ export class LinkedinPageProvider
   mentionFormat(idOrHandle: string, name: string) {
     return `@[${name.replace('@', '')}](urn:li:organization:${idOrHandle})`;
   }
+
+  // the stored profile is the vanity name of the company page
+  override profileUrl(profile: string) {
+    const handle = (profile || '').trim().replace(/^@/, '');
+    return handle
+      ? `https://www.linkedin.com/company/${encodeURIComponent(handle)}`
+      : undefined;
+  }
 }
 
 export interface Root {

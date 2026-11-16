@@ -48,6 +48,8 @@ export async function proxy(request: NextRequest) {
     nextUrl.pathname.startsWith('/p/') ||
     // the client approval page is opened without an account
     nextUrl.pathname.startsWith('/approve/') ||
+    // the public link in bio pages are opened without an account
+    nextUrl.pathname.startsWith('/bio/') ||
     nextUrl.pathname.startsWith('/provider/') ||
     nextUrl.pathname.startsWith('/icons/') ||
     // the consent screen of MCP / OAuth clients handles signed-out visitors

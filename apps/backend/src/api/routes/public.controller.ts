@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
   Param,
   Post,
   Query,
@@ -36,6 +37,7 @@ import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf
 import { CreatePublicCommentDto } from '@gitroom/nestjs-libraries/dtos/comments/add.comment.dto';
 import { PostApprovalsService } from '@gitroom/nestjs-libraries/database/prisma/post-approvals/post.approvals.service';
 import { PostApprovalDecisionDto } from '@gitroom/nestjs-libraries/dtos/post-approvals/post.approval.dto';
+import { BioPageService } from '@gitroom/nestjs-libraries/database/prisma/bio-page/bio-page.service';
 
 const pump = promisify(pipeline);
 
@@ -47,7 +49,8 @@ export class PublicController {
     private _agentGraphInsertService: AgentGraphInsertService,
     private _postsService: PostsService,
     private _subscriptionService: SubscriptionService,
-    private _postApprovalsService: PostApprovalsService
+    private _postApprovalsService: PostApprovalsService,
+    private _bioPageService: BioPageService
   ) {}
   @Post('/agent')
   async createAgent(@Body() body: { text: string; apiKey: string }) {
@@ -143,6 +146,18 @@ export class PublicController {
     @Body() body: PostApprovalDecisionDto
   ) {
     return this._postApprovalsService.decide(token, body);
+  }
+
+  // the link in bio page, opened by anyone without logging in. Only published
+  // pages are returned, with nothing of the workspace but what the page shows
+  @Get(`/bio/:slug`)
+  async getBioPage(@Param('slug') slug: string) {
+    const page = await this._bioPageService.getPublicBioPage(slug);
+    if (!page) {
+      throw new HttpException('Page not found', 404);
+    }
+
+    return page;
   }
 
   @Post('/t')

@@ -42,6 +42,7 @@ model Organization {
   sets                Sets[]
   signatures          Signatures[]
   brandKit            BrandKit?
+  bioPage             BioPage?
   subscription        Subscription?
   tags                Tags[]
   thirdParty          ThirdParty[]
@@ -451,6 +452,32 @@ model BrandKit {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+// The public "link in bio" page of a workspace, at /bio/<slug>
+model BioPage {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  // lowercase a-z, 0-9 and -, 3 to 30 characters
+  slug           String       @unique
+  title          String?
+  description    String?
+  // a picture from the media library of the workspace, and its path
+  avatarMediaId  String?
+  avatar         String?
+  theme          String       @default("light")
+  // [{ id, title, url }], http(s) urls only
+  links          Json         @default("[]")
+  showChannels   Boolean      @default(false)
+  // the channels shown as icons, in this order
+  channelIds     String[]     @default([])
+  published      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([deletedAt])
 }
 
 model Comments {

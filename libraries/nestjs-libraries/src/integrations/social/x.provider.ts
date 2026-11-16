@@ -1684,4 +1684,9 @@ export class XProvider extends SocialAbstract implements SocialProvider {
   mentionFormat(idOrHandle: string, name: string) {
     return `@${idOrHandle}`;
   }
+
+  profileUrl(profile: string) {
+    const handle = (profile || '').trim().replace(/^@/, '');
+    return handle ? `https://x.com/${encodeURIComponent(handle)}` : undefined;
+  }
 }

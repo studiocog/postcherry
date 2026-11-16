@@ -1469,4 +1469,11 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       return [];
     }
   }
+
+  profileUrl(profile: string) {
+    const handle = (profile || '').trim().replace(/^@/, '');
+    return handle
+      ? `https://www.tiktok.com/@${encodeURIComponent(handle)}`
+      : undefined;
+  }
 }

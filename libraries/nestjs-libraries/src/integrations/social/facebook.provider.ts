@@ -1220,4 +1220,12 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
       return [];
     }
   }
+
+  // the stored profile is the username of the page, empty when it has none
+  profileUrl(profile: string) {
+    const handle = (profile || '').trim().replace(/^@/, '');
+    return handle
+      ? `https://www.facebook.com/${encodeURIComponent(handle)}`
+      : undefined;
+  }
 }

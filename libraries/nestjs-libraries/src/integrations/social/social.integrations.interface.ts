@@ -242,6 +242,9 @@ export interface SocialProvider
     | { none: true }
   >;
   mentionFormat?(idOrHandle: string, name: string): string;
+  // The public address of the channel, built from Integration.profile (the
+  // username the provider stored), undefined when it can not be built
+  profileUrl?(profile: string): string | undefined;
   fetchPageInformation?(
     accessToken: string,
     data: any

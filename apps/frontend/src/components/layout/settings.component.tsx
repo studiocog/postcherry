@@ -39,6 +39,7 @@ import { ThirdPartyComponent } from '@gitroom/frontend/components/third-parties/
 import { Plugs } from '@gitroom/frontend/components/plugs/plugs';
 import { useAccountType } from '@gitroom/frontend/components/settings/account-type.component';
 import { BrandKitComponent } from '@gitroom/frontend/components/settings/brand-kit.component';
+import { BioPageComponent } from '@gitroom/frontend/components/settings/bio-page.component';
 import { BrandsSettings } from '@gitroom/frontend/components/brands/brands.settings';
 import { isNewTier } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 export const SettingsPopup: FC<{
@@ -116,6 +117,8 @@ export const SettingsPopup: FC<{
     arr.push({ tab: 'global_settings', label: t('global_settings', 'Global Settings') });
     // every account type has a brand
     arr.push({ tab: 'brand_kit', label: t('brand_kit', 'Brand kit') });
+    // every account type can have a public link in bio page
+    arr.push({ tab: 'link_in_bio', label: t('link_in_bio', 'Link in bio') });
     // the brands of the brand switcher (Customer rows)
     arr.push({ tab: 'brands', label: t('brands', 'Brands') });
     // Populate tabs based on user permissions, individuals and businesses only see the basics
@@ -229,6 +232,11 @@ export const SettingsPopup: FC<{
               {tab === 'brand_kit' && (
                 <div>
                   <BrandKitComponent />
+                </div>
+              )}
+              {tab === 'link_in_bio' && (
+                <div>
+                  <BioPageComponent />
                 </div>
               )}
               {tab === 'brands' && (

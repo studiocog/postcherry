@@ -1087,4 +1087,12 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
   // Re-posters" (linkedin-repost-post-users) were removed: engagement from
   // other connected accounts is not an approved LinkedIn use case. Plugs
   // already saved for them are skipped by processInternalPlug.
+
+  // the stored profile is the vanity name of the member
+  profileUrl(profile: string) {
+    const handle = (profile || '').trim().replace(/^@/, '');
+    return handle
+      ? `https://www.linkedin.com/in/${encodeURIComponent(handle)}`
+      : undefined;
+  }
 }

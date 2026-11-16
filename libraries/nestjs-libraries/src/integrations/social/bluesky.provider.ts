@@ -997,4 +997,11 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
   mentionFormat(idOrHandle: string, name: string) {
     return `@${idOrHandle}`;
   }
+
+  profileUrl(profile: string) {
+    const handle = (profile || '').trim().replace(/^@/, '');
+    return handle
+      ? `https://bsky.app/profile/${encodeURIComponent(handle)}`
+      : undefined;
+  }
 }
