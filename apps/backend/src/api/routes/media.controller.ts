@@ -25,6 +25,7 @@ import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/media/save.media.information.dto';
 import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
 import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
+import { UploadDto } from '@gitroom/nestjs-libraries/dtos/media/upload.dto';
 
 @ApiTags('Media')
 @Controller('/media')
@@ -148,6 +149,17 @@ export class MediaController {
       file.path,
       file.originalname
     );
+  }
+
+  // the same download as the public API: a public https url of a picture or
+  // a video, fetched through the SSRF-safe dispatcher and saved to the media
+  // library. Declared before /:endpoint, which would catch it otherwise
+  @Post('/upload-from-url')
+  uploadFromUrl(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: UploadDto
+  ) {
+    return this._mediaService.uploadFromUrl(org.id, body.url);
   }
 
   @Post('/:endpoint')
