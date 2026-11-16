@@ -150,7 +150,7 @@ export const AuthShowcase: FC = () => {
         <div className="text-[17px] mt-[14px] opacity-70 max-w-[460px] mx-auto">
           {t(
             'auth_showcase_subtitle',
-            'Schedule to 30+ channels from PostCherry, or straight from Claude, ChatGPT and the AI apps you already use.'
+            'Schedule to 50+ channels from PostCherry, or straight from Claude, ChatGPT and the AI apps you already use.'
           )}
         </div>
       </div>

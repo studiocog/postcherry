@@ -517,7 +517,7 @@ export const useBillingFeatures = (tier: string) => {
       );
       list.push({
         key: 'billing_all_channel_types',
-        defaultValue: 'All 30+ channel types',
+        defaultValue: 'All 50+ channel types',
       });
       list.push(
         currentPricing.team_members
