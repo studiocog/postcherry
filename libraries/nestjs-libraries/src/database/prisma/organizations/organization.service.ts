@@ -110,7 +110,17 @@ export class OrganizationService {
     const id = makeId(5);
     const url =
       process.env.FRONTEND_URL +
-      `/?org=${AuthService.signJWT({ ...body, orgId: org.id, timeLimit, id })}`;
+      // only these fields: the body can carry extra keys (no whitelist in the
+      // validation pipe), and other readers trust claims of tokens signed
+      // with this key (e.g. orgId + billing in /public/modify-subscription)
+      `/?org=${AuthService.signJWT({
+        email: body.email,
+        role: body.role,
+        sendEmail: body.sendEmail,
+        orgId: org.id,
+        timeLimit,
+        id,
+      })}`;
     if (body.sendEmail) {
       const inviter = user.name
         ? `${user.name} (${user.email})`

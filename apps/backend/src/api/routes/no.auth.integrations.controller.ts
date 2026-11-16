@@ -441,8 +441,12 @@ export class NoAuthIntegrationsController {
       false,
       undefined,
       undefined,
-      AuthService.signJWT(
-        JSON.parse(Buffer.from(body.cookies, 'base64').toString())
+      // stored like the first connect does: encrypted JSON. Signing it with
+      // the login key would turn a caller-chosen object into a valid token.
+      AuthService.fixedEncryption(
+        JSON.stringify(
+          JSON.parse(Buffer.from(body.cookies, 'base64').toString())
+        )
       )
     );
 
