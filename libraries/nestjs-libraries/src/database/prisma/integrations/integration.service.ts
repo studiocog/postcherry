@@ -708,6 +708,13 @@ ${this._notificationService.emailButton(reconnectUrl, 'Reconnect channel')}`,
       inBetweenSteps: false,
       token: getIntegrationInformation.access_token,
       profile: getIntegrationInformation.username,
+      // On a reconnect, updateIntegration writes these onto the existing
+      // channel and deletes this temporary one, so the fresh refresh token
+      // has to travel with it. Otherwise the channel keeps the old (often
+      // revoked) refresh token and breaks when the access token expires.
+      refreshToken: getIntegration.refreshToken,
+      tokenExpiration: getIntegration.tokenExpiration,
+      refreshNeeded: false,
     });
 
     await this.releaseDisconnectAlert(id);
