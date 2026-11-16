@@ -1,7 +1,12 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { AdminCustomerStatus } from '@gitroom/nestjs-libraries/dtos/admin/admin.dto';
+import {
+  AdminCustomerStatus,
+  AdminProfile,
+  AdminSort,
+  AdminStage,
+} from '@gitroom/nestjs-libraries/dtos/admin/admin.dto';
 
 // A workspace pays when it has a live subscription that is not a manual one
 // (a manual one is a free plan given from the admin area or set-owner-plan.ps1)
@@ -47,6 +52,53 @@ export const statusWhere: Record<
   never_posted: { post: { none: { deletedAt: null } } },
 };
 
+// A stage set by hand wins; without one the stage comes from the plan and
+// posting (the same rules as AdminService.autoStage)
+const noStageSet: Prisma.OrganizationWhereInput = {
+  OR: [
+    { adminCustomer: { is: null } },
+    { adminCustomer: { is: { stage: null } } },
+  ],
+};
+const livePost: Prisma.PostWhereInput = { deletedAt: null };
+
+const autoStageWhere: Partial<
+  Record<AdminStage, Prisma.OrganizationWhereInput>
+> = {
+  trial: { isTrailing: true },
+  at_risk: statusWhere.cancelling,
+  onboarding: {
+    isTrailing: false,
+    NOT: statusWhere.cancelling,
+    post: { none: livePost },
+  },
+  active: {
+    isTrailing: false,
+    NOT: statusWhere.cancelling,
+    post: { some: livePost },
+  },
+};
+
+export const stageWhere = (
+  stage: AdminStage
+): Prisma.OrganizationWhereInput => ({
+  OR: [
+    { adminCustomer: { is: { stage } } },
+    ...(autoStageWhere[stage]
+      ? [{ AND: [noStageSet, autoStageWhere[stage]!] }]
+      : []),
+  ],
+});
+
+const sortOrder: Record<
+  AdminSort,
+  Prisma.OrganizationOrderByWithRelationInput
+> = {
+  newest: { createdAt: 'desc' },
+  oldest: { createdAt: 'asc' },
+  name: { name: 'asc' },
+};
+
 // members whose user account still exists
 const activeMember: Prisma.UserOrganizationWhereInput = {
   user: { deletedAt: null },
@@ -90,8 +142,21 @@ const customerListSelect = {
     },
   },
   adminTags: { select: { name: true }, orderBy: { name: 'asc' } },
+  adminCustomer: {
+    select: {
+      stage: true,
+      company: true,
+      phone: true,
+      website: true,
+      country: true,
+      source: true,
+    },
+  },
   _count: {
-    select: { Integration: { where: liveChannel } },
+    select: {
+      Integration: { where: liveChannel },
+      post: { where: livePost },
+    },
   },
 } satisfies Prisma.OrganizationSelect;
 
@@ -99,6 +164,8 @@ export interface CustomerListParams {
   search?: string;
   status?: AdminCustomerStatus;
   tag?: string;
+  stage?: AdminStage;
+  sort?: AdminSort;
   page: number;
   limit: number;
 }
@@ -115,7 +182,10 @@ export class AdminRepository {
     private _adminSecurity: PrismaRepository<'adminSecurity'>,
     private _adminNote: PrismaRepository<'adminNote'>,
     private _adminTag: PrismaRepository<'adminTag'>,
-    private _adminAuditLog: PrismaRepository<'adminAuditLog'>
+    private _adminAuditLog: PrismaRepository<'adminAuditLog'>,
+    private _adminCustomer: PrismaRepository<'adminCustomer'>,
+    private _adminTask: PrismaRepository<'adminTask'>,
+    private _errors: PrismaRepository<'errors'>
   ) {}
 
   // ---------- the second login step ----------
@@ -286,6 +356,9 @@ export class AdminRepository {
     if (params.tag) {
       and.push({ adminTags: { some: { name: params.tag } } });
     }
+    if (params.stage) {
+      and.push(stageWhere(params.stage));
+    }
     return { AND: and } satisfies Prisma.OrganizationWhereInput;
   }
 
@@ -296,7 +369,7 @@ export class AdminRepository {
       this._organization.model.organization.findMany({
         where,
         select: customerListSelect,
-        orderBy: { createdAt: 'desc' },
+        orderBy: sortOrder[params.sort || 'newest'],
         skip: params.page * params.limit,
         take: params.limit,
       }),
@@ -393,6 +466,166 @@ export class AdminRepository {
       },
       orderBy: { role: 'asc' },
       select: { id: true, user: { select: { email: true } } },
+    });
+  }
+
+  // ---------- pipeline ----------
+
+  async stageColumn(stage: AdminStage, take: number) {
+    const where: Prisma.OrganizationWhereInput = {
+      AND: [{ deletedAt: null }, stageWhere(stage)],
+    };
+    const [total, customers] = await Promise.all([
+      this._organization.model.organization.count({ where }),
+      this._organization.model.organization.findMany({
+        where,
+        select: customerListSelect,
+        orderBy: { createdAt: 'desc' },
+        take,
+      }),
+    ]);
+    return { total, customers };
+  }
+
+  // ---------- health ----------
+
+  async reconnectPerWorkspace(organizationIds: string[]) {
+    if (!organizationIds.length) {
+      return new Map<string, number>();
+    }
+    const grouped = await this._integration.model.integration.groupBy({
+      by: ['organizationId'],
+      where: {
+        organizationId: { in: organizationIds },
+        deletedAt: null,
+        OR: [{ refreshNeeded: true }, { inBetweenSteps: true }],
+      },
+      _count: { _all: true },
+    });
+    return new Map(grouped.map((g) => [g.organizationId, g._count._all]));
+  }
+
+  async errorsPerWorkspace(organizationIds: string[], since: Date) {
+    if (!organizationIds.length) {
+      return new Map<string, number>();
+    }
+    const grouped = await this._errors.model.errors.groupBy({
+      by: ['organizationId'],
+      where: {
+        organizationId: { in: organizationIds },
+        createdAt: { gte: since },
+      },
+      _count: { _all: true },
+    });
+    return new Map(grouped.map((g) => [g.organizationId, g._count._all]));
+  }
+
+  // ---------- CRM profile ----------
+
+  setStage(organizationId: string, stage: AdminStage | null) {
+    return this._adminCustomer.model.adminCustomer.upsert({
+      where: { organizationId },
+      create: { organizationId, stage },
+      update: { stage },
+      select: { id: true },
+    });
+  }
+
+  setProfile(organizationId: string, profile: AdminProfile) {
+    return this._adminCustomer.model.adminCustomer.upsert({
+      where: { organizationId },
+      create: { organizationId, ...profile },
+      update: profile,
+      select: { id: true },
+    });
+  }
+
+  // ---------- tasks ----------
+
+  listTasks(params: {
+    organizationId?: string;
+    done?: boolean;
+    take: number;
+  }) {
+    const openFirst: Prisma.AdminTaskOrderByWithRelationInput[] = [
+      { dueAt: { sort: 'asc', nulls: 'last' } },
+      { createdAt: 'desc' },
+    ];
+    const doneFirst: Prisma.AdminTaskOrderByWithRelationInput[] = [
+      { doneAt: 'desc' },
+    ];
+    const where: Prisma.AdminTaskWhereInput = {
+      deletedAt: null,
+      organization: { deletedAt: null },
+      ...(params.organizationId
+        ? { organizationId: params.organizationId }
+        : {}),
+      ...(params.done === undefined
+        ? {}
+        : params.done
+        ? { doneAt: { not: null } }
+        : { doneAt: null }),
+    };
+    return this._adminTask.model.adminTask.findMany({
+      where,
+      select: {
+        id: true,
+        title: true,
+        dueAt: true,
+        doneAt: true,
+        createdAt: true,
+        author: { select: { name: true, email: true } },
+        organization: { select: { id: true, name: true } },
+      },
+      // open: the soonest first (no date last); done: the latest first
+      orderBy: params.done ? doneFirst : openFirst,
+      take: params.take,
+    });
+  }
+
+  countOpenTasks(dueBefore: Date) {
+    const where: Prisma.AdminTaskWhereInput = {
+      deletedAt: null,
+      doneAt: null,
+      organization: { deletedAt: null },
+      dueAt: { lt: dueBefore },
+    };
+    return this._adminTask.model.adminTask.count({ where });
+  }
+
+  addTask(
+    organizationId: string,
+    authorId: string,
+    title: string,
+    dueAt: Date | null
+  ) {
+    return this._adminTask.model.adminTask.create({
+      data: { organizationId, authorId, title, dueAt },
+      select: { id: true },
+    });
+  }
+
+  getTask(id: string) {
+    const where: Prisma.AdminTaskWhereInput = { id, deletedAt: null };
+    return this._adminTask.model.adminTask.findFirst({
+      where,
+      select: { id: true, organizationId: true, title: true },
+    });
+  }
+
+  setTaskDone(id: string, done: boolean) {
+    return this._adminTask.model.adminTask.update({
+      where: { id },
+      data: { doneAt: done ? new Date() : null },
+      select: { id: true },
+    });
+  }
+
+  deleteTask(id: string) {
+    return this._adminTask.model.adminTask.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+      select: { id: true },
     });
   }
 

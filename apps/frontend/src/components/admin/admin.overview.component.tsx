@@ -50,7 +50,7 @@ export const AdminOverviewComponent: FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-[12px]">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-[12px]">
         <Card
           label="Users"
           value={data.users.total.toLocaleString()}
@@ -87,6 +87,22 @@ export const AdminOverviewComponent: FC = () => {
           label="Channels"
           value={data.activity.channels.toLocaleString()}
           hint={`${data.activity.channelsNeedReconnect} need reconnecting`}
+        />
+        <Card
+          label="Follow-ups due"
+          value={(data.tasks.overdue + data.tasks.today).toLocaleString()}
+          hint={
+            data.tasks.overdue
+              ? `${data.tasks.overdue} overdue`
+              : 'Nothing overdue'
+          }
+          href="/admin/tasks"
+        />
+        <Card
+          label="Pipeline"
+          value={<span className="text-[18px]">Open board →</span>}
+          hint="Leads, trials, active, at risk"
+          href="/admin/pipeline"
         />
       </div>
 

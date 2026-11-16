@@ -47,6 +47,8 @@ model Organization {
   adminNotes          AdminNote[]
   adminTags           AdminTag[]
   adminAuditLogs      AdminAuditLog[]
+  adminCustomer       AdminCustomer?
+  adminTasks          AdminTask[]
   subscription        Subscription?
   tags                Tags[]
   thirdParty          ThirdParty[]
@@ -133,6 +135,7 @@ model User {
   adminSecurity         AdminSecurity?
   adminNotes            AdminNote[]          @relation("adminNoteAuthor")
   adminAuditLogs        AdminAuditLog[]      @relation("adminAuditAdmin")
+  adminTasks            AdminTask[]          @relation("adminTaskAuthor")
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -512,6 +515,44 @@ model AdminTag {
 
   @@unique([organizationId, name])
   @@index([name])
+}
+
+// The CRM record the super admin keeps about a workspace (HQ): the pipeline
+// stage (null = worked out from the plan and posting) and contact details
+model AdminCustomer {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  // lead | trial | onboarding | active | at_risk | churned
+  stage          String?
+  company        String?
+  phone          String?
+  website        String?
+  country        String?
+  // how the customer found PostCherry, e.g. "Google", "Product Hunt"
+  source         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([stage])
+}
+
+// A follow-up the super admin wants to do for a workspace (HQ)
+model AdminTask {
+  id             String       @id @default(uuid())
+  organizationId String
+  authorId       String
+  title          String
+  dueAt          DateTime?
+  doneAt         DateTime?
+  createdAt      DateTime     @default(now())
+  deletedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  author         User         @relation("adminTaskAuthor", fields: [authorId], references: [id])
+
+  @@index([organizationId])
+  @@index([doneAt, dueAt])
+  @@index([deletedAt])
 }
 
 // Every change made from the admin area, who made it and when

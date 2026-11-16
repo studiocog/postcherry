@@ -7,7 +7,9 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   AdminCustomerRow,
+  AdminHealth,
   AdminPlanStatus,
+  AdminStage,
 } from '@gitroom/nestjs-libraries/dtos/admin/admin.dto';
 
 dayjs.extend(relativeTime);
@@ -29,6 +31,75 @@ const statusColors: Record<AdminPlanStatus, string> = {
   free: 'bg-gray-500/20 text-gray-400',
   none: 'bg-gray-500/10 text-gray-500',
 };
+
+export const stageLabels: Record<AdminStage, string> = {
+  lead: 'Lead',
+  trial: 'Trial',
+  onboarding: 'Getting started',
+  active: 'Active',
+  at_risk: 'At risk',
+  churned: 'Churned',
+};
+
+const stageColors: Record<AdminStage, string> = {
+  lead: 'bg-sky-500/15 text-sky-500',
+  trial: 'bg-blue-500/15 text-blue-500',
+  onboarding: 'bg-amber-500/15 text-amber-600',
+  active: 'bg-green-600/15 text-green-600',
+  at_risk: 'bg-orange-500/15 text-orange-500',
+  churned: 'bg-gray-500/15 text-gray-500',
+};
+
+export const StageBadge: FC<{ stage: AdminStage; set?: boolean }> = ({
+  stage,
+  set = true,
+}) => (
+  <span
+    title={set ? 'Set by hand' : 'Worked out from the plan and posting'}
+    className={clsx(
+      'inline-flex items-center gap-[4px] h-[22px] px-[8px] rounded-full text-[12px] font-[600] whitespace-nowrap',
+      stageColors[stage]
+    )}
+  >
+    {stageLabels[stage]}
+    {!set && <span className="opacity-60 font-[500]">· auto</span>}
+  </span>
+);
+
+const healthColors = {
+  healthy: 'bg-green-600',
+  attention: 'bg-amber-500',
+  risk: 'bg-red-500',
+};
+const healthLabels = {
+  healthy: 'Healthy',
+  attention: 'Needs attention',
+  risk: 'At risk',
+};
+
+// a dot, the score and (with details) the reasons
+export const HealthBadge: FC<{ health: AdminHealth; details?: boolean }> = ({
+  health,
+  details,
+}) => (
+  <span
+    className="inline-flex items-center gap-[6px] whitespace-nowrap"
+    title={
+      health.reasons.length
+        ? `${healthLabels[health.label]}: ${health.reasons.join(', ')}`
+        : healthLabels[health.label]
+    }
+  >
+    <span
+      className={clsx(
+        'w-[8px] h-[8px] rounded-full shrink-0',
+        healthColors[health.label]
+      )}
+    />
+    <span className="font-[600]">{health.score}</span>
+    {details && <span className="opacity-70">{healthLabels[health.label]}</span>}
+  </span>
+);
 
 export const StatusBadge: FC<{ status: AdminPlanStatus }> = ({ status }) => (
   <span
@@ -102,12 +173,14 @@ export const CustomerTable: FC<{ customers: AdminCustomerRow[] }> = ({
   customers,
 }) => (
   <div className="border border-newTableBorder rounded-[10px] overflow-x-auto">
-    <table className="w-full text-[13px] min-w-[900px]">
+    <table className="w-full text-[13px] min-w-[1100px]">
       <thead>
         <tr className="bg-newBgColorInner text-[12px] uppercase opacity-70 text-start">
           <th className="text-start font-[500] px-[12px] py-[10px]">Workspace</th>
           <th className="text-start font-[500] px-[12px] py-[10px]">Owner</th>
           <th className="text-start font-[500] px-[12px] py-[10px]">Plan</th>
+          <th className="text-start font-[500] px-[12px] py-[10px]">Stage</th>
+          <th className="text-start font-[500] px-[12px] py-[10px]">Health</th>
           <th className="text-end font-[500] px-[12px] py-[10px]">$ / month</th>
           <th className="text-end font-[500] px-[12px] py-[10px]">Channels</th>
           <th className="text-end font-[500] px-[12px] py-[10px]">Posts this month</th>
@@ -118,7 +191,7 @@ export const CustomerTable: FC<{ customers: AdminCustomerRow[] }> = ({
       <tbody>
         {customers.length === 0 && (
           <tr>
-            <td colSpan={8} className="px-[12px] py-[16px] opacity-70">
+            <td colSpan={10} className="px-[12px] py-[16px] opacity-70">
               No workspaces match.
             </td>
           </tr>
@@ -158,6 +231,12 @@ export const CustomerTable: FC<{ customers: AdminCustomerRow[] }> = ({
                 )}
               </div>
             </td>
+            <td className="px-[12px] py-[10px]">
+              <StageBadge stage={customer.stage} set={customer.stageSet} />
+            </td>
+            <td className="px-[12px] py-[10px]">
+              <HealthBadge health={customer.health} />
+            </td>
             <td className="px-[12px] py-[10px] text-end">
               {customer.monthlyRevenue ? money(customer.monthlyRevenue) : '-'}
             </td>
@@ -182,14 +261,36 @@ export const actionLabels: Record<string, string> = {
   note_deleted: 'Deleted a note',
   tags_changed: 'Changed the tags',
   logged_in_as: 'Opened the app as the customer',
+  stage_changed: 'Moved to another stage',
+  profile_changed: 'Changed the contact details',
+  task_added: 'Added a task',
+  task_done: 'Finished a task',
+  task_reopened: 'Reopened a task',
+  task_deleted: 'Deleted a task',
+  customers_exported: 'Exported the customers list',
 };
 
 // "tags_changed" with { tags: [...] } -> "Changed the tags: vip, agency"
 export const describeAction = (action: string, details: unknown) => {
   const label = actionLabels[action] || action;
-  const value = details as { tags?: string[]; email?: string } | null;
+  const value = details as {
+    tags?: string[];
+    email?: string;
+    stage?: string;
+    title?: string;
+  } | null;
   if (value?.tags) {
     return `${label}: ${value.tags.join(', ') || 'none'}`;
+  }
+  if (value?.stage) {
+    return `${label}: ${
+      value.stage === 'auto'
+        ? 'automatic'
+        : stageLabels[value.stage as AdminStage] || value.stage
+    }`;
+  }
+  if (value?.title) {
+    return `${label}: ${value.title}`;
   }
   if (value?.email) {
     return `${label} (${value.email})`;

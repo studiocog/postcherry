@@ -18,15 +18,24 @@ import {
 } from '@gitroom/nestjs-libraries/services/totp';
 import {
   ADMIN_TAG,
+  AdminBoard,
   AdminCustomerDetail,
   AdminCustomerRow,
   AdminCustomerStatus,
+  AdminHealth,
   adminLimits,
   AdminLogEntry,
   AdminOverview,
   AdminPlanStatus,
+  AdminProfile,
+  AdminProfileDto,
   AdminSessionState,
   AdminSetupResponse,
+  AdminSort,
+  AdminStage,
+  adminStages,
+  AdminTaskRow,
+  AdminTimelineEntry,
 } from '@gitroom/nestjs-libraries/dtos/admin/admin.dto';
 
 // 5 wrong codes in a row lock the second step for 15 minutes
@@ -62,6 +71,75 @@ const monthlyPrice = (tier: string, period: string) => {
     ? Math.round((price.year_price / 12) * 100) / 100
     : price.month_price;
 };
+
+// Health of a workspace, 100 = all good. Each problem takes points off and
+// says why, so the customer page can show what to fix.
+const healthOf = (input: {
+  createdAt: Date;
+  lastActive?: Date;
+  channels: number;
+  postsThisMonth: number;
+  needReconnect: number;
+  errors7Days: number;
+  cancelling: boolean;
+}): AdminHealth => {
+  let score = 100;
+  const reasons: string[] = [];
+  const idleDays = input.lastActive
+    ? dayjs().diff(input.lastActive, 'day')
+    : Infinity;
+  if (idleDays > 30) {
+    score -= 40;
+    reasons.push('Not seen for over 30 days');
+  } else if (idleDays > 14) {
+    score -= 25;
+    reasons.push('Not seen for over 14 days');
+  } else if (idleDays > 7) {
+    score -= 10;
+    reasons.push('Not seen for over a week');
+  }
+  if (!input.channels) {
+    score -= 25;
+    reasons.push('No channel connected');
+  }
+  if (!input.postsThisMonth && dayjs().diff(input.createdAt, 'day') > 7) {
+    score -= 20;
+    reasons.push('No post published this month');
+  }
+  if (input.needReconnect) {
+    score -= 15;
+    reasons.push(
+      `${input.needReconnect} channel${
+        input.needReconnect === 1 ? '' : 's'
+      } need reconnecting`
+    );
+  }
+  if (input.errors7Days > 5) {
+    score -= 10;
+    reasons.push(`${input.errors7Days} posting errors in 7 days`);
+  }
+  if (input.cancelling) {
+    score -= 30;
+    reasons.push('Plan is cancelling');
+  }
+  score = Math.max(0, Math.min(100, score));
+  return {
+    score,
+    label: score >= 70 ? 'healthy' : score >= 40 ? 'attention' : 'risk',
+    reasons,
+  };
+};
+
+// a CSV cell: quoted when needed, and never read as a formula by Excel
+const csvCell = (value: unknown) => {
+  let text = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) {
+    text = `'${text}`;
+  }
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const trimOrNull = (value?: string) => value?.trim() || null;
 
 @Injectable()
 export class AdminService {
@@ -194,8 +272,25 @@ export class AdminService {
     return org.freePlanSince ? 'free' : 'none';
   }
 
-  private toRow(org: CustomerRowSource, posts: Map<string, number>): AdminCustomerRow {
+  // the same rules as autoStageWhere in the repository
+  private autoStage(org: CustomerRowSource, status: AdminPlanStatus): AdminStage {
+    if (org.isTrailing) {
+      return 'trial';
+    }
+    if (status === 'cancelling') {
+      return 'at_risk';
+    }
+    return org._count.post ? 'active' : 'onboarding';
+  }
+
+  private toRow(
+    org: CustomerRowSource,
+    posts: Map<string, number>,
+    reconnect: Map<string, number>,
+    errors: Map<string, number>
+  ): AdminCustomerRow {
     const status = this.planStatus(org);
+    const setStage = org.adminCustomer?.stage as AdminStage | null | undefined;
     const sub = org.subscription && !org.subscription.deletedAt ? org.subscription : null;
     const owner = org.users[0]?.user;
     const lastActive = org.users
@@ -224,21 +319,45 @@ export class AdminService {
       postsThisMonth: posts.get(org.id) || 0,
       lastActive: lastActive ? lastActive.toISOString() : null,
       tags: org.adminTags.map((t) => t.name),
+      stage:
+        setStage && adminStages.includes(setStage)
+          ? setStage
+          : this.autoStage(org, status),
+      stageSet: !!setStage,
+      health: healthOf({
+        createdAt: org.createdAt,
+        lastActive,
+        channels: org._count.Integration,
+        postsThisMonth: posts.get(org.id) || 0,
+        needReconnect: reconnect.get(org.id) || 0,
+        errors7Days: errors.get(org.id) || 0,
+        cancelling: status === 'cancelling',
+      }),
     };
   }
 
   private async toRows(orgs: CustomerRowSource[]) {
-    const posts = await this._adminRepository.postsPerWorkspace(
-      orgs.map((o) => o.id),
-      dayjs().startOf('month').toDate()
-    );
-    return orgs.map((org) => this.toRow(org, posts));
+    const ids = orgs.map((o) => o.id);
+    const [posts, reconnect, errors] = await Promise.all([
+      this._adminRepository.postsPerWorkspace(
+        ids,
+        dayjs().startOf('month').toDate()
+      ),
+      this._adminRepository.reconnectPerWorkspace(ids),
+      this._adminRepository.errorsPerWorkspace(
+        ids,
+        dayjs().subtract(7, 'day').toDate()
+      ),
+    ]);
+    return orgs.map((org) => this.toRow(org, posts, reconnect, errors));
   }
 
   async listCustomers(params: {
     search?: string;
     status?: AdminCustomerStatus;
     tag?: string;
+    stage?: AdminStage;
+    sort?: AdminSort;
     page: number;
   }) {
     const limit = 25;
@@ -250,6 +369,91 @@ export class AdminService {
       total,
       pages: Math.max(1, Math.ceil(total / limit)),
       customers: await this.toRows(customers),
+    };
+  }
+
+  // the customers list with the same filters, as a CSV file
+  async exportCustomers(params: {
+    search?: string;
+    status?: AdminCustomerStatus;
+    tag?: string;
+    stage?: AdminStage;
+    sort?: AdminSort;
+  }) {
+    const { customers } = await this._adminRepository.listCustomers({
+      ...params,
+      page: 0,
+      limit: adminLimits.exportRows,
+    });
+    const rows = await this.toRows(customers);
+    const header = [
+      'Workspace',
+      'Owner',
+      'Email',
+      'Plan status',
+      'Plan',
+      'Period',
+      'USD per month',
+      'Stage',
+      'Health',
+      'Channels',
+      'Posts this month',
+      'Members',
+      'Last active',
+      'Signed up',
+      'Tags',
+      'Company',
+      'Phone',
+      'Website',
+      'Country',
+      'Source',
+    ];
+    const profileOf = new Map(
+      customers.map((c) => [c.id, c.adminCustomer])
+    );
+    const lines = rows.map((row) => {
+      const profile = profileOf.get(row.id);
+      return [
+        row.name,
+        row.owner?.name,
+        row.owner?.email,
+        row.status,
+        row.plan,
+        row.period,
+        row.monthlyRevenue,
+        row.stage,
+        row.health.score,
+        row.channels,
+        row.postsThisMonth,
+        row.members,
+        row.lastActive,
+        row.createdAt,
+        row.tags.join(' '),
+        profile?.company,
+        profile?.phone,
+        profile?.website,
+        profile?.country,
+        profile?.source,
+      ]
+        .map(csvCell)
+        .join(',');
+    });
+    return [header.join(','), ...lines].join('\r\n');
+  }
+
+  // the pipeline: the newest workspaces of each stage
+  async board(): Promise<AdminBoard> {
+    const columns = await Promise.all(
+      adminStages.map((stage) => this._adminRepository.stageColumn(stage, 40))
+    );
+    const rows = await this.toRows(columns.flatMap((c) => c.customers));
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return {
+      stages: adminStages.map((stage, index) => ({
+        stage,
+        total: columns[index].total,
+        customers: columns[index].customers.map((c) => byId.get(c.id)!),
+      })),
     };
   }
 
@@ -277,6 +481,8 @@ export class AdminService {
       channelsNeedReconnect,
       signups,
       latest,
+      tasksOverdue,
+      tasksDueToday,
     ] = await Promise.all([
       this._adminRepository.countUsers(),
       this._adminRepository.countUsers(today.toDate()),
@@ -303,6 +509,8 @@ export class AdminService {
       this._adminRepository.countChannels({ refreshNeeded: true }),
       this._adminRepository.userSignupDates(since30.toDate()),
       this._adminRepository.latestCustomers(8),
+      this._adminRepository.countOpenTasks(today.toDate()),
+      this._adminRepository.countOpenTasks(today.add(1, 'day').toDate()),
     ]);
 
     const perDay = new Map<string, number>();
@@ -354,6 +562,7 @@ export class AdminService {
         day,
         count,
       })),
+      tasks: { overdue: tasksOverdue, today: tasksDueToday - tasksOverdue },
       latest: await this.toRows(latest),
       billingEnabled: !!process.env.STRIPE_PUBLISHABLE_KEY,
     };
@@ -364,7 +573,7 @@ export class AdminService {
     if (!org) {
       throw new HttpException('Workspace not found', 404);
     }
-    const [[row], channels, notes, log, activity] = await Promise.all([
+    const [[row], channels, notes, log, activity, tasks] = await Promise.all([
       this.toRows([org]),
       this._adminRepository.getChannels(organizationId),
       this._adminRepository.getNotes(organizationId),
@@ -374,13 +583,81 @@ export class AdminService {
         from: dayjs().subtract(30, 'day').startOf('day').toDate(),
         to: dayjs().endOf('day').toDate(),
       }),
+      this.tasks({ organizationId }),
     ]);
     const sub = org.subscription && !org.subscription.deletedAt ? org.subscription : null;
+
+    // everything that happened to this workspace, the latest first
+    const events: AdminTimelineEntry[] = [
+      { at: org.createdAt.toISOString(), kind: 'signup', text: 'Signed up' },
+      ...channels.map((channel) => ({
+        at: channel.createdAt.toISOString(),
+        kind: 'channel' as const,
+        text: `Connected ${channel.providerIdentifier}: ${channel.name}`,
+      })),
+      ...(activity.firstActivityAt
+        ? [
+            {
+              at: activity.firstActivityAt,
+              kind: 'post' as const,
+              text: 'First post published',
+            },
+          ]
+        : []),
+      ...(activity.lastActivityAt &&
+      activity.lastActivityAt !== activity.firstActivityAt
+        ? [
+            {
+              at: activity.lastActivityAt,
+              kind: 'post' as const,
+              text: 'Latest post published',
+            },
+          ]
+        : []),
+      ...(sub
+        ? [
+            {
+              at: sub.createdAt.toISOString(),
+              kind: 'plan' as const,
+              text: `Plan ${sub.subscriptionTier.replace(/_/g, ' ')} started`,
+            },
+          ]
+        : []),
+      ...notes.map((note) => ({
+        at: note.createdAt.toISOString(),
+        kind: 'note' as const,
+        text: `Note: ${note.text.slice(0, 120)}`,
+      })),
+      ...tasks.flatMap((task) => [
+        { at: task.createdAt, kind: 'task' as const, text: `Task: ${task.title}` },
+        ...(task.doneAt
+          ? [{ at: task.doneAt, kind: 'task' as const, text: `Done: ${task.title}` }]
+          : []),
+      ]),
+      ...log.entries
+        .filter((entry) => !['note_added', 'task_added', 'task_done'].includes(entry.action))
+        .map((entry) => ({
+          at: entry.createdAt,
+          kind: 'admin' as const,
+          text: entry.action,
+          details: entry.details,
+        })),
+    ];
+    const timeline = events
+      .sort((a, b) => b.at.localeCompare(a.at))
+      .slice(0, 100);
 
     return {
       customer: {
         ...row,
         description: org.description,
+        profile: {
+          company: org.adminCustomer?.company || null,
+          phone: org.adminCustomer?.phone || null,
+          website: org.adminCustomer?.website || null,
+          country: org.adminCustomer?.country || null,
+          source: org.adminCustomer?.source || null,
+        },
         subscription: sub
           ? {
               tier: sub.subscriptionTier,
@@ -426,10 +703,116 @@ export class AdminService {
         author: note.author.name || note.author.email,
       })),
       log: log.entries,
+      tasks,
+      timeline,
     };
   }
 
   // ---------- changes (each one is written to the activity log) ----------
+
+  async setStage(
+    adminId: string,
+    organizationId: string,
+    stage: AdminStage | 'auto'
+  ) {
+    if (!(await this._adminRepository.getCustomer(organizationId))) {
+      throw new HttpException('Workspace not found', 404);
+    }
+    await this._adminRepository.setStage(
+      organizationId,
+      stage === 'auto' ? null : stage
+    );
+    await this._adminRepository.log(adminId, organizationId, 'stage_changed', {
+      stage,
+    });
+  }
+
+  async setProfile(
+    adminId: string,
+    organizationId: string,
+    body: AdminProfileDto
+  ) {
+    if (!(await this._adminRepository.getCustomer(organizationId))) {
+      throw new HttpException('Workspace not found', 404);
+    }
+    const profile: AdminProfile = {
+      company: trimOrNull(body.company),
+      phone: trimOrNull(body.phone),
+      website: trimOrNull(body.website),
+      country: trimOrNull(body.country),
+      source: trimOrNull(body.source),
+    };
+    await this._adminRepository.setProfile(organizationId, profile);
+    await this._adminRepository.log(adminId, organizationId, 'profile_changed');
+  }
+
+  async tasks(params: {
+    organizationId?: string;
+    done?: boolean;
+  }): Promise<AdminTaskRow[]> {
+    const tasks = await this._adminRepository.listTasks({
+      ...params,
+      take: params.organizationId ? 100 : 300,
+    });
+    return tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      dueAt: task.dueAt ? task.dueAt.toISOString() : null,
+      doneAt: task.doneAt ? task.doneAt.toISOString() : null,
+      createdAt: task.createdAt.toISOString(),
+      author: task.author.name || task.author.email,
+      organization: task.organization,
+    }));
+  }
+
+  async addTask(
+    adminId: string,
+    organizationId: string,
+    title: string,
+    dueAt?: string
+  ) {
+    const value = title.trim();
+    if (!value) {
+      throw new HttpException('The task is empty', 400);
+    }
+    if (!(await this._adminRepository.getCustomer(organizationId))) {
+      throw new HttpException('Workspace not found', 404);
+    }
+    await this._adminRepository.addTask(
+      organizationId,
+      adminId,
+      value,
+      dueAt ? dayjs(dueAt).toDate() : null
+    );
+    await this._adminRepository.log(adminId, organizationId, 'task_added', {
+      title: value,
+    });
+  }
+
+  async setTaskDone(adminId: string, taskId: string, done: boolean) {
+    const task = await this._adminRepository.getTask(taskId);
+    if (!task) {
+      throw new HttpException('Task not found', 404);
+    }
+    await this._adminRepository.setTaskDone(taskId, done);
+    await this._adminRepository.log(
+      adminId,
+      task.organizationId,
+      done ? 'task_done' : 'task_reopened',
+      { title: task.title }
+    );
+  }
+
+  async deleteTask(adminId: string, taskId: string) {
+    const task = await this._adminRepository.getTask(taskId);
+    if (!task) {
+      throw new HttpException('Task not found', 404);
+    }
+    await this._adminRepository.deleteTask(taskId);
+    await this._adminRepository.log(adminId, task.organizationId, 'task_deleted', {
+      title: task.title,
+    });
+  }
 
   async setFreePlan(adminId: string, organizationId: string, enabled: boolean) {
     if (!(await this._adminRepository.getCustomer(organizationId))) {

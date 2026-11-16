@@ -1,8 +1,12 @@
 'use client';
 
-import React, { FC, useEffect, useState } from 'react';
+import React, { FC, useCallback, useContext, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import {
+  AdminSessionContext,
+  customersQuery,
   useAdminCustomers,
   useAdminTags,
 } from '@gitroom/frontend/components/admin/admin.hooks';
@@ -10,13 +14,17 @@ import {
   CustomerTable,
   Loading,
   Pager,
+  stageLabels,
   statusLabels,
 } from '@gitroom/frontend/components/admin/admin.ui';
 import {
   AdminCustomerStatus,
   adminCustomerStatuses,
   AdminPlanStatus,
+  adminStages,
 } from '@gitroom/nestjs-libraries/dtos/admin/admin.dto';
+
+const sortLabels = { newest: 'Newest first', oldest: 'Oldest first', name: 'Name A-Z' };
 
 const filterLabel = (status: AdminCustomerStatus) =>
   status === 'never_posted'
@@ -31,6 +39,12 @@ export const AdminCustomersComponent: FC = () => {
   const searchParams = useSearchParams();
   const status = searchParams.get('status') || '';
   const tag = searchParams.get('tag') || '';
+  const stage = searchParams.get('stage') || '';
+  const sort = searchParams.get('sort') || '';
+  const fetch = useFetch();
+  const toaster = useToaster();
+  const { expired } = useContext(AdminSessionContext);
+  const [exporting, setExporting] = useState(false);
   const [searchInput, setSearchInput] = useState(searchParams.get('search') || '');
   const [search, setSearch] = useState(searchInput);
   const [page, setPage] = useState(0);
@@ -44,7 +58,10 @@ export const AdminCustomersComponent: FC = () => {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const setFilter = (name: 'status' | 'tag', value: string) => {
+  const setFilter = (
+    name: 'status' | 'tag' | 'stage' | 'sort',
+    value: string
+  ) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value) {
       params.set(name, value);
@@ -60,8 +77,44 @@ export const AdminCustomersComponent: FC = () => {
     search,
     status,
     tag,
+    stage,
+    sort,
     page,
   });
+
+  // the list with these filters as a CSV file
+  const exportCsv = useCallback(async () => {
+    setExporting(true);
+    try {
+      const response = await fetch(
+        `/admin/customers/export?${customersQuery({
+          search,
+          status,
+          tag,
+          stage,
+          sort,
+        })}`
+      );
+      if (response.status === 428) {
+        expired();
+        return;
+      }
+      if (!response.ok) {
+        toaster.show('Could not export the list', 'warning');
+        return;
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `postcherry-customers-${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }, [search, status, tag, stage, sort]);
   const { data: tags } = useAdminTags();
 
   return (
@@ -95,6 +148,18 @@ export const AdminCustomersComponent: FC = () => {
           ))}
         </select>
         <select
+          value={stage}
+          onChange={(e) => setFilter('stage', e.target.value)}
+          className={selectClass}
+        >
+          <option value="">All stages</option>
+          {adminStages.map((value) => (
+            <option key={value} value={value}>
+              {stageLabels[value]}
+            </option>
+          ))}
+        </select>
+        <select
           value={tag}
           onChange={(e) => setFilter('tag', e.target.value)}
           className={selectClass}
@@ -106,6 +171,27 @@ export const AdminCustomersComponent: FC = () => {
             </option>
           ))}
         </select>
+        <select
+          value={sort || 'newest'}
+          onChange={(e) =>
+            setFilter('sort', e.target.value === 'newest' ? '' : e.target.value)
+          }
+          className={selectClass}
+        >
+          {Object.entries(sortLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={exporting}
+          className="h-[40px] px-[14px] rounded-[8px] border border-newTableBorder bg-newBgColorInner text-[14px] hover:border-forth disabled:opacity-50"
+        >
+          {exporting ? 'Exporting…' : 'Export CSV'}
+        </button>
       </div>
 
       {error && !data && <div className="text-red-400">{error.message}</div>}

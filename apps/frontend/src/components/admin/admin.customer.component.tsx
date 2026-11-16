@@ -14,12 +14,32 @@ import {
   Card,
   day,
   describeAction,
+  HealthBadge,
   Loading,
   money,
   Section,
   StatusBadge,
 } from '@gitroom/frontend/components/admin/admin.ui';
-import { adminLimits } from '@gitroom/nestjs-libraries/dtos/admin/admin.dto';
+import {
+  ProfileEditor,
+  StageSelect,
+  TaskForm,
+  TaskList,
+} from '@gitroom/frontend/components/admin/admin.crm.component';
+import {
+  adminLimits,
+  AdminTimelineEntry,
+} from '@gitroom/nestjs-libraries/dtos/admin/admin.dto';
+
+const timelineIcons: Record<AdminTimelineEntry['kind'], string> = {
+  signup: '🎉',
+  channel: '🔗',
+  post: '📣',
+  plan: '💳',
+  note: '📝',
+  task: '✅',
+  admin: '🛠',
+};
 
 const TagsEditor: FC<{
   tags: string[];
@@ -208,9 +228,37 @@ export const AdminCustomerComponent: FC<{ id: string }> = ({ id }) => {
                 ? ` · ${customer.accountType.toLowerCase()}`
                 : ''}
             </div>
+            <div className="flex flex-wrap items-center gap-[12px] text-[13px]">
+              <span className="flex items-center gap-[6px]">
+                <span className="opacity-70">Stage</span>
+                <StageSelect
+                  organizationId={id}
+                  stage={customer.stage}
+                  stageSet={customer.stageSet}
+                  onChanged={() => mutate()}
+                />
+              </span>
+              <span className="flex items-center gap-[6px]">
+                <span className="opacity-70">Health</span>
+                <HealthBadge health={customer.health} details />
+              </span>
+            </div>
+            {customer.health.reasons.length > 0 && (
+              <div className="text-[12px] opacity-70">
+                {customer.health.reasons.join(' · ')}
+              </div>
+            )}
             <TagsEditor tags={customer.tags} onChange={saveTags} />
           </div>
           <div className="flex flex-wrap gap-[8px]">
+            {customer.owner?.email && (
+              <a
+                href={`mailto:${customer.owner.email}`}
+                className="h-[40px] px-[16px] flex items-center rounded-[8px] border border-newTableBorder bg-newBgColorInner text-[14px] hover:border-forth"
+              >
+                Email
+              </a>
+            )}
             <Button
               onClick={loginAs}
               loading={busy === 'login'}
@@ -341,6 +389,29 @@ export const AdminCustomerComponent: FC<{ id: string }> = ({ id }) => {
         </Section>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-[24px]">
+        <Section title="Contact details">
+          <ProfileEditor
+            organizationId={id}
+            profile={customer.profile}
+            onSaved={() => mutate()}
+          />
+        </Section>
+
+        <Section
+          title={`Follow-ups (${data.tasks.filter((task) => !task.doneAt).length} open)`}
+        >
+          <div className="flex flex-col gap-[8px]">
+            <TaskForm organizationId={id} onAdded={() => mutate()} />
+            <TaskList
+              tasks={data.tasks}
+              onChanged={() => mutate()}
+              empty="No follow-ups yet."
+            />
+          </div>
+        </Section>
+      </div>
+
       <Section title="Members">
         <div className="border border-newTableBorder rounded-[10px] overflow-x-auto">
           <table className="w-full text-[13px] min-w-[700px]">
@@ -417,24 +488,25 @@ export const AdminCustomerComponent: FC<{ id: string }> = ({ id }) => {
         )}
       </Section>
 
-      <Section title="Activity log">
-        {data.log.length === 0 ? (
-          <div className="text-[14px] opacity-70">Nothing changed from HQ yet.</div>
-        ) : (
-          <div className="border border-newTableBorder rounded-[10px] overflow-hidden">
-            {data.log.map((entry) => (
-              <div
-                key={entry.id}
-                className="flex flex-wrap justify-between gap-[8px] px-[12px] py-[10px] text-[13px] border-b border-newTableBorder last:border-b-0"
-              >
-                <span>{describeAction(entry.action, entry.details)}</span>
-                <span className="opacity-60">
-                  {entry.admin} · {ago(entry.createdAt)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+      <Section title="Timeline">
+        <div className="border border-newTableBorder rounded-[10px] overflow-hidden">
+          {data.timeline.map((entry, index) => (
+            <div
+              key={`${entry.at}-${index}`}
+              className="flex gap-[10px] px-[12px] py-[10px] text-[13px] border-b border-newTableBorder last:border-b-0"
+            >
+              <span aria-hidden="true">{timelineIcons[entry.kind]}</span>
+              <span className="flex-1 min-w-0 break-words">
+                {entry.kind === 'admin'
+                  ? describeAction(entry.text, entry.details)
+                  : entry.text}
+              </span>
+              <span className="opacity-60 whitespace-nowrap" title={entry.at}>
+                {day(entry.at)}
+              </span>
+            </div>
+          ))}
+        </div>
       </Section>
     </div>
   );

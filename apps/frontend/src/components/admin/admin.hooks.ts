@@ -5,11 +5,13 @@ import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import {
+  AdminBoard,
   AdminCustomerDetail,
   AdminCustomerRow,
   AdminLogEntry,
   AdminOverview,
   AdminSessionState,
+  AdminTaskRow,
 } from '@gitroom/nestjs-libraries/dtos/admin/admin.dto';
 
 // The hq pages tell the layout when the admin session ran out (the backend
@@ -111,19 +113,32 @@ export const useAdminOverview = () => {
   });
 };
 
+// the filters of the customers list, as the query of the list and the export
+export const customersQuery = (params: {
+  search: string;
+  status: string;
+  tag: string;
+  stage: string;
+  sort: string;
+}) =>
+  new URLSearchParams({
+    search: params.search,
+    status: params.status,
+    tag: params.tag,
+    stage: params.stage,
+    sort: params.sort,
+  }).toString();
+
 export const useAdminCustomers = (params: {
   search: string;
   status: string;
   tag: string;
+  stage: string;
+  sort: string;
   page: number;
 }) => {
   const load = useAdminLoader();
-  const query = new URLSearchParams({
-    search: params.search,
-    status: params.status,
-    tag: params.tag,
-    page: String(params.page),
-  }).toString();
+  const query = `${customersQuery(params)}&page=${params.page}`;
   return useSWR<{
     total: number;
     pages: number;
@@ -151,4 +166,17 @@ export const useAdminLog = (page: number) => {
     load,
     { ...quiet, keepPreviousData: true }
   );
+};
+
+export const useAdminBoard = () => {
+  const load = useAdminLoader();
+  return useSWR<AdminBoard>('/admin/board', load, quiet);
+};
+
+export const useAdminTasks = (done: boolean) => {
+  const load = useAdminLoader();
+  return useSWR<AdminTaskRow[]>(`/admin/tasks?done=${done}`, load, {
+    ...quiet,
+    keepPreviousData: true,
+  });
 };

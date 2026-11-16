@@ -12,6 +12,7 @@ import React, {
 import Link from 'next/link';
 import clsx from 'clsx';
 import useSWR from 'swr';
+import useCookie from 'react-use-cookie';
 import { usePathname } from 'next/navigation';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
@@ -39,6 +40,8 @@ const ACTIVE_MS = 5 * 60 * 1000;
 const menu = [
   { href: '/admin', label: 'Overview', exact: true },
   { href: '/admin/customers', label: 'Customers' },
+  { href: '/admin/pipeline', label: 'Pipeline' },
+  { href: '/admin/tasks', label: 'Tasks' },
   { href: '/admin/activity', label: 'Activity log' },
   { href: '/admin/stats', label: 'Posting stats' },
   { href: '/admin/errors', label: 'Errors' },
@@ -56,6 +59,15 @@ export const AdminLayoutComponent: FC<{ children: ReactNode }> = ({
   const fetch = useFetch();
   const pathname = usePathname();
   const { frontEndUrl } = useVariables();
+
+  // HQ has its own light / dark choice (light the first time), apart from the app's
+  const [modeCookie, setMode] = useCookie('hq_mode', 'light');
+  const mode = modeCookie === 'dark' ? 'dark' : 'light';
+  useEffect(() => {
+    // pop-ups and toasts live outside the HQ page, they follow the body
+    document.body.classList.remove('dark', 'light');
+    document.body.classList.add(mode);
+  }, [mode]);
 
   const loadUser = useCallback(async (path: string) => {
     return (await fetch(path)).json();
@@ -138,6 +150,7 @@ export const AdminLayoutComponent: FC<{ children: ReactNode }> = ({
           <div
             className={clsx(
               'min-h-screen flex flex-col text-newTextColor bg-newBgColor',
+              mode,
               jakartaSans.className
             )}
           >
@@ -186,6 +199,34 @@ export const AdminLayoutComponent: FC<{ children: ReactNode }> = ({
                 </nav>
               )}
               <div className="flex items-center gap-[12px] ms-auto text-[13px]">
+                <button
+                  type="button"
+                  onClick={() => setMode(mode === 'dark' ? 'light' : 'dark', { days: 365 })}
+                  aria-label={mode === 'dark' ? 'Switch to light' : 'Switch to dark'}
+                  title={mode === 'dark' ? 'Switch to light' : 'Switch to dark'}
+                  className="w-[32px] h-[32px] flex items-center justify-center rounded-[8px] bg-white/10 hover:bg-white/20"
+                >
+                  {mode === 'dark' ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.8" />
+                      <path
+                        d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="M21 13.2A8.5 8.5 0 1 1 10.8 3a6.6 6.6 0 0 0 10.2 10.2Z"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </button>
                 <a
                   href={frontEndUrl}
                   target="_blank"
