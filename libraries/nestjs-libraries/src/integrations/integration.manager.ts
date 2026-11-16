@@ -39,6 +39,29 @@ import { SkoolProvider } from '@gitroom/nestjs-libraries/integrations/social/sko
 import { WhopProvider } from '@gitroom/nestjs-libraries/integrations/social/whop.provider';
 import { MeweProvider } from '@gitroom/nestjs-libraries/integrations/social/mewe.provider';
 import { TumblrProvider } from '@gitroom/nestjs-libraries/integrations/social/tumblr.provider';
+import { TeamsProvider } from '@gitroom/nestjs-libraries/integrations/social/teams.provider';
+import { GoogleChatProvider } from '@gitroom/nestjs-libraries/integrations/social/google-chat.provider';
+import { MattermostProvider } from '@gitroom/nestjs-libraries/integrations/social/mattermost.provider';
+import { RocketChatProvider } from '@gitroom/nestjs-libraries/integrations/social/rocketchat.provider';
+import { ZulipProvider } from '@gitroom/nestjs-libraries/integrations/social/zulip.provider';
+import { MatrixProvider } from '@gitroom/nestjs-libraries/integrations/social/matrix.provider';
+import { WebhookProvider } from '@gitroom/nestjs-libraries/integrations/social/webhook.provider';
+import { LineProvider } from '@gitroom/nestjs-libraries/integrations/social/line.provider';
+import { ViberProvider } from '@gitroom/nestjs-libraries/integrations/social/viber.provider';
+import { GhostProvider } from '@gitroom/nestjs-libraries/integrations/social/ghost.provider';
+import { MailchimpProvider } from '@gitroom/nestjs-libraries/integrations/social/mailchimp.provider';
+import { KitProvider } from '@gitroom/nestjs-libraries/integrations/social/kit.provider';
+import { BrevoProvider } from '@gitroom/nestjs-libraries/integrations/social/brevo.provider';
+import { BeehiivProvider } from '@gitroom/nestjs-libraries/integrations/social/beehiiv.provider';
+import { ShopifyProvider } from '@gitroom/nestjs-libraries/integrations/social/shopify.provider';
+import { WebflowProvider } from '@gitroom/nestjs-libraries/integrations/social/webflow.provider';
+import { NotionProvider } from '@gitroom/nestjs-libraries/integrations/social/notion.provider';
+import { MisskeyProvider } from '@gitroom/nestjs-libraries/integrations/social/misskey.provider';
+import { PixelfedProvider } from '@gitroom/nestjs-libraries/integrations/social/pixelfed.provider';
+import { PeertubeProvider } from '@gitroom/nestjs-libraries/integrations/social/peertube.provider';
+import { VimeoProvider } from '@gitroom/nestjs-libraries/integrations/social/vimeo.provider';
+import { DiscourseProvider } from '@gitroom/nestjs-libraries/integrations/social/discourse.provider';
+import { CircleProvider } from '@gitroom/nestjs-libraries/integrations/social/circle.provider';
 
 export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
   new XProvider(),
@@ -76,6 +99,29 @@ export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
   new SkoolProvider(),
   new MeweProvider(),
   new TumblrProvider(),
+  new TeamsProvider(),
+  new GoogleChatProvider(),
+  new MattermostProvider(),
+  new RocketChatProvider(),
+  new ZulipProvider(),
+  new MatrixProvider(),
+  new WebhookProvider(),
+  new LineProvider(),
+  new ViberProvider(),
+  new GhostProvider(),
+  new MailchimpProvider(),
+  new KitProvider(),
+  new BrevoProvider(),
+  new BeehiivProvider(),
+  new ShopifyProvider(),
+  new WebflowProvider(),
+  new NotionProvider(),
+  new MisskeyProvider(),
+  new PixelfedProvider(),
+  new PeertubeProvider(),
+  new VimeoProvider(),
+  new DiscourseProvider(),
+  new CircleProvider(),
   // new MastodonCustomProvider(),
 ];
 

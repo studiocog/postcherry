@@ -40,6 +40,29 @@ import SkoolProvider from '@gitroom/frontend/components/new-launch/providers/sko
 import WhopProvider from '@gitroom/frontend/components/new-launch/providers/whop/whop.provider';
 import MeweProvider from '@gitroom/frontend/components/new-launch/providers/mewe/mewe.provider';
 import TumblrProvider from '@gitroom/frontend/components/new-launch/providers/tumblr/tumblr.provider';
+import TeamsProviderFe from '@gitroom/frontend/components/new-launch/providers/teams/teams.provider';
+import GoogleChatProviderFe from '@gitroom/frontend/components/new-launch/providers/google-chat/google-chat.provider';
+import MattermostProviderFe from '@gitroom/frontend/components/new-launch/providers/mattermost/mattermost.provider';
+import RocketChatProviderFe from '@gitroom/frontend/components/new-launch/providers/rocketchat/rocketchat.provider';
+import ZulipProviderFe from '@gitroom/frontend/components/new-launch/providers/zulip/zulip.provider';
+import MatrixProviderFe from '@gitroom/frontend/components/new-launch/providers/matrix/matrix.provider';
+import WebhookProviderFe from '@gitroom/frontend/components/new-launch/providers/webhook/webhook.provider';
+import LineProviderFe from '@gitroom/frontend/components/new-launch/providers/line/line.provider';
+import ViberProviderFe from '@gitroom/frontend/components/new-launch/providers/viber/viber.provider';
+import GhostProviderFe from '@gitroom/frontend/components/new-launch/providers/ghost/ghost.provider';
+import MailchimpProviderFe from '@gitroom/frontend/components/new-launch/providers/mailchimp/mailchimp.provider';
+import KitProviderFe from '@gitroom/frontend/components/new-launch/providers/kit/kit.provider';
+import BrevoProviderFe from '@gitroom/frontend/components/new-launch/providers/brevo/brevo.provider';
+import BeehiivProviderFe from '@gitroom/frontend/components/new-launch/providers/beehiiv/beehiiv.provider';
+import ShopifyProviderFe from '@gitroom/frontend/components/new-launch/providers/shopify/shopify.provider';
+import WebflowProviderFe from '@gitroom/frontend/components/new-launch/providers/webflow/webflow.provider';
+import NotionProviderFe from '@gitroom/frontend/components/new-launch/providers/notion/notion.provider';
+import MisskeyProviderFe from '@gitroom/frontend/components/new-launch/providers/misskey/misskey.provider';
+import PixelfedProviderFe from '@gitroom/frontend/components/new-launch/providers/pixelfed/pixelfed.provider';
+import PeertubeProviderFe from '@gitroom/frontend/components/new-launch/providers/peertube/peertube.provider';
+import VimeoProviderFe from '@gitroom/frontend/components/new-launch/providers/vimeo/vimeo.provider';
+import DiscourseProviderFe from '@gitroom/frontend/components/new-launch/providers/discourse/discourse.provider';
+import CircleProviderFe from '@gitroom/frontend/components/new-launch/providers/circle/circle.provider';
 
 export const Providers = [
   {
@@ -181,6 +204,98 @@ export const Providers = [
   {
     identifier: 'tumblr',
     component: TumblrProvider,
+  },
+  {
+    identifier: 'teams',
+    component: TeamsProviderFe,
+  },
+  {
+    identifier: 'google-chat',
+    component: GoogleChatProviderFe,
+  },
+  {
+    identifier: 'mattermost',
+    component: MattermostProviderFe,
+  },
+  {
+    identifier: 'rocketchat',
+    component: RocketChatProviderFe,
+  },
+  {
+    identifier: 'zulip',
+    component: ZulipProviderFe,
+  },
+  {
+    identifier: 'matrix',
+    component: MatrixProviderFe,
+  },
+  {
+    identifier: 'webhook',
+    component: WebhookProviderFe,
+  },
+  {
+    identifier: 'line',
+    component: LineProviderFe,
+  },
+  {
+    identifier: 'viber',
+    component: ViberProviderFe,
+  },
+  {
+    identifier: 'ghost',
+    component: GhostProviderFe,
+  },
+  {
+    identifier: 'mailchimp',
+    component: MailchimpProviderFe,
+  },
+  {
+    identifier: 'kit',
+    component: KitProviderFe,
+  },
+  {
+    identifier: 'brevo',
+    component: BrevoProviderFe,
+  },
+  {
+    identifier: 'beehiiv',
+    component: BeehiivProviderFe,
+  },
+  {
+    identifier: 'shopify',
+    component: ShopifyProviderFe,
+  },
+  {
+    identifier: 'webflow',
+    component: WebflowProviderFe,
+  },
+  {
+    identifier: 'notion',
+    component: NotionProviderFe,
+  },
+  {
+    identifier: 'misskey',
+    component: MisskeyProviderFe,
+  },
+  {
+    identifier: 'pixelfed',
+    component: PixelfedProviderFe,
+  },
+  {
+    identifier: 'peertube',
+    component: PeertubeProviderFe,
+  },
+  {
+    identifier: 'vimeo',
+    component: VimeoProviderFe,
+  },
+  {
+    identifier: 'discourse',
+    component: DiscourseProviderFe,
+  },
+  {
+    identifier: 'circle',
+    component: CircleProviderFe,
   },
 ];
 export const ShowAllProviders = forwardRef((props, ref) => {

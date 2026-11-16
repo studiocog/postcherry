@@ -25,6 +25,18 @@ import { SkoolDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-setting
 import { WhopDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/whop.dto';
 import { MeweDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/mewe.dto';
 import { TumblrDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/tumblr.dto';
+import { GhostDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/ghost.dto';
+import { MailchimpDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/mailchimp.dto';
+import { KitDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/kit.dto';
+import { BrevoDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/brevo.dto';
+import { BeehiivDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/beehiiv.dto';
+import { ShopifyDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/shopify.dto';
+import { WebflowDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/webflow.dto';
+import { NotionDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/notion.dto';
+import { PeertubeDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/peertube.dto';
+import { VimeoDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/vimeo.dto';
+import { DiscourseDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/discourse.dto';
+import { CircleDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/circle.dto';
 
 export type ProviderExtension<T extends string, M> = { __type: T } & M;
 export type AllProvidersSettings =
@@ -62,7 +74,30 @@ export type AllProvidersSettings =
   | ProviderExtension<'skool', SkoolDto>
   | ProviderExtension<'mewe', MeweDto>
   | ProviderExtension<'tumblr', TumblrDto>
-  | ProviderExtension<'whop', WhopDto>;
+  | ProviderExtension<'whop', WhopDto>
+  | ProviderExtension<'teams', None>
+  | ProviderExtension<'google-chat', None>
+  | ProviderExtension<'mattermost', None>
+  | ProviderExtension<'rocketchat', None>
+  | ProviderExtension<'zulip', None>
+  | ProviderExtension<'matrix', None>
+  | ProviderExtension<'webhook', None>
+  | ProviderExtension<'line', None>
+  | ProviderExtension<'viber', None>
+  | ProviderExtension<'ghost', GhostDto>
+  | ProviderExtension<'mailchimp', MailchimpDto>
+  | ProviderExtension<'kit', KitDto>
+  | ProviderExtension<'brevo', BrevoDto>
+  | ProviderExtension<'beehiiv', BeehiivDto>
+  | ProviderExtension<'shopify', ShopifyDto>
+  | ProviderExtension<'webflow', WebflowDto>
+  | ProviderExtension<'notion', NotionDto>
+  | ProviderExtension<'misskey', None>
+  | ProviderExtension<'pixelfed', None>
+  | ProviderExtension<'peertube', PeertubeDto>
+  | ProviderExtension<'vimeo', VimeoDto>
+  | ProviderExtension<'discourse', DiscourseDto>
+  | ProviderExtension<'circle', CircleDto>;
 
 type None = NonNullable<unknown>;
 
@@ -103,6 +138,29 @@ export const allProviders = (setEmpty?: any) => {
     { value: WhopDto, name: 'whop' },
     { value: MeweDto, name: 'mewe' },
     { value: TumblrDto, name: 'tumblr' },
+    { value: setEmpty, name: 'teams' },
+    { value: setEmpty, name: 'google-chat' },
+    { value: setEmpty, name: 'mattermost' },
+    { value: setEmpty, name: 'rocketchat' },
+    { value: setEmpty, name: 'zulip' },
+    { value: setEmpty, name: 'matrix' },
+    { value: setEmpty, name: 'webhook' },
+    { value: setEmpty, name: 'line' },
+    { value: setEmpty, name: 'viber' },
+    { value: GhostDto, name: 'ghost' },
+    { value: MailchimpDto, name: 'mailchimp' },
+    { value: KitDto, name: 'kit' },
+    { value: BrevoDto, name: 'brevo' },
+    { value: BeehiivDto, name: 'beehiiv' },
+    { value: ShopifyDto, name: 'shopify' },
+    { value: WebflowDto, name: 'webflow' },
+    { value: NotionDto, name: 'notion' },
+    { value: setEmpty, name: 'misskey' },
+    { value: setEmpty, name: 'pixelfed' },
+    { value: PeertubeDto, name: 'peertube' },
+    { value: VimeoDto, name: 'vimeo' },
+    { value: DiscourseDto, name: 'discourse' },
+    { value: CircleDto, name: 'circle' },
   ].filter((f) => f.value);
 };
 

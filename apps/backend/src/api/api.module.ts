@@ -30,6 +30,7 @@ import { CodesService } from '@gitroom/nestjs-libraries/services/codes.service';
 import { CopilotController } from '@gitroom/backend/api/routes/copilot.controller';
 import { PublicController } from '@gitroom/backend/api/routes/public.controller';
 import { MetaController } from '@gitroom/backend/api/routes/meta.controller';
+import { ViberController } from '@gitroom/backend/api/routes/viber.controller';
 import { RootController } from '@gitroom/backend/api/routes/root.controller';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
@@ -58,6 +59,7 @@ import { WalletProvider } from '@gitroom/backend/services/auth/providers/wallet.
 import { OauthProvider } from '@gitroom/backend/services/auth/providers/oauth.provider';
 import { StripeController } from '@gitroom/backend/api/routes/stripe.controller';
 import { BrandKitController } from '@gitroom/backend/api/routes/brand-kit.controller';
+import { BioPageController } from '@gitroom/backend/api/routes/bio-page.controller';
 import { PostApprovalsController } from '@gitroom/backend/api/routes/post.approvals.controller';
 import { ReportsController } from '@gitroom/backend/api/routes/reports.controller';
 import { AiPlannerController } from '@gitroom/backend/api/routes/ai.planner.controller';
@@ -85,6 +87,7 @@ const authenticatedController = [
   AnnouncementsController,
   AdminController,
   BrandKitController,
+  BioPageController,
   PostApprovalsController,
   ReportsController,
   AiPlannerController,
@@ -105,6 +108,7 @@ const authenticatedController = [
         AuthController,
         PublicController,
         MetaController,
+        ViberController,
         MonitorController,
         EnterpriseController,
         NoAuthIntegrationsController,
