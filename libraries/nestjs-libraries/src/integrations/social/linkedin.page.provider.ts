@@ -11,9 +11,6 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 
-@Rules(
-  'LinkedIn can have maximum one attachment when selecting video, when choosing a carousel on LinkedIn minimum amount of attachment must be two, and only pictures, if uploading a video, LinkedIn can have only one attachment'
-)
 // LinkedIn only grants the Community Management API (Company Pages) to an app
 // that has no other products, so Pages can use their own app. Without
 // LINKEDIN_PAGE_* set, they keep using the personal-profile app as before.
@@ -22,6 +19,9 @@ const linkedinPageClientId = () =>
 const linkedinPageClientSecret = () =>
   process.env.LINKEDIN_PAGE_CLIENT_SECRET || process.env.LINKEDIN_CLIENT_SECRET!;
 
+@Rules(
+  'LinkedIn can have maximum one attachment when selecting video, when choosing a carousel on LinkedIn minimum amount of attachment must be two, and only pictures, if uploading a video, LinkedIn can have only one attachment'
+)
 export class LinkedinPageProvider
   extends LinkedinProvider
   implements SocialProvider
