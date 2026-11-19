@@ -240,8 +240,25 @@ export class UsersRepository {
     });
   }
 
-  // A Google or single sign-on account that set a password can also sign in
-  // with email and password (an email/password account of the same email wins)
+  // Google or single sign-on accounts of this email that set a password: they
+  // can also sign in with email and password
+  getPasswordUsersByEmail(email: string) {
+    return this._user.model.user.findMany({
+      where: {
+        email: {
+          equals: email,
+          mode: 'insensitive',
+        },
+        providerName: { not: Provider.LOCAL },
+        password: { not: '' },
+        NOT: { password: null },
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  // the first of them (the forgotten-password link)
   getPasswordUserByEmail(email: string) {
     return this._user.model.user.findFirst({
       where: {

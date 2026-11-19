@@ -147,6 +147,10 @@ export class UsersService {
     return this._usersRepository.getPasswordUserByEmail(email);
   }
 
+  getPasswordUsersByEmail(email: string) {
+    return this._usersRepository.getPasswordUsersByEmail(email);
+  }
+
   async passwordStatus(id: string) {
     const user = await this._usersRepository.getPasswordHash(id);
     return {

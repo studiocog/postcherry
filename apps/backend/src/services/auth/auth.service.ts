@@ -79,15 +79,19 @@ export class AuthService {
         return obj;
       }
 
-      // an account made with Google or single sign-on can also sign in with
-      // email and password once it set a password in Settings
-      const loginUser =
-        user || (await this._userService.getPasswordUserByEmail(body.email));
-      if (
-        !loginUser ||
-        !loginUser.password ||
-        !AuthChecker.comparePassword(body.password, loginUser.password)
-      ) {
+      // The same email can have an email/password account and a Google or
+      // single sign-on account that set a password in Settings: sign in to
+      // the one whose password matches (the email/password one first)
+      const candidates = [
+        ...(user ? [user] : []),
+        ...(await this._userService.getPasswordUsersByEmail(body.email)),
+      ];
+      const loginUser = candidates.find(
+        (candidate) =>
+          !!candidate.password &&
+          AuthChecker.comparePassword(body.password, candidate.password)
+      );
+      if (!loginUser) {
         throw new Error('Invalid user name or password');
       }
 
