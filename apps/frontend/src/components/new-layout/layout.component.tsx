@@ -49,6 +49,7 @@ import { BrandVoiceCopilotContext } from '@gitroom/frontend/components/settings/
 import { BrandProvider } from '@gitroom/frontend/components/brands/brand.context';
 import { BrandSwitcher } from '@gitroom/frontend/components/brands/brand.switcher';
 import { PlanBadge } from '@gitroom/frontend/components/billing/current.plan.component';
+import { AccountMenu } from '@gitroom/frontend/components/layout/account.menu';
 
 const jakartaSans = Plus_Jakarta_Sans({
   weight: ['600', '500', '700'],
@@ -165,6 +166,8 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                         <AttachToFeedbackIcon />
                         <NotificationComponent />
                       </div>
+                      {/* who is signed in: Settings, Billing and Log out */}
+                      <AccountMenu />
                       <div className="absolute start-[12px] end-[12px] bottom-0 h-[3px] rounded-full bg-gradient-to-r from-[#D21F3C] via-[#FF7A90] to-[#FFB36B]" />
                     </header>
                     <div className="flex-1 flex gap-[8px] mobile:gap-0">
@@ -230,6 +233,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                             </div>
                             <LanguageComponent />
                             <NotificationComponent />
+                            <AccountMenu variant="mobile" />
                           </div>
                         </div>
                         <div className="flex flex-1 min-w-0 gap-[1px] mobile:flex-col">
