@@ -31,6 +31,7 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
+import { SetPasswordDto } from '@gitroom/nestjs-libraries/dtos/users/password.dto';
 import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { RealIP } from 'nestjs-real-ip';
@@ -232,6 +233,31 @@ export class UsersController {
     await this._paymentService.syncCustomerEmailsAfterSwitch([kept, switched]);
 
     return { success: true };
+  }
+
+  @Get('/password')
+  async passwordStatus(@GetUserFromRequest() user: User) {
+    return this._userService.passwordStatus(user.id);
+  }
+
+  @Post('/password')
+  async setPassword(
+    @GetUserFromRequest() user: User,
+    @Req() req: Request,
+    @Body() body: SetPasswordDto
+  ) {
+    // while a super admin views the app as a customer, user is that customer
+    if (requestUserId(req) !== user.id) {
+      throw new HttpException(
+        "You can't change a customer's password while viewing as them",
+        400
+      );
+    }
+    return this._userService.setPassword(
+      user.id,
+      body.password,
+      body.currentPassword
+    );
   }
 
   @Post('/personal')

@@ -79,15 +79,23 @@ export class AuthService {
         return obj;
       }
 
-      if (!user || !AuthChecker.comparePassword(body.password, user.password)) {
+      // an account made with Google or single sign-on can also sign in with
+      // email and password once it set a password in Settings
+      const loginUser =
+        user || (await this._userService.getPasswordUserByEmail(body.email));
+      if (
+        !loginUser ||
+        !loginUser.password ||
+        !AuthChecker.comparePassword(body.password, loginUser.password)
+      ) {
         throw new Error('Invalid user name or password');
       }
 
-      if (!user.activated) {
+      if (!loginUser.activated) {
         throw new Error('User is not activated');
       }
 
-      return { addedOrg: false, jwt: await this.jwt(user) };
+      return { addedOrg: false, jwt: await this.jwt(loginUser) };
     }
 
     const user = await this.loginOrRegisterProvider(
@@ -212,8 +220,10 @@ export class AuthService {
   }
 
   async forgot(email: string) {
-    const user = await this._userService.getUserByEmail(email);
-    if (!user || user.providerName !== Provider.LOCAL) {
+    const user =
+      (await this._userService.getUserByEmail(email)) ||
+      (await this._userService.getPasswordUserByEmail(email));
+    if (!user) {
       return false;
     }
 

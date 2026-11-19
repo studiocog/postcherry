@@ -89,6 +89,10 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
 
   if (!user) return null;
 
+  // a new workspace on Free picks a plan first (the long pricing page)
+  const choosePlan =
+    user.tier === 'FREE' && !user.freePlan && isGeneral && billingEnabled;
+
   return (
     <ContextWrapper user={user}>
       <BrandProvider>
@@ -113,17 +117,20 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
               <ContinueProvider />
               <div
                 className={clsx(
-                  'flex flex-col min-h-screen min-w-screen text-newTextColor p-[12px] mobile:p-[8px] mobile:pb-[80px]',
+                  'flex flex-col min-w-screen text-newTextColor p-[12px] mobile:p-[8px] mobile:pb-[80px]',
+                  // the app's frame stays in place on desktop and only the
+                  // page inside scrolls; the long first pricing page and
+                  // phones scroll the whole page
+                  choosePlan
+                    ? 'min-h-screen'
+                    : 'h-screen overflow-hidden mobile:h-auto mobile:min-h-screen mobile:overflow-visible',
                   jakartaSans.className
                 )}
               >
                 <div className={clsx(user?.admin && 'mb-[8px]')}>
                   {user?.admin ? <Impersonate /> : <div />}
                 </div>
-                {user.tier === 'FREE' &&
-                !user.freePlan &&
-                isGeneral &&
-                billingEnabled ? (
+                {choosePlan ? (
                   <FirstBillingComponent />
                 ) : (
                   <>
@@ -170,7 +177,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                       <AccountMenu />
                       <div className="absolute start-[12px] end-[12px] bottom-0 h-[3px] rounded-full bg-gradient-to-r from-[#D21F3C] via-[#FF7A90] to-[#FFB36B]" />
                     </header>
-                    <div className="flex-1 flex gap-[8px] mobile:gap-0">
+                    <div className="flex-1 min-h-0 flex gap-[8px] mobile:gap-0">
                       <Support />
                       {menuOpen && (
                         <div
@@ -198,7 +205,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex-1 min-w-0 bg-newBgLineColor rounded-[12px] overflow-hidden flex flex-col gap-[1px] blurMe">
+                      <div className="flex-1 min-w-0 min-h-0 bg-newBgLineColor rounded-[12px] overflow-hidden flex flex-col gap-[1px] blurMe">
                         <div className="flex bg-newBgColorInner h-[64px] px-[20px] mobile:px-[12px] gap-[12px] items-center">
                           <button
                             className="hidden mobile:flex items-center justify-center w-[36px] h-[36px] -ms-[6px] rounded-[8px] text-textItemBlur hover:text-newTextColor hover:bg-boxFocused"
@@ -236,7 +243,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                             <AccountMenu variant="mobile" />
                           </div>
                         </div>
-                        <div className="flex flex-1 min-w-0 gap-[1px] mobile:flex-col">
+                        <div className="flex flex-1 min-w-0 min-h-0 overflow-y-auto mobile:overflow-visible gap-[1px] mobile:flex-col">
                           {children}
                         </div>
                       </div>

@@ -9,6 +9,7 @@ import ShortlinkPreferenceComponent from '@gitroom/frontend/components/settings/
 import AccountTypeComponent from '@gitroom/frontend/components/settings/account-type.component';
 import DeleteAccountComponent from '@gitroom/frontend/components/settings/delete-account.component';
 import LegalLinksComponent from '@gitroom/frontend/components/settings/legal-links.component';
+import { PasswordComponent } from '@gitroom/frontend/components/settings/password.component';
 
 const MetricComponent = dynamic(
   () => import('@gitroom/frontend/components/settings/metric.component'),
@@ -24,6 +25,7 @@ export const GlobalSettings = () => {
       <h3 className="text-[20px]">{t('global_settings', 'Global Settings')}</h3>
       <AccountTypeComponent />
       <AuthenticationComponent />
+      <PasswordComponent />
       <MetricComponent />
       <EmailNotificationsComponent />
       <ShortlinkPreferenceComponent />

@@ -1,5 +1,6 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { UsersRepository } from '@gitroom/nestjs-libraries/database/prisma/users/users.repository';
+import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { Provider, Role } from '@prisma/client';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
 import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
@@ -140,6 +141,36 @@ export class UsersService {
 
   updatePassword(id: string, password: string) {
     return this._usersRepository.updatePassword(id, password);
+  }
+
+  getPasswordUserByEmail(email: string) {
+    return this._usersRepository.getPasswordUserByEmail(email);
+  }
+
+  async passwordStatus(id: string) {
+    const user = await this._usersRepository.getPasswordHash(id);
+    return {
+      hasPassword: !!user?.password,
+      provider: user?.providerName || null,
+    };
+  }
+
+  // Settings > Password. With a password already set, the current one must
+  // match; an account made with Google or single sign-on sets its first one.
+  async setPassword(id: string, password: string, currentPassword?: string) {
+    const user = await this._usersRepository.getPasswordHash(id);
+    if (!user) {
+      throw new HttpException('Account not found', 404);
+    }
+    if (
+      user.password &&
+      (!currentPassword ||
+        !AuthService.comparePassword(currentPassword, user.password))
+    ) {
+      throw new HttpException('The current password is not right', 400);
+    }
+    await this._usersRepository.setPassword(id, password);
+    return { hasPassword: true };
   }
 
   getPersonal(userId: string) {

@@ -209,15 +209,52 @@ export class UsersRepository {
     });
   }
 
+  // the forgotten-password link: an email/password account, or a Google or
+  // single sign-on account that set a password in Settings
   updatePassword(id: string, password: string) {
     return this._user.model.user.update({
       where: {
         id,
-        providerName: Provider.LOCAL,
+        OR: [{ providerName: Provider.LOCAL }, { password: { not: '' } }],
       },
       data: {
         password: AuthService.hashPassword(password),
       },
+      select: { id: true },
+    });
+  }
+
+  // Settings > Password: the hash is only read here, never sent out
+  getPasswordHash(id: string) {
+    return this._user.model.user.findFirst({
+      where: { id, deletedAt: null },
+      select: { password: true, providerName: true },
+    });
+  }
+
+  setPassword(id: string, password: string) {
+    return this._user.model.user.update({
+      where: { id },
+      data: { password: AuthService.hashPassword(password) },
+      select: { id: true },
+    });
+  }
+
+  // A Google or single sign-on account that set a password can also sign in
+  // with email and password (an email/password account of the same email wins)
+  getPasswordUserByEmail(email: string) {
+    return this._user.model.user.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: 'insensitive',
+        },
+        providerName: { not: Provider.LOCAL },
+        password: { not: '' },
+        NOT: { password: null },
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
