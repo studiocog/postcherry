@@ -16,7 +16,7 @@ export const AccountMenu: FC<{ variant?: 'bar' | 'mobile' }> = ({
 }) => {
   const user = useUser();
   const logout = useLogout();
-  const { billingEnabled } = useVariables();
+  const { billingEnabled, adminUrl } = useVariables();
   const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useClickOutside(() => setOpen(false));
@@ -105,6 +105,26 @@ export const AccountMenu: FC<{ variant?: 'bar' | 'mobile' }> = ({
               </svg>
               {t('billing', 'Billing')}
             </Link>
+          )}
+          {!!user?.isSuperAdmin && (
+            <a
+              href={`${adminUrl || ''}/admin`}
+              target={adminUrl ? '_blank' : undefined}
+              rel="noreferrer"
+              role="menuitem"
+              className={item}
+              onClick={() => setOpen(false)}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {t('admin_hq', 'Admin (HQ)')}
+            </a>
           )}
           <div className="h-[1px] bg-newTableBorder my-[6px]" />
           <div

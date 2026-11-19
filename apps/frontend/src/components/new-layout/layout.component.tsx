@@ -60,7 +60,7 @@ const jakartaSans = Plus_Jakarta_Sans({
 export const LayoutComponent = ({ children }: { children: ReactNode }) => {
   const fetch = useFetch();
 
-  const { backendUrl, billingEnabled, isGeneral } = useVariables();
+  const { backendUrl, billingEnabled, isGeneral, adminUrl } = useVariables();
   const t = useT();
 
   // Feedback icon component attaches Sentry feedback to a top-bar icon when DSN is present
@@ -88,6 +88,8 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   if (!user) return null;
+
+  const showAdminBar = !!user?.admin && (!adminUrl || !!user?.impersonate);
 
   // a new workspace on Free picks a plan first (the long pricing page)
   const choosePlan =
@@ -127,8 +129,10 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                   jakartaSans.className
                 )}
               >
-                <div className={clsx(user?.admin && 'mb-[8px]')}>
-                  {user?.admin ? <Impersonate /> : <div />}
+                {/* the admin bar: with HQ (ADMIN_URL) it only shows while
+                    viewing the app as a customer; the tools live in HQ */}
+                <div className={clsx(showAdminBar && 'mb-[8px]')}>
+                  {showAdminBar ? <Impersonate /> : <div />}
                 </div>
                 {choosePlan ? (
                   <FirstBillingComponent />
